@@ -1,0 +1,68 @@
+# Customised analyzer configuration (standard 7.2: "stock lint presets that
+# cannot fail a build are not enforcement"). `flutter analyze` exits non-zero
+# on ANY issue it reports, so every rule below that matters is raised to
+# `error`, and the analyzer's own warnings are raised too.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    # Strict typing: no implicit dynamic, no implicit casts, no raw generics.
+    # Money and API payloads must never pass through `dynamic` unnoticed.
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  exclude:
+    # Generated platform folders and build output are not our code.
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+  errors:
+    # Lints that guard the project's rules, raised from info to error.
+    avoid_print: error                    # logs go through debugPrint, never print
+    prefer_const_constructors: error      # keeps rebuilds cheap on low-end phones
+    prefer_const_declarations: error
+    unawaited_futures: error              # a dropped Future hides a failed save
+    always_declare_return_types: error    # signatures are the documentation
+    avoid_dynamic_calls: error            # payloads are typed at the boundary
+    use_build_context_synchronously: error  # context after await is a crash
+    cancel_subscriptions: error
+    close_sinks: error
+    only_throw_errors: error
+    avoid_slow_async_io: error
+    prefer_final_locals: error
+    unnecessary_null_checks: error
+    directives_ordering: error            # one import order, no diff noise
+    # Analyzer diagnostics that are warnings by default, raised to error so a
+    # warning cannot be left to rot.
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+    unused_field: error
+    unused_catch_clause: error
+    dead_code: error
+    deprecated_member_use: error          # a deprecated API is a pending break
+    deprecated_member_use_from_same_package: error
+    invalid_use_of_visible_for_testing_member: error
+    # TODO comments are tracked in the plan, not in analyzer output. The one
+    # tolerated downgrade: they are not diagnostics worth failing a build.
+    todo: ignore
+
+linter:
+  rules:
+    # Added on top of flutter_lints (each is also an error above).
+    - avoid_print
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - unawaited_futures
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - use_build_context_synchronously
+    - cancel_subscriptions
+    - close_sinks
+    - only_throw_errors
+    - avoid_slow_async_io
+    - prefer_final_locals
+    - unnecessary_null_checks
+    - directives_ordering
+    # Tolerated: none. No flutter_lints rule is switched off.

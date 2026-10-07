@@ -72,6 +72,34 @@ curl http://127.0.0.1:5001/demo-gabay/asia-southeast1/api/api/health     # {"sta
 - The test seed (P0-02, L119): tenants "Demo Malls" (Aurora, Bayview Grand, Meridian Twin Malls, Skyline Spire; no beacons) and "Spike Venues" (the penthouse, MEZZ office and your exported spike venues), plus six accounts (`superadmin@`, `malladmin@`, `editor@`, `viewer@`, `malladmin.demo@`, `shopper@`, all `@gabay.test`). Fill the `SEED_PW_*` keys in `.env` first.
 - The verification command.
 
+### A.3 The Flutter app (`app/`, slice S3)
+
+One Flutter project, two entry points (Blueprint §2.3). Run everything from `app/`; there is no Node step.
+
+```sh
+cd app
+flutter pub get
+flutter analyze                       # must print "No issues found!"
+flutter test                          # every unit and widget test
+
+# Shopper app (phone or emulator). Debug builds call the local Functions emulator.
+flutter run -t lib/main_mobile.dart
+#   Android emulator: reach the host as 10.0.2.2, not 127.0.0.1:
+#   flutter run -t lib/main_mobile.dart --dart-define=API_BASE=http://10.0.2.2:5001/demo-gabay/asia-southeast1/api
+
+# Admin web page (path URLs, no #)
+flutter run -d chrome -t lib/main_admin.dart
+
+# Test-rendered screenshots: both shells, light and dark, phone and tablet (8 PNGs)
+flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<an existing folder outside the repo>
+
+# Builds. A release build REQUIRES --dart-define=API_BASE=<https url>; without it the app refuses to start.
+flutter build web -t lib/main_admin.dart --dart-define=API_BASE=<https url>
+flutter build apk --debug -t lib/main_mobile.dart
+```
+
+Build stamps come from `--dart-define` (`APP_VERSION`, `BUILD_NUMBER`, `GIT_COMMIT`, `BUILD_TIME`); a plain `flutter run` shows the committed fallbacks. Android: `minSdk 24`, applicationId `com.dynamiqes.gabay`. iOS: deployment target 15.0 (Xcode project and `ios/Podfile`); iOS builds need the team's Mac.
+
 ## Gotchas
 
 - The schema's first teardown run prints "does not exist, skipping" notices; they are not errors.
