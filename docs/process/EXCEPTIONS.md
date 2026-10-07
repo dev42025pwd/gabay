@@ -1,6 +1,6 @@
 # Gabay — EXCEPTIONS.md
 
-> **Status**: IN FORCE. E-02 to E-10 and E-12 to E-16 are approved, each with expiry 2027-04-02, by the product owner under delegation from Raphael Mendoza, held since the project started (plan L115, 2026-10-07). E-01 and E-11 are withdrawn. The P0 gate's §1 item is met | **Date**: 2026-10-07 | **Owner**: Gabay developer | **Approver**: Allan Young (Raphael Mendoza if Allan works on Gabay); exercised under Raphael Mendoza's delegation by the product owner (L115)
+> **Status**: IN FORCE. E-02 to E-10 and E-12 to E-17 are approved, each with expiry 2027-04-02, by the product owner under delegation from Raphael Mendoza, held since the project started (plan L115, 2026-10-07). E-01 and E-11 are withdrawn. The P0 gate's §1 item is met | **Date**: 2026-10-07 | **Owner**: Gabay developer | **Approver**: Allan Young (Raphael Mendoza if Allan works on Gabay); exercised under Raphael Mendoza's delegation by the product owner (L115)
 > **Audience**: the tech lead and auditors | **Scope**: deviations from the Dynamiq Engineering Standards v1.0
 > *Standard §1 and Appendix C.1: every §1 deviation is either reversed or has written lead sign-off with an expiry date here before the P0 gate passes. An entry without an expiry date "becomes the standard by silence".*
 
@@ -24,6 +24,7 @@ An entry is in force only once **Approved by** and **Approved on** are filled in
 | E-14 | §1 stack table (a library §1 does not name) | `@techstark/opencv-js` 5.x (OpenCV's WebAssembly build; Apache-2.0), in the admin web page only, for the image processing of scanned plans (thresholding, line and contour detection) | L108, L109: classical image processing in the browser, no AI. 5.0.0-release.1 (npm, read 2026-10-07; a release tag, recheck at P1). DXF is read by Gabay's own code instead of `dxf-parser`, which has been unmaintained since 2021 | 2027-04-02 | Product owner (L109), under delegation from Raphael Mendoza; signed L115 | 2026-10-07; signed 2026-10-07 |
 | E-15 | §1 stack table (a library §1 does not name) | `cupertino_icons` 2.x, in the Flutter app | L126: added by `flutter create` (S3). Removing it makes the build warn that the Cupertino icon font is missing; it is Flutter's own icon font package and carries no code | 2027-04-02 | Product owner (L126), under delegation from Raphael Mendoza | 2026-10-07 |
 | E-16 | §1 stack table (a library §1 does not name) | `flutter_lints` 6.x (dev only), in the Flutter app | L126: the Flutter team's lint set, which the strict `analysis_options.yaml` (§7.2: "a customized `analysis_options.yaml`") includes and then tightens. Ships in no build | 2027-04-02 | Product owner (L126), under delegation from Raphael Mendoza | 2026-10-07 |
+| E-17 | §1 stack table (a library §1 does not name) | `intl` 0.20.x (`^0.20.3`), in the Flutter app | L127: required by the Flutter SDK's `flutter_localizations`, which generates the ARB wording (L126, L99); the SDK constrains its version. Message formatting only | 2027-04-02 | Product owner (L127), under delegation from Raphael Mendoza | 2026-10-07 |
 
 ## Checked and not exceptions
 
@@ -42,6 +43,7 @@ An entry is in force only once **Approved by** and **Approved on** are filled in
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | E-17 added and approved by the product owner under delegation from Raphael Mendoza (plan 0.62, L127): `intl`, required by the SDK's `flutter_localizations` for ARB wording (L126) |
 | 2026-10-07 | E-15 and E-16 added and approved by the product owner under delegation from Raphael Mendoza (plan 0.61, L126): `cupertino_icons` and `flutter_lints`, both added by `flutter create` in S3 |
 | 2026-10-07 | All entries signed (plan 0.52, L115): E-02 to E-04 approved and E-05 to E-10, E-12 to E-14 signed by the product owner under delegation from Raphael Mendoza, with expiry 2027-04-02; E-03's stale MSSQL wording corrected |
 | 2026-10-07 | E-12's reason updated (plan 0.51): OQ10 was closed by L109; no change to the request |
