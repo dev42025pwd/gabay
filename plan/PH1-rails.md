@@ -108,7 +108,7 @@ Each is about 60 lines, names the file and line it fails on, and has a test that
 
 Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error text to users" lint, which FEATURE_PIPELINE §5.1 names as enforcers. Deferred to the slice that creates the thing they guard: published-version immutability (P0-03; the database trigger already exists) and the Public-Read package allow-list (the first public route).
 
-### S5 — Hooks and `npm run verify`
+### S5 — Hooks and `npm run verify` — DONE 2026-10-07 (report: `phase-reports/phase-1/S5.md`)
 - L126 (from the S2 review): `verify` also starts the Functions emulator, checks `GET …/api/api/health` answers `{ status: "ok", db: "ok" }` with an `X-Request-Id`, and stops it; ESLint, Prettier and the tests cover `db/tools/` as well as `functions/`.
 - `npm run verify` runs, in order: `node --check` on the critical files; every linter; ESLint; Prettier check; the API tests; `schema.sql` twice on the local PostgreSQL; the seed (Auth emulator); `flutter analyze`; `flutter test`. It prints one line per check with its result, ends `ALL GREEN` or lists the failures, and exits with the failure count.
 - `.githooks/pre-commit`: the secret guard (pure shell); the version bump and changelog date stamp for the surface touched (Node, so the date is right on Windows; L129: the patch is raised, 0.1.0 → 0.1.1, unless the version was raised by hand in the same commit; `app/lib/core`, `app/lib/shared` and `l10n` touch both surfaces); the changelog duplicate guard; the linters for the staged paths.
