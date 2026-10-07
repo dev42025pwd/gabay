@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.2 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`) | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.3 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -62,7 +62,7 @@ Each slice ends with its evidence pasted into the slice report (outputs with exi
 
 ### S2 — API skeleton (`functions/`) — BUILT 2026-10-07 by api-coder; awaiting dod-reviewer
 Checklist items, adapted where Cloud Functions differ (§6 lists each adaptation):
-- **§3.1** middleware order: `trust proxy` hop count from env (default 1) → `x-powered-by` off → `helmet` → `cors` allow-list from `CORS_ORIGINS` (loud warning on the permissive fallback) → 5 MB body limit (`MAX_JSON_BODY`) → audit-logger slot (filled in Phase 2) → `/api` no-store headers → rate-limiter slot (Phase 2) → routes → 404 → error handler.
+- **§3.1** middleware order: `trust proxy` hop count from env (default 1) → `x-powered-by` off → `helmet` → `cors` allow-list from `CORS_ORIGINS` (loud warning on the permissive fallback) → 5 MB body limit (`MAX_JSON_BODY`) → `requestId` (L126: incoming `X-Request-Id` if sane, else a new UUID; echoed; bound to the log) → `actorContext` slot (L126: Phase 2 fills it) → audit-logger slot (filled in Phase 2) → `/api` no-store headers → rate-limiter slot (Phase 2) → routes → 404 → error handler.
 - **§3.16** config: `.env.example` heavily commented; the env loaded by absolute path; fail fast on missing required config; the `GlobalSetting` resolver (frozen defaults, 30 s cache, never throws, `PUBLIC_FLAGS` allow-list).
 - **§3.8** one error shape `{ error }`; PostgreSQL errors logged, never echoed; unique-violation (`23505`) → 409; `err.httpStatus` for domain errors.
 - **§3.9** the DB layer: one `pg` pool (explicit size and timeouts from env), `query(text, params)` that refuses a call without a params array, `withTransaction(fn)` (BEGIN/COMMIT/ROLLBACK), boot log without the password; `decimal.js` set once (precision 18, half-up) for money.
@@ -109,6 +109,7 @@ Each is about 60 lines, names the file and line it fails on, and has a test that
 Deferred to the slice that creates the thing they guard: published-version immutability (P0-03; the database trigger already exists) and the Public-Read package allow-list (the first public route).
 
 ### S5 — Hooks and `npm run verify`
+- L126 (from the S2 review): `verify` also starts the Functions emulator, checks `GET …/api/api/health` answers `{ status: "ok", db: "ok" }` with an `X-Request-Id`, and stops it; ESLint, Prettier and the tests cover `db/tools/` as well as `functions/`.
 - `npm run verify` runs, in order: `node --check` on the critical files; every linter; ESLint; Prettier check; the API tests; `schema.sql` twice on the local PostgreSQL; the seed (Auth emulator); `flutter analyze`; `flutter test`. It prints one line per check with its result, ends `ALL GREEN` or lists the failures, and exits with the failure count.
 - `.githooks/pre-commit`: the secret guard (pure shell); the version bump and changelog date stamp for the surface touched (Node, so the date is right on Windows); the changelog duplicate guard; the linters for the staged paths.
 - `.githooks/pre-push`: `npm run verify`.
@@ -132,6 +133,8 @@ Deferred to the slice that creates the thing they guard: published-version immut
 - dod-reviewer runs `npm run verify` in a fresh context.
 - `phase-reports/phase-1.md`: each gate condition with its evidence; the documents synced (Blueprint pins and §2.3, pipeline, INSTALL, smoke guide, CLAUDE.md); the modules page republished. **You sign it.**
 
+**Slice reports (L126):** each slice's full evidence (the coder's pasted outputs, the main session's re-runs, dod-reviewer's findings and the fixes) is kept in `phase-reports/phase-1/S<n>.md`, which the gate report (S8) links.
+
 ## 5. DESIGN CHOICES (for your approval with this plan)
 
 | # | Choice | Alternative, and why it was passed over |
@@ -154,6 +157,9 @@ Deferred to the slice that creates the thing they guard: published-version immut
 | §3.9 `.input(name, type, value)`, `OUTPUT inserted.*` | `$1…$n` parameters; `RETURNING *` | `pg` and PostgreSQL (E-06, E-07) |
 | A.6 `GO` splitter | Not applicable. Each schema or migration file runs as one `pg` query inside a transaction, with no parameters. Verified 2026-10-07 on the local database: three statements in one parameterless `query` returned three results; with parameters, PostgreSQL refuses ("cannot insert multiple commands into a prepared statement") | `GO` is a SQL Server batch separator |
 | §3.11 `OFFSET/FETCH` | `LIMIT/OFFSET` | PostgreSQL |
+| §3.16 "`dotenv` line 1" | Node's built-in `process.loadEnvFile()` on the root `.env` by absolute path; a variable already in the environment wins (checked on Node 22) | Same behaviour with no extra package; added by L126 after the S2 review |
+| A.7 DATE as a local-midnight `Date`, projected later | `pg` returns `DATE` as `YYYY-MM-DD` text; `projectDates()` still fixes the output form | Gabay is UTC everywhere (Blueprint invariant 12), so there is no local midnight to shift; added by L126 |
+| §3.10 `toLocalDateOnly()` and local-ISO formatters | Not built | UTC everywhere (invariant 12): a `YYYY-MM-DD` string binds as is; added by L126 |
 
 ## 7. Open items (asked when the slice reaches them, not assumed)
 
