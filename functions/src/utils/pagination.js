@@ -62,10 +62,13 @@ function likePattern(search) {
  * @param {ReturnType<typeof parsePaging>} args.paging
  */
 async function runPaged({ query, select, from, where = '', params = [], paging }) {
+  // sql-identifiers: caller-written fragments (select, from, where use $n placeholders), never client text
   const whereSql = where ? `WHERE ${where}` : '';
+  // sql-identifiers: caller-written fragments (select, from, where use $n placeholders), never client text
   const count = await query(`SELECT COUNT(*) AS n FROM ${from} ${whereSql}`, params);
   const limitAt = params.length + 1;
   const page = await query(
+    // sql-identifiers: select, from, where as above; orderBy is built from the caller's sortMap allow-list
     `SELECT ${select} FROM ${from} ${whereSql} ORDER BY ${paging.orderBy} LIMIT $${limitAt} OFFSET $${limitAt + 1}`,
     [...params, paging.pageSize, paging.offset],
   );

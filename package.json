@@ -10,6 +10,9 @@
     "setup-db": "npm --prefix db/tools run setup-db --",
     "migrate": "npm --prefix db/tools run migrate",
     "api:test": "npm --prefix functions test",
-    "api:lint": "npm --prefix functions run lint && npm --prefix functions run format:check"
+    "api:lint": "npm --prefix functions run lint && npm --prefix functions run format:check",
+    "lint:structural": "node tools/lint/run.js",
+    "test:schema-forms": "node tools/lint/run.js schema-forms",
+    "lint:test": "node --test \"tools/lint/test/**/*.test.js\""
   }
 }
