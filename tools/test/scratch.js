@@ -1,6 +1,7 @@
-// Test helpers: a scratch git repository carrying the real hooks, the real linters and the real
-// version and changelog files, so the hooks are exercised exactly as they run. Never touches the
-// real repository. Plain CommonJS.
+// Test helpers: a scratch git repository carrying the real hooks and linters and FIXED COPIES of the
+// version, changelog and ARB files (tools/test/fixtures), so the hooks are exercised exactly as they
+// run and no test depends on the live files. (The live files move with every stamped commit; tests
+// that read them failed once hooks were on.) Never touches the real repository. Plain CommonJS.
 'use strict';
 
 const fs = require('node:fs');
@@ -17,10 +18,17 @@ const COPIED = [
   'tools/lint',
   'tools/fingerprint.js',
   '.claude/hooks',
-  'app/lib/core/config/app_version.dart',
-  'app/lib/core/config/changelog.dart',
-  'app/lib/l10n/app_en.arb',
+  '.gitignore',
+  'app/.gitignore',
 ];
+
+/** Fixed fixture -> where it sits in a scratch repo. */
+const FIXTURES = path.join(__dirname, 'fixtures');
+const FIXTURE_FILES = {
+  'app_version.dart': 'app/lib/core/config/app_version.dart',
+  'changelog.dart': 'app/lib/core/config/changelog.dart',
+  'app_en.arb': 'app/lib/l10n/app_en.arb',
+};
 
 /**
  * A test folder or node_modules inside the repository: not copied into a scratch repo. It looks at
@@ -71,6 +79,10 @@ function scratchRepo(extra = {}) {
   git(dir, ['config', 'core.autocrlf', 'false']);
   git(dir, ['config', 'core.hooksPath', '.githooks']);
   for (const rel of COPIED) copy(rel, dir);
+  for (const [name, rel] of Object.entries(FIXTURE_FILES)) {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    fs.copyFileSync(path.join(FIXTURES, name), path.join(dir, rel));
+  }
   fs.writeFileSync(path.join(dir, '.gitattributes'), '* text=auto eol=lf\n');
   for (const [rel, content] of Object.entries(extra)) write(dir, rel, content);
   // The hooks must run as committed: mark them executable in the index.
@@ -94,4 +106,4 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 const headFile = (dir, rel) => git(dir, ['show', `HEAD:${rel}`]).out;
 const remove = (dir) => fs.rmSync(dir, { recursive: true, force: true });
 
-module.exports = { isTestPath, REAL, scratchRepo, git, write, read, headFile, remove };
+module.exports = { isTestPath, FIXTURES, REAL, scratchRepo, git, write, read, headFile, remove };

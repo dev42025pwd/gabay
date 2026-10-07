@@ -8,7 +8,7 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
-const { REAL, scratchRepo, git, write, read, headFile, remove } = require('./scratch');
+const { REAL, FIXTURES, scratchRepo, git, write, read, headFile, remove } = require('./scratch');
 const stamp = require('../hooks/stamp');
 const { checkChangelogDart } = require('../hooks/changelog-guard');
 
@@ -75,7 +75,10 @@ for (const [label, version, date, expected] of [
 }
 
 test('stamp (C1): plan never keeps a version that is empty, not semver, or not above HEAD', () => {
-  const head = { versionSrc: read(REAL, VERSION), changelogSrc: read(REAL, CHANGELOG) };
+  const head = {
+    versionSrc: fs.readFileSync(path.join(FIXTURES, 'app_version.dart'), 'utf8'),
+    changelogSrc: fs.readFileSync(path.join(FIXTURES, 'changelog.dart'), 'utf8'),
+  };
   const staged = (fallback) => ({
     versionSrc: head.versionSrc.replace(
       "mobileFallbackVersion = '0.1.0'",
@@ -86,7 +89,12 @@ test('stamp (C1): plan never keeps a version that is empty, not semver, or not a
   const paths = ['app/lib/features/shopper/views/home.dart'];
   const pick = (fallback) =>
     stamp.plan({ paths, head, staged: staged(fallback) }).find((d) => d.surface === 'mobile');
-  assert.deepEqual(pick('0.2.0'), { surface: 'mobile', version: '0.2.0', reason: 'kept' });
+  assert.deepEqual(pick('0.2.0'), {
+    surface: 'mobile',
+    version: '0.2.0',
+    reason: 'kept',
+    entryNumber: 1,
+  });
   assert.equal(pick('0.1.0-beta').version, '0.1.1');
   assert.equal(pick('').version, '0.1.1');
   assert.equal(pick('0.0.5').version, '0.1.1', 'lower than HEAD is bumped from HEAD, not kept');
@@ -301,17 +309,22 @@ test('verify (I4): an interrupt never kills a foreign process listening on an em
 // ---- I5: a renumbered copy that reuses an entry's bullets ---------------------------------------------------------
 
 test('duplicate guard (I5): two entries of one surface that reference the same bullets function are refused', () => {
-  const src = read(REAL, CHANGELOG).replace(
-    'const List<ChangelogEntry> mobileChangelog = [\n',
-    "const List<ChangelogEntry> mobileChangelog = [\n  ChangelogEntry(\n    number: 2,\n    version: '0.1.0',\n    date: '2026-10-07',\n    bullets: _mobileE001,\n  ),\n",
-  );
+  const src = fs
+    .readFileSync(path.join(FIXTURES, 'changelog.dart'), 'utf8')
+    .replace(
+      'const List<ChangelogEntry> mobileChangelog = [\n',
+      "const List<ChangelogEntry> mobileChangelog = [\n  ChangelogEntry(\n    number: 2,\n    version: '0.1.0',\n    date: '2026-10-07',\n    bullets: _mobileE001,\n  ),\n",
+    );
   const problems = checkChangelogDart(src);
   assert.equal(problems.length, 1);
   assert.match(
     problems[0].message,
     /mobile changelog entries 1 and 2 both use bullets _mobileE001/,
   );
-  assert.deepEqual(checkChangelogDart(read(REAL, CHANGELOG)), []);
+  assert.deepEqual(
+    checkChangelogDart(fs.readFileSync(path.join(FIXTURES, 'changelog.dart'), 'utf8')),
+    [],
+  );
 });
 
 test('duplicate guard (I5): the commit is refused', () => {

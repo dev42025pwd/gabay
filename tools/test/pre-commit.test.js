@@ -37,7 +37,7 @@ const commit = (dir, args = []) =>
 test('secret guard: a staged .env is refused; .env.example and the other templates are allowed', () => {
   withRepo((dir) => {
     write(dir, '.env', 'PGPASSWORD=hunter2\n');
-    git(dir, ['add', '.env']);
+    git(dir, ['add', '-f', '.env']);
     const refused = commit(dir);
     assert.notEqual(refused.status, 0);
     assert.match(refused.all, /refusing to commit secrets: \.env/);
@@ -48,9 +48,9 @@ test('secret guard: a staged .env is refused; .env.example and the other templat
       write(dir, name, 'PGPASSWORD=\n');
     }
     write(dir, 'app/.env.local', 'X=1\n');
-    git(dir, ['add', '.env.example', '.env.sample', '.env.template', '.env.dist']);
+    git(dir, ['add', '-f', '.env.example', '.env.sample', '.env.template', '.env.dist']);
     assert.equal(commit(dir).status, 0, 'templates pass');
-    git(dir, ['add', 'app/.env.local']);
+    git(dir, ['add', '-f', 'app/.env.local']);
     const nested = commit(dir);
     assert.notEqual(nested.status, 0, 'a nested .env.local is refused too');
     assert.match(nested.all, /app\/\.env\.local/);
@@ -60,7 +60,7 @@ test('secret guard: a staged .env is refused; .env.example and the other templat
 test('secret guard: it fires even when Node is not on the PATH', () => {
   withRepo((dir) => {
     write(dir, '.env', 'X=1\n');
-    git(dir, ['add', '.env']);
+    git(dir, ['add', '-f', '.env']);
     // A PATH with git but no node (git's own folder only).
     // git itself, plus its bundled sh and coreutils; no node anywhere. On Windows that is Git for
     // Windows' cmd, mingw64/bin and usr/bin (found from `git --exec-path`).

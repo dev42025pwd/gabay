@@ -30,7 +30,30 @@ const SCREEN_PATHS = [
 ];
 const isChangelogKey = (key) => /^@?changelog/.test(key);
 const isMetadataKey = (key) => key.startsWith('@');
-const WAIVER = /^[ \t]*Changelog waived:[ \t]*(\S.*)$/m;
+
+/**
+ * The reason of a "Changelog waived: <reason>" line in the assistant's last message, or null.
+ * The line may start with a list marker (- * +) and may be bold; the words are matched in any case;
+ * lines inside ``` code fences are ignored (an example is not a waiver); and the reason must be
+ * real: the template text <reason>, or text with no letter in it (".", "...", "123"), does not count.
+ */
+const WAIVER_LINE =
+  /^[ \t]*(?:[-*+][ \t]+)?(?:\*\*|__)?[ \t]*changelog waived[ \t]*(?:\*\*|__)?[ \t]*:[ \t]*(?:\*\*|__)?[ \t]*(\S.*)$/i;
+function waiverReason(message) {
+  let inFence = false;
+  for (const line of String(message ?? '').split(/\r?\n/)) {
+    if (/^[ \t]*```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const reason = WAIVER_LINE.exec(line)?.[1]
+      .replace(/(\*\*|__)\s*$/, '')
+      .trim();
+    if (reason && reason.toLowerCase() !== '<reason>' && /\p{L}/u.test(reason)) return reason;
+  }
+  return null;
+}
 
 const git = (args) =>
   execFileSync('git', args, {
@@ -118,14 +141,18 @@ async function main() {
   let result;
   try {
     result = assess(baselineHead(event.session_id));
-  } catch {
-    return; // not a git repo, or git is unavailable: never trap the session on our own failure
+  } catch (err) {
+    // Fail closed, like stop-verify: when git cannot say what changed, do not finish on trust.
+    block(
+      `Could not tell whether screens changed (${String(err.message).split('\n')[0]}). Check the repository and try again.`,
+    );
+    return;
   }
   if (result.screens.length === 0 || result.hasEntry) return;
   const list = result.screens.slice(0, 6).join(', ') + (result.screens.length > 6 ? ', ...' : '');
-  const waiver = WAIVER.exec(String(event.last_assistant_message ?? ''));
+  const waiver = waiverReason(event.last_assistant_message);
   if (waiver) {
-    notice(`changelog waived for the screen changes (${list}): ${waiver[1].trim()}`);
+    notice(`changelog waived for the screen changes (${list}): ${waiver}`);
     return;
   }
   block(

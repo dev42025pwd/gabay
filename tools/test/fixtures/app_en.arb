@@ -1,0 +1,107 @@
+{
+  "@@locale": "en",
+
+  "appName": "Gabay",
+  "@appName": { "description": "The product name, shown in the app bar, the home heading and the OS task switcher." },
+  "surfaceMobileName": "Shopper app",
+  "@surfaceMobileName": { "description": "Subtitle on the placeholder home screen of the shopper (mobile) app." },
+  "surfaceAdminName": "Admin",
+  "@surfaceAdminName": { "description": "Subtitle on the placeholder home screen of the admin web page." },
+
+  "aboutTitle": "About",
+  "@aboutTitle": { "description": "Title of the About page's app bar." },
+  "aboutAction": "About this app",
+  "@aboutAction": { "description": "Button on the home screen that opens the About page." },
+  "backAction": "Back",
+  "@backAction": { "description": "Screen-reader name and tooltip of the back arrow in an app bar." },
+  "whatsNewTitle": "What is new",
+  "@whatsNewTitle": { "description": "Heading above the list of changes (the changelog) on the About page." },
+  "skeletonStatus": "Skeleton only: no features yet",
+  "@skeletonStatus": { "description": "Status note on the Phase 1 placeholder home screen, shown with an info icon." },
+  "showSuccessAction": "Show a success message",
+  "@showSuccessAction": { "description": "Placeholder-screen button that demonstrates the success banner." },
+  "showErrorAction": "Show an error message",
+  "@showErrorAction": { "description": "Placeholder-screen button that demonstrates the error banner." },
+  "sampleSuccess": "Saved. This is a sample message.",
+  "@sampleSuccess": { "description": "Sample text shown in the success banner by the placeholder screen." },
+  "sampleError": "Something went wrong. This is a sample message.",
+  "@sampleError": { "description": "Sample text shown in the error banner by the placeholder screen." },
+
+  "versionLine": "Version: {value}",
+  "@versionLine": {
+    "description": "Version line on the home and About pages.",
+    "placeholders": { "value": { "type": "String", "example": "0.1.0" } }
+  },
+  "buildLine": "Build: {value}",
+  "@buildLine": {
+    "description": "Build-number line on the home and About pages.",
+    "placeholders": { "value": { "type": "String", "example": "42" } }
+  },
+  "commitLine": "Commit: {value}",
+  "@commitLine": {
+    "description": "Source-control commit line on the home and About pages.",
+    "placeholders": { "value": { "type": "String", "example": "a1b2c3d" } }
+  },
+  "builtLine": "Built: {value}",
+  "@builtLine": {
+    "description": "Build-time line on the home and About pages.",
+    "placeholders": { "value": { "type": "String", "example": "2026-10-07T08:00:00Z" } }
+  },
+
+  "messageErrorPrefix": "Error",
+  "@messageErrorPrefix": { "description": "Spoken and written prefix of an error banner, so status is never colour alone." },
+  "messageSuccessPrefix": "Success",
+  "@messageSuccessPrefix": { "description": "Spoken and written prefix of a success banner, so status is never colour alone." },
+  "messageDismissAction": "Dismiss message",
+  "@messageDismissAction": { "description": "Screen-reader name of the close button on a banner." },
+
+  "errorBadRequest": "That request was not valid. Check what you entered and try again.",
+  "@errorBadRequest": { "description": "Friendly copy for HTTP 400 when the server sent no message." },
+  "errorUnauthenticated": "Your session has ended. Please sign in again.",
+  "@errorUnauthenticated": { "description": "Friendly copy for HTTP 401." },
+  "errorForbidden": "You do not have permission to do that.",
+  "@errorForbidden": { "description": "Friendly copy for HTTP 403." },
+  "errorNotFound": "We could not find that.",
+  "@errorNotFound": { "description": "Friendly copy for HTTP 404." },
+  "errorConflict": "That conflicts with something that already exists.",
+  "@errorConflict": { "description": "Friendly copy for HTTP 409 (for example a duplicate)." },
+  "errorTooLarge": "That is too large to send.",
+  "@errorTooLarge": { "description": "Friendly copy for HTTP 413." },
+  "errorInvalid": "Some of the details are not valid.",
+  "@errorInvalid": { "description": "Friendly copy for HTTP 422." },
+  "errorTooManyRequests": "Too many requests. Wait a moment and try again.",
+  "@errorTooManyRequests": { "description": "Friendly copy for HTTP 429." },
+  "errorServer": "Something went wrong on our side. Please try again shortly.",
+  "@errorServer": { "description": "Friendly copy for HTTP 5xx other than 503." },
+  "errorUnavailable": "The service is not available right now. Please try again shortly.",
+  "@errorUnavailable": { "description": "Friendly copy for HTTP 503." },
+  "errorTimeout": "The server took too long to answer. Please try again.",
+  "@errorTimeout": { "description": "Copy when a request timed out (no response)." },
+  "errorNoConnection": "Cannot reach the server. Check your connection and try again.",
+  "@errorNoConnection": { "description": "Copy when there is no network path to the server." },
+  "errorCancelled": "The request was cancelled.",
+  "@errorCancelled": { "description": "Copy when a request was cancelled before it finished." },
+  "errorUnexpectedReply": "The server sent a reply we could not read.",
+  "@errorUnexpectedReply": { "description": "Copy when the server's reply was malformed." },
+  "errorGeneric": "Something went wrong. Please try again.",
+  "@errorGeneric": { "description": "Last-resort copy; also replaces any text that looks like a raw exception or stack trace." },
+
+  "validatorRequired": "{label} is required.",
+  "@validatorRequired": {
+    "description": "Form validation: a mandatory field is empty. The label is the field's own name.",
+    "placeholders": { "label": { "type": "String", "example": "Venue name" } }
+  },
+  "validatorTooLong": "{label} must be at most {max} characters.",
+  "@validatorTooLong": {
+    "description": "Form validation: the text is longer than the field allows.",
+    "placeholders": {
+      "label": { "type": "String", "example": "Code" },
+      "max": { "type": "int", "example": "3" }
+    }
+  },
+
+  "changelogMobile_e001_a": "The Gabay shopper app now starts. It has no features yet.",
+  "@changelogMobile_e001_a": { "description": "Shopper-app changelog, entry e001, first bullet. Plain language for shoppers." },
+  "changelogAdmin_e001_a": "The Gabay admin page now starts. It has no features yet.",
+  "@changelogAdmin_e001_a": { "description": "Admin changelog, entry e001, first bullet. Plain language for mall staff." }
+}

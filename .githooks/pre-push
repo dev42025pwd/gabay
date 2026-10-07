@@ -2,18 +2,41 @@
 # Gabay pre-push (standard §8.1, L121): the push is refused unless `npm run verify` is green.
 # Incident this prevents: broken code reaching the shared branch because the local checks were skipped.
 #
-# verify checks the WORKING TREE, not the commits being pushed. So a green verify proves nothing about
-# the pushed commits when code has uncommitted or untracked changes: this hook refuses the push first
-# (documents, *.md, do not count). Commit or stash them. (Alternative passed over: verify in a clean
-# worktree of the pushed commit; node_modules and the Flutter dependencies would have to be rebuilt on
-# every push.)
-#
-# Then it runs tools/verify.js under Node 22 (the same file `npm run verify` runs); its exit code is the
-# number of failed checks, so any failure blocks the push. It takes minutes: it applies the schema,
-# seeds the database and runs the Flutter tests. Skip it only with `git push --no-verify`, and CI
-# (lint.yml) will still refuse the merge.
+# verify checks the WORKING TREE, so it only speaks for what is pushed when the pushed commit IS the
+# checked-out one and the tree is clean. This hook therefore
+#   1. reads the refs git is about to push (stdin: "<local ref> <local sha> <remote ref> <remote sha>")
+#      and refuses unless every one, apart from deletions, points at the current HEAD: check out the
+#      branch you are pushing and push from it. A deletion (local sha all zeros) pushes no code, so a
+#      push of only deletions passes without verify;
+#   2. refuses while code has uncommitted or untracked changes (documents, *.md, do not count);
+#   3. runs tools/verify.js under Node 22 (the same file `npm run verify` runs); its exit code is the
+#      number of failed checks, so any failure blocks the push. It takes minutes: it applies the schema,
+#      seeds the database and runs the Flutter tests.
+# (Alternative passed over: verify in a clean worktree of the pushed commit; node_modules and the
+# Flutter dependencies would have to be rebuilt on every push.) Skip it only with `git push --no-verify`;
+# CI (lint.yml) will still refuse the merge.
 root=$(git rev-parse --show-toplevel) || exit 1
 cd "$root" || exit 1
+
+zero=0000000000000000000000000000000000000000
+head=$(git rev-parse HEAD 2>/dev/null)
+code_refs=0
+wrong=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+  case "$local_sha" in
+    "$zero" | 0000000000000000000000000000000000000000000000000000000000000000) continue ;;
+  esac
+  code_refs=$((code_refs + 1))
+  [ "$local_sha" = "$head" ] || wrong="$wrong $local_ref"
+done
+# Only deletions (or nothing): no code is being pushed, so there is nothing to verify.
+[ "$code_refs" -eq 0 ] && exit 0
+if [ -n "$wrong" ]; then
+  echo "pre-push: verify checks what is checked out, and these refs are not the checked-out commit:$wrong" >&2
+  echo "Check out the branch you are pushing and push from it." >&2
+  exit 1
+fi
 
 # The same set of paths the code fingerprint covers (tools/fingerprint.js).
 dirty=$(git -c core.quotePath=false status --porcelain --untracked-files=all -- \
@@ -27,7 +50,7 @@ if [ -n "$dirty" ]; then
 fi
 
 . "$root/.githooks/node.sh"
-gabay_node tools/verify.js
+gabay_node tools/verify.js </dev/null
 status=$?
 if [ "$status" -ne 0 ]; then
   echo "pre-push: npm run verify failed ($status check(s)); the push is refused." >&2

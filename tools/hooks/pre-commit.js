@@ -98,20 +98,22 @@ function lint(files) {
   const node = process.execPath;
   if (files.length > 0) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gabay-staged-'));
+    let refused = false;
     try {
       git(['checkout-index', '-a', '-f', `--prefix=${tmp.split(path.sep).join('/')}/`]);
-      for (let i = 0; i < files.length; i += LINT_CHUNK) {
+      for (let i = 0; i < files.length && !refused; i += LINT_CHUNK) {
         const r = spawnSync(
           node,
           ['tools/lint/run.js', '--root', tmp, '--files', ...files.slice(i, i + LINT_CHUNK)],
           { stdio: 'inherit' },
         );
-        if (r.status !== 0)
-          refuse('a structural linter refused the staged files', ['see the lines above']);
+        refused = r.status !== 0;
       }
     } finally {
+      // Always, before anything can exit the process: refuse() ends it, and would skip this.
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+    if (refused) refuse('a structural linter refused the staged files', ['see the lines above']);
   }
   const migrations = spawnSync(
     node,

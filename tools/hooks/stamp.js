@@ -115,21 +115,32 @@ function isAbove(a, b) {
 
 const fallbackPattern = (surface) => new RegExp(`(${surface}FallbackVersion\\s*=\\s*')([^']*)(')`);
 
-/** The text of one surface's changelog list, from its declaration to the end of the first entry. */
-function topEntryRange(changelogSrc, surface) {
+/** The entries of one surface's changelog list: [{ from, to }] in file order (newest first). */
+function entryRanges(changelogSrc, surface) {
   const decl = changelogSrc.indexOf(`List<ChangelogEntry> ${surface}Changelog`);
-  if (decl === -1) return null;
-  const from = changelogSrc.indexOf('ChangelogEntry(', decl + 1);
-  if (from === -1) return null;
-  // The first entry ends at the first "),\n" after it (entries do not nest parentheses).
-  const rel = changelogSrc.slice(from).search(/\)\s*,?\s*(\]|ChangelogEntry\()/);
-  return { from, to: rel === -1 ? changelogSrc.length : from + rel };
+  if (decl === -1) return [];
+  const next = changelogSrc.indexOf('List<ChangelogEntry>', decl + 1);
+  const end = next === -1 ? changelogSrc.length : next;
+  const starts = [];
+  for (let at = changelogSrc.indexOf('ChangelogEntry(', decl + 1); at !== -1 && at < end;) {
+    starts.push(at);
+    at = changelogSrc.indexOf('ChangelogEntry(', at + 1);
+  }
+  return starts.map((from, i) => ({ from, to: i + 1 < starts.length ? starts[i + 1] : end }));
+}
+
+/** The entry with this number, or the top (newest) entry when no number is given. */
+function entryRange(changelogSrc, surface, number) {
+  const ranges = entryRanges(changelogSrc, surface);
+  if (number === undefined || number === null) return ranges[0] ?? null;
+  const numberOf = (r) => Number(/number:\s*(\d+)/.exec(changelogSrc.slice(r.from, r.to))?.[1]);
+  return ranges.find((r) => numberOf(r) === number) ?? null;
 }
 
 /** { fallback, topVersion, topDate, topNumber } for one surface; a missing piece is null. */
 function readSurface(versionSrc, changelogSrc, surface) {
   const fb = fallbackPattern(surface).exec(versionSrc);
-  const range = topEntryRange(changelogSrc, surface);
+  const range = entryRange(changelogSrc, surface);
   const entry = range ? changelogSrc.slice(range.from, range.to) : '';
   return {
     fallback: fb ? fb[2] : null,
@@ -140,12 +151,14 @@ function readSurface(versionSrc, changelogSrc, surface) {
 }
 
 /**
- * Both sources with one surface's fallback, and top entry version and date, set (date null: leave it).
- * It touches only those literals, so it is safe on a file that has other edits of its own.
+ * Both sources with one surface's fallback, and ONE entry's version and date, set (date null: leave
+ * it). The entry is the one with `entryNumber` (the entry being committed); without a number it is the
+ * top entry. A draft entry above it is never touched. If the entry is not in the text, only the
+ * fallback changes. Only those literals change, so it is safe on a file that has other edits.
  */
-function stampSurface(versionSrc, changelogSrc, surface, version, date) {
+function stampSurface(versionSrc, changelogSrc, surface, version, date, entryNumber) {
   const nextVersionSrc = versionSrc.replace(fallbackPattern(surface), `$1${version}$3`);
-  const range = topEntryRange(changelogSrc, surface);
+  const range = entryRange(changelogSrc, surface, entryNumber);
   if (!range) return { versionSrc: nextVersionSrc, changelogSrc };
   let entry = changelogSrc
     .slice(range.from, range.to)
@@ -164,7 +177,7 @@ function stampSurface(versionSrc, changelogSrc, surface, version, date) {
  * @param {{versionSrc:string, changelogSrc:string}|null} o.head  HEAD's copies (null: first commit)
  * @param {{versionSrc:string, changelogSrc:string}} o.staged  the staged copies
  * @param {Record<string,string[]>} [o.arb]  see surfacesTouched
- * @returns {Array<{ surface, version, reason: 'bump'|'kept'|'sync'|'restore' }>}
+ * @returns {Array<{ surface, version, reason: 'bump'|'kept'|'sync'|'restore', entryNumber }>} entryNumber: the staged top entry, the one being committed
  */
 function plan({ paths, head, staged, arb }) {
   const touched = surfacesTouched(paths, arb);
@@ -175,7 +188,7 @@ function plan({ paths, head, staged, arb }) {
     if (!head) {
       // First commit: nothing to bump from; only make the two agree.
       if (now.topVersion !== now.fallback)
-        out.push({ surface, version: now.fallback, reason: 'sync' });
+        out.push({ surface, version: now.fallback, reason: 'sync', entryNumber: now.topNumber });
       continue;
     }
     const before = readSurface(head.versionSrc, head.changelogSrc, surface);
@@ -187,14 +200,19 @@ function plan({ paths, head, staged, arb }) {
       .filter((v) => isAbove(v, before.fallback))
       .sort((x, y) => (isAbove(x, y) ? -1 : 1))[0];
     if (hand) {
-      out.push({ surface, version: hand, reason: 'kept' });
+      out.push({ surface, version: hand, reason: 'kept', entryNumber: now.topNumber });
     } else if (touched.includes(surface) || newEntry) {
       // A new top entry is a release even when no surface path is staged.
       const next = bumpPatch(before.fallback);
-      if (next) out.push({ surface, version: next, reason: 'bump' });
+      if (next) out.push({ surface, version: next, reason: 'bump', entryNumber: now.topNumber });
     } else if (raisedFallback || raisedTop) {
       // Something moved the versions but not up (lower, empty, copied): HEAD's goes back, never lower.
-      out.push({ surface, version: before.fallback, reason: 'restore' });
+      out.push({
+        surface,
+        version: before.fallback,
+        reason: 'restore',
+        entryNumber: now.topNumber,
+      });
     }
   }
   return out;
@@ -210,7 +228,14 @@ function applyDecisions(versionSrc, changelogSrc, decisions) {
   for (const d of decisions) {
     const now = readSurface(out.versionSrc, out.changelogSrc, d.surface);
     if (d.reason !== 'restore' && isAbove(now.fallback, d.version)) continue;
-    out = stampSurface(out.versionSrc, out.changelogSrc, d.surface, d.version, d.date ?? null);
+    out = stampSurface(
+      out.versionSrc,
+      out.changelogSrc,
+      d.surface,
+      d.version,
+      d.date ?? null,
+      d.entryNumber,
+    );
   }
   return out;
 }
