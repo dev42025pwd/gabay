@@ -2,9 +2,10 @@ name: gabay
 description: "Gabay: the shopper app (main_mobile.dart) and the admin web page (main_admin.dart)."
 publish_to: 'none' # private app, never published to pub.dev
 
-# Template value. Real build stamps come from --dart-define (APP_VERSION,
-# BUILD_NUMBER, GIT_COMMIT, BUILD_TIME; standard 4.8) and the S5 hook.
-version: 1.0.0+1
+# Not stamped by the pre-commit hook (L129): the surfaces' versions live in core/config/app_version.dart
+# and changelog.dart. Real build stamps come from --dart-define (APP_VERSION,
+# BUILD_NUMBER, GIT_COMMIT, BUILD_TIME; standard 4.8); builds pass --build-name and --build-number.
+version: 0.1.0+1
 
 environment:
   sdk: ^3.13.4

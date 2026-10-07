@@ -259,6 +259,7 @@ async function main() {
   process.on('exit', killAll);
 
   const started = Date.now();
+  const printAtStart = fingerprint();
   const selected = CHECKS.filter((c) => !only || only.includes(c.name));
   const results = [];
   for (const check of selected) {
@@ -275,10 +276,19 @@ async function main() {
     if (!r.ok && check.fatal) break;
   }
 
+  // A result only speaks for the code that was there when the checks ran: if a file changed meanwhile
+  // (an edit during the run, or a check that rewrites code), the run cannot be trusted either way.
+  const printAtEnd = fingerprint();
+  if (printAtEnd !== printAtStart) {
+    results.push({ name: 'code-changed-during-run', ok: false, seconds: 0 });
+    console.log(
+      `FAIL ${pad('code-changed-during-run')} (a code file changed while verify ran; run it again)`,
+    );
+  }
   const failed = results.filter((r) => !r.ok).map((r) => r.name);
   const total = ((Date.now() - started) / 1000).toFixed(1);
   writeState({
-    fingerprint: fingerprint(),
+    fingerprint: printAtEnd,
     result: failed.length === 0 ? 'green' : 'red',
     partial: only !== null,
     failed,

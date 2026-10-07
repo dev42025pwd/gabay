@@ -382,3 +382,15 @@ test('linters: editing a committed migration is refused; adding a new one is fin
     { 'db/migrations/0001_a.sql': 'CREATE TABLE a (x INT);\n-- verify:\n-- SELECT 1\n' },
   );
 });
+
+// ---- the hooks as committed -------------------------------------------------------------------------
+
+test('the three hooks are executable in the index (git ignores a hook that is not)', () => {
+  const real = path.resolve(__dirname, '..', '..');
+  const listed = git(real, ['ls-files', '-s', '.githooks']).out.trim().split('\n');
+  for (const hook of ['pre-commit', 'post-commit', 'pre-push']) {
+    const line = listed.find((l) => l.endsWith(`.githooks/${hook}`));
+    assert.ok(line, `${hook} is tracked`);
+    assert.match(line, /^100755 /, `${hook} must be mode 100755 (git update-index --chmod=+x)`);
+  }
+});

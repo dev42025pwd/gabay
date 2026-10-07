@@ -172,3 +172,26 @@ test('the recorded fingerprint is the one tools/fingerprint.js computes for the 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a check that changes code (or an edit during the run) makes the run fail: the result would not describe the code', () => {
+  const dir = scratch({
+    'functions/src/x.js': "'use strict';\n",
+    // The "linter run" rewrites a code file, as a generator or an editor mid-run would.
+    'tools/lint/run.js': [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "fs.appendFileSync(path.join(__dirname, '..', '..', 'functions', 'src', 'x.js'), '// changed\\n');",
+      "console.log('ok   repo-layout');",
+      '',
+    ].join('\n'),
+  });
+  try {
+    const r = verify(dir, ['--only', 'structural-linters']);
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /^FAIL code-changed-during-run/m);
+    assert.deepEqual(r.state.failed, ['code-changed-during-run']);
+    assert.equal(r.state.result, 'red');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
