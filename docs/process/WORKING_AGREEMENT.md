@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.5 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.6 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -62,7 +62,7 @@ If something was not run, say so. If a step was skipped, say so. A partial resul
 | `.githooks/pre-push` | every push | the push, when `npm run verify` fails |
 | GitHub Actions | every push and PR; the e2e suite on a schedule | the merge, when the lint fails; uploads the server log on failure |
 | `.claude/settings.json` Stop hook | when the main session finishes (L129; coders hand back to it) | finishing until `npm run verify` has run on the current code; a failed run lets the session stop with a "verify FAILED" notice to the product owner, so an agent can still stop to ask a question |
-| `.claude/settings.json` Stop hook | when an agent finishes | finishing when user-facing screens changed with no changelog entry |
+| `.claude/settings.json` Stop hook | when the main session finishes (L130) | finishing when user-facing screens changed with no changelog entry, unless the final message states "Changelog waived: <reason>" (the waiver is in front of the product owner) |
 | `.claude/settings.json` after Flutter edits | after any Flutter file edit | a schema-to-form drift |
 
 One-time, after cloning: `git config core.hooksPath .githooks` (README).

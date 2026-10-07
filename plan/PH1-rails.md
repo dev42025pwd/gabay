@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.5 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.6 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -113,7 +113,7 @@ Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error tex
 - `npm run verify` runs, in order: `node --check` on the critical files; every linter; ESLint; Prettier check; the API tests; `schema.sql` twice on the local PostgreSQL; the seed (Auth emulator); `flutter analyze`; `flutter test`. It prints one line per check with its result, ends `ALL GREEN` or lists the failures, and exits with the failure count.
 - `.githooks/pre-commit`: the secret guard (pure shell); the version bump and changelog date stamp for the surface touched (Node, so the date is right on Windows; L129: the patch is raised, 0.1.0 → 0.1.1, unless the version was raised by hand in the same commit; `app/lib/core`, `app/lib/shared` and `l10n` touch both surfaces); the changelog duplicate guard; the linters for the staged paths.
 - `.githooks/pre-push`: `npm run verify`.
-- `.claude/settings.json`: a Stop hook (main session only, L129) that refuses to finish until `npm run verify` has run on the current code, and shows a "verify FAILED" notice when that run failed; a Stop hook that refuses to finish when screens changed with no changelog entry; the drift linter after any Flutter edit.
+- `.claude/settings.json`: a Stop hook (main session only, L129) that refuses to finish until `npm run verify` has run on the current code, and shows a "verify FAILED" notice when that run failed; a Stop hook (main session only) that refuses to finish when screens changed with no changelog entry, unless the final message states "Changelog waived: <reason>" (L130); the drift linter after any Flutter edit.
 - Check: each hook shown blocking a bad sample and passing a good one.
 
 ### S6 — CLAUDE.md under a page, the sync table and REVIEW.md
