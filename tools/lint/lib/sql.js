@@ -1,42 +1,65 @@
 // Finds SQL text in JS source, for sql-interpolation and tenant-predicate.
 //
-// A string or template literal is "SQL" when it contains an upper-case SQL keyword (SELECT, FROM,
-// WHERE, ORDER BY, INSERT INTO, ...) or a gabay.<name> reference. Upper-case only, on purpose: it
-// is how this codebase writes SQL, and it keeps an English message such as "select an item from the
-// list" out. A lower-case statement that names gabay.<table> is still found.
+// A string or template literal is "SQL" when it contains an upper-case SQL word (SELECT, FROM,
+// WHERE, ORDER BY, AND, INSERT INTO, ...) or a gabay.<name> reference. Upper-case only, on purpose:
+// it is how this codebase writes SQL, and it keeps an English message such as "select an item from
+// the list" out. A template that has a ${...} is ALSO SQL when
+//   - it is the value of a select / from / where / orderBy / join / groupBy / having key (the shape
+//     runPaged takes), or
+//   - it wraps an interpolation in quotes ('${x}'), or
+//   - it holds a $n placeholder.
+// Literals nested inside a ${...} are found too (a ternary that adds a WHERE is still SQL).
 //
 // An annotation is a comment on the line directly above the literal:  // <tag>: <reason>
-// The reason is required; an empty one is itself a violation (see annotationProblem).
+// The reason is required; an empty one is itself a violation.
 'use strict';
 
-const { scan, lineMap } = require('./scan');
+const { scan, blank, lineMap } = require('./scan');
 
 const KEYWORD =
-  /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|WITH|WHERE|ORDER\s+BY|GROUP\s+BY|LIMIT|OFFSET|JOIN|VALUES|FROM)\b/;
+  /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|WITH|WHERE|ORDER\s+BY|GROUP\s+BY|LIMIT|OFFSET|JOIN|VALUES|FROM|AND|OR|LIKE|ILIKE|BETWEEN|HAVING|SET)\b/;
 const SCHEMA_REF = /\bgabay\./i;
 const STATEMENT = /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|WITH)\b/;
+const SQL_KEY = /\b(select|from|where|orderBy|join|joins|groupBy|having)\s*:\s*$/;
+const QUOTED_INTERPOLATION = /'[^'\n]*\0[^'\n]*'/;
+const PLACEHOLDER = /\$\d+/;
 
 const looksLikeSql = (text) => KEYWORD.test(text) || SCHEMA_REF.test(text);
-const looksLikeStatement = (text) => STATEMENT.test(text) || (SCHEMA_REF.test(text) && /\b(select|insert|update|delete)\b/i.test(text));
+const looksLikeStatement = (text) =>
+  STATEMENT.test(text) || (SCHEMA_REF.test(text) && /\b(select|insert|update|delete)\b/i.test(text));
+
+/** A literal's text with its JS escapes of quotes and backslashes undone, so SQL quotes read as quotes. */
+const unescape = (text) => text.replace(/\\(['"`\\])/g, '$1');
 
 /**
  * @returns {Array<{ type, text, line, start, end, hasInterpolation, statement }>} the SQL-looking
- * string and template literals in code (not in comments, not nested inside a ${...}).
+ * string and template literals in code (never in comments), at any nesting depth.
  */
 function findSql(src) {
   const tokens = scan(src, { lang: 'js' });
   const lineOf = lineMap(src);
-  return tokens
-    .filter((t) => (t.type === 'string' || t.type === 'template') && t.depth === 0 && looksLikeSql(t.text))
-    .map((t) => ({
+  const found = [];
+  for (const t of tokens) {
+    if (t.type !== 'string' && t.type !== 'template') continue;
+    const text = unescape(t.text);
+    const fragment =
+      t.type === 'template' &&
+      t.hasInterpolation &&
+      (SQL_KEY.test(src.slice(Math.max(0, t.start - 60), t.start)) ||
+        QUOTED_INTERPOLATION.test(text) ||
+        PLACEHOLDER.test(text));
+    if (!looksLikeSql(text) && !fragment) continue;
+    found.push({
       type: t.type,
-      text: t.text,
+      text,
       line: lineOf(t.start),
       start: t.start,
       end: t.end,
       hasInterpolation: !!t.hasInterpolation,
-      statement: looksLikeStatement(t.text),
-    }));
+      statement: looksLikeStatement(text),
+    });
+  }
+  return found;
 }
 
 /**
@@ -49,4 +72,95 @@ function annotation(src, line, tag) {
   return m ? { reason: m[1].trim() } : null;
 }
 
-module.exports = { findSql, annotation };
+/** Top-level properties of the object literal opening at src[open]: [{ key, valueStart, valueEnd }]. */
+function objectProps(src, topTokens, open) {
+  const props = [];
+  const push = (from, end) => {
+    const head = /^\s*([A-Za-z_$][\w$]*)\s*(:)?/.exec(src.slice(from, end));
+    if (head) props.push({ key: head[1], valueStart: head[2] ? from + head[0].length : null, valueEnd: end });
+  };
+  let depth = 0;
+  let from = open + 1;
+  for (let i = open; i < src.length; i += 1) {
+    const t = topTokens.get(i);
+    if (t) {
+      i = t.end - 1;
+      continue;
+    }
+    const c = src[i];
+    if (c === '(' || c === '[' || c === '{') depth += 1;
+    else if (c === ')' || c === ']' || c === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        push(from, i);
+        break;
+      }
+    } else if (c === ',' && depth === 1) {
+      push(from, i);
+      from = i + 1;
+    }
+  }
+  return props;
+}
+
+/**
+ * The literal text of a property value: its string and template literals joined, with \0 where a
+ * variable or call sits between them. `literal` is false when the value is not made of literals only.
+ */
+function literalValue(src, strings, start, end) {
+  const own = strings.filter((t) => t.start >= start && t.end <= end);
+  let text = '';
+  let at = start;
+  let literal = own.length > 0;
+  for (const t of own) {
+    if (src.slice(at, t.start).replace(/[\s+]/g, '')) {
+      text += '\0';
+      literal = false;
+    }
+    text += unescape(t.text);
+    at = t.end;
+  }
+  if (src.slice(at, end).replace(/[\s+]/g, '')) {
+    text += '\0';
+    literal = false;
+  }
+  return { text, literal };
+}
+
+/**
+ * Every runPaged({ ... }) call (not its declaration), as the statement it will run:
+ * SELECT <select> FROM <from> <join> WHERE <where>. `complete` is false when the where value is
+ * missing or is not a literal (so a tenant predicate cannot be seen).
+ * @returns {Array<{ line: number, text: string, whereLiteral: boolean }>}
+ */
+function findRunPagedCalls(src) {
+  const tokens = scan(src, { lang: 'js' });
+  const clean = blank(src, tokens, ['comment']);
+  const topTokens = new Map(tokens.filter((t) => t.depth === 0).map((t) => [t.start, t]));
+  const strings = tokens.filter((t) => t.depth === 0 && (t.type === 'string' || t.type === 'template'));
+  const lineOf = lineMap(src);
+  const calls = [];
+  for (const m of clean.matchAll(/\brunPaged\s*\(\s*\{/g)) {
+    const inLiteral = strings.some((t) => m.index > t.start && m.index < t.end);
+    const declaration = /\bfunction\s*\*?\s*$/.test(clean.slice(Math.max(0, m.index - 20), m.index));
+    if (inLiteral || declaration) continue;
+    const props = objectProps(clean, topTokens, m.index + m[0].length - 1);
+    const value = (...keys) => {
+      const p = props.find((x) => keys.includes(x.key) && x.valueStart !== null);
+      return p ? literalValue(clean, strings, p.valueStart, p.valueEnd) : null;
+    };
+    const select = value('select');
+    const from = value('from');
+    const join = value('join', 'joins');
+    const where = value('where');
+    const text = [
+      `SELECT ${select ? select.text : '*'} FROM ${from ? from.text : '\0'}`,
+      join ? join.text : '',
+      where ? `WHERE ${where.text}` : '',
+    ].join(' ');
+    calls.push({ line: lineOf(m.index), text, whereLiteral: !!where && where.literal });
+  }
+  return calls;
+}
+
+module.exports = { findSql, annotation, findRunPagedCalls };

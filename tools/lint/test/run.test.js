@@ -13,7 +13,7 @@ const { scan, codeOnly } = require('../lib/scan');
 const RUN = path.resolve(__dirname, '..', 'run.js');
 const BAD_VIEW = 'app/lib/features/demo/views/v.dart';
 const cli = (root, ...args) =>
-  spawnSync(process.execPath, [RUN, '--root', root, ...args], { encoding: 'utf8' });
+  spawnSync(process.execPath, [RUN, '--root', root, '--allow-partial', ...args], { encoding: 'utf8' });
 
 test('run: all ten linters are registered, with the fixed rule names', () => {
   assert.deepEqual(

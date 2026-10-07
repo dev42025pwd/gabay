@@ -49,6 +49,7 @@ function walk(root, dir = '') {
  */
 function createContext({ root, files = null, staged = false, base = null }) {
   let all = null;
+  const scanned = new Set(); // files this linter was handed or read, for the per-linter count
   const explicit = files
     ? files
         .map((f) => toPosix(path.isAbsolute(f) ? path.relative(root, f) : f).replace(/^\.\//, ''))
@@ -67,14 +68,25 @@ function createContext({ root, files = null, staged = false, base = null }) {
     list(test, { widenOn = [] } = {}) {
       const narrow = explicit && !widenOn.some((w) => explicit.includes(w));
       if (!narrow) all ??= walk(root);
-      return (narrow ? explicit : all).filter(test);
+      const found = (narrow ? explicit : all).filter(test);
+      found.forEach((f) => scanned.add(f));
+      return found;
     },
     /** Like list(), but always the whole repo (for checks that compare files with each other). */
     repo(test) {
       all ??= walk(root);
-      return all.filter(test);
+      const found = all.filter(test);
+      found.forEach((f) => scanned.add(f));
+      return found;
     },
-    read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8'),
+    read(rel) {
+      scanned.add(rel);
+      return fs.readFileSync(path.join(root, rel), 'utf8');
+    },
+    /** Forget what was scanned; the runner calls this before each linter. */
+    startCount: () => scanned.clear(),
+    /** How many distinct files the current linter was handed or read. */
+    scannedCount: () => scanned.size,
     exists: (rel) => fs.existsSync(path.join(root, rel)),
     /** True when the schema is among the files being checked, or there is no file list. */
     touches: (rel) => !explicit || explicit.includes(rel),

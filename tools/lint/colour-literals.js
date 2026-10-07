@@ -1,6 +1,11 @@
 // colour-literals (rule 6, standard §4.7): colour literals live only in the theme-token file.
-// Everywhere else use Theme.of(context).colorScheme.* or the GabayTokens extension. Comments and
-// strings are ignored; only code is searched.
+// Everywhere else in app/lib use Theme.of(context).colorScheme.* or the GabayTokens extension.
+// Comments and strings are ignored; only code is searched (a Dart ${...} interpolation is code).
+//
+// Caught: Color(0x..) and Color(0X..), any Color.from*( constructor, any <prefix>Colors.<name>
+// (Colors, CupertinoColors, m.Colors), and primaryColor wherever it appears (including
+// ThemeData(primaryColor: ..)). Documented limits, not caught: Color(<decimal integer>), a colour
+// built from a const int, HSLColor, and the other ThemeData legacy colours.
 'use strict';
 
 const { violation } = require('./lib/context');
@@ -11,11 +16,10 @@ const TOKENS_FILE = 'app/lib/core/theme/gabay_tokens.dart';
 const DART_IN_LIB = /^app\/lib\/.+\.dart$/;
 
 const PATTERNS = [
-  [/\bColor\s*\(\s*0x/g, 'Color(0x...)'],
-  [/\bColor\s*\.\s*fromARGB\s*\(/g, 'Color.fromARGB('],
-  [/\bColor\s*\.\s*fromRGBO\s*\(/g, 'Color.fromRGBO('],
-  [/(?<![\w.])Colors\s*\.\s*\w+/g, 'Colors.<name>'],
-  [/\.\s*primaryColor\b/g, '.primaryColor'],
+  [/\bColor\s*\(\s*0[xX]/g, 'Color(0x...)'],
+  [/\bColor\s*\.\s*from\w*\s*\(/g, 'Color.from...('],
+  [/\b\w*Colors\s*\.\s*\w+/g, 'Colors.<name>'],
+  [/\bprimaryColor\b/g, 'primaryColor'],
 ];
 
 function run(ctx) {

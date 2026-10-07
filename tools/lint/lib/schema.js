@@ -136,4 +136,4 @@ function parseSchema(text) {
   return { tables, drops };
 }
 
-module.exports = { parseSchema };
+module.exports = { parseSchema, splitTopLevel };

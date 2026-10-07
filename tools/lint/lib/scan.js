@@ -73,7 +73,7 @@ function scan(src, { lang }) {
     const bodyStart = start + (triple ? 3 : 1);
     const closed = triple ? src.startsWith(q.repeat(3), i) : src[i] === q;
     const end = Math.min(n, closed ? i + (triple ? 3 : 1) : i);
-    tokens.push({ type: 'string', quote: q, start, end, depth, text: src.slice(bodyStart, closed ? i : end) });
+    tokens.push({ type: 'string', quote: q, raw, start, end, depth, text: src.slice(bodyStart, closed ? i : end) });
     return end;
   }
 
@@ -141,9 +141,29 @@ function blank(src, tokens, types) {
   return chars.join('');
 }
 
-/** Source with comments, strings, templates and regexes blanked: only code is left. */
+/**
+ * Source with comments, strings, templates and regexes blanked: only code is left. In Dart a
+ * string's ${...} interpolation is code (Text('${Colors.black}') uses a colour), so it is kept.
+ */
 function codeOnly(src, lang) {
-  return blank(src, scan(src, { lang }), ['comment', 'string', 'template', 'regex']);
+  const tokens = scan(src, { lang });
+  const code = blank(src, tokens, ['comment', 'string', 'template', 'regex']);
+  if (lang !== 'dart') return code;
+  const chars = code.split('');
+  for (const t of tokens.filter((x) => x.type === 'string' && !x.raw && x.depth === 0)) {
+    for (let i = t.start; i < t.end - 1; i += 1) {
+      if (src[i] === '\\') {
+        i += 1;
+      } else if (src[i] === '$' && src[i + 1] === '{') {
+        let depth = 1;
+        let j = i + 2;
+        for (; j < t.end && depth > 0; j += 1) depth += src[j] === '{' ? 1 : src[j] === '}' ? -1 : 0;
+        for (let k = i + 2; k < j - 1; k += 1) chars[k] = src[k];
+        i = j - 1;
+      }
+    }
+  }
+  return chars.join('');
 }
 
 /** Source with only comments blanked (strings kept). */
