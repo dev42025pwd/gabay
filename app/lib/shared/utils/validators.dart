@@ -17,14 +17,15 @@ abstract final class Validators {
       ? l10n.validatorRequired(label)
       : null;
 
-  /// Fails when the trimmed input is longer than [max] characters. Empty is
+  /// Fails when the input, measured as it will be sent (spaces included, never
+  /// trimmed), is longer than [max] characters. Empty is
   /// valid: combine with [required] when the field is mandatory.
   static FieldValidator maxLength(
     AppLocalizations l10n,
     String label,
     int max,
   ) =>
-      (value) => (value != null && value.trim().length > max)
+      (value) => (value != null && value.length > max)
       ? l10n.validatorTooLong(label, max)
       : null;
 

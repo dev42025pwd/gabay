@@ -310,17 +310,17 @@ abstract class AppLocalizations {
   /// **'{label} must be at most {max} characters.'**
   String validatorTooLong(String label, int max);
 
-  /// Shopper-app changelog, version 0.1.0, first bullet. Plain language for shoppers.
+  /// Shopper-app changelog, entry e001, first bullet. Plain language for shoppers.
   ///
   /// In en, this message translates to:
   /// **'The Gabay shopper app now starts. It has no features yet.'**
-  String get changelogMobile_0_1_0_a;
+  String get changelogMobile_e001_a;
 
-  /// Admin changelog, version 0.1.0, first bullet. Plain language for mall staff.
+  /// Admin changelog, entry e001, first bullet. Plain language for mall staff.
   ///
   /// In en, this message translates to:
   /// **'The Gabay admin page now starts. It has no features yet.'**
-  String get changelogAdmin_0_1_0_a;
+  String get changelogAdmin_e001_a;
 }
 
 class _AppLocalizationsDelegate

@@ -54,11 +54,24 @@ String sanitizeErrorText(String text, AppLocalizations l10n) {
   return '${collapsed.substring(0, kMaxErrorTextLength - 1)}…';
 }
 
-/// Case-sensitive on purpose: `SocketException` is raw text, the word
-/// "exception" in a sentence is not.
+/// Text that is the `toString()` of a Dart exception or error, or a stack
+/// trace, must never reach a user. Case-sensitive on purpose: `SocketException`
+/// is raw text, the word "exception" in a sentence is not.
+///
+/// Two families: (1) class names and their `Name:` form; (2) the fixed
+/// messages Dart core errors print WITHOUT their class name ("Bad state: ...",
+/// "Invalid argument(s): ...", "Null check operator used on a null value").
+/// `test/api_error_test.dart` generates every message below from a real throw.
 final RegExp _looksRaw = RegExp(
   r'(DioException|DioError|\bException:|\b[A-Z]\w*Exception\b|\b[A-Z]\w*Error:|'
-  r"XMLHttpRequest|Instance of '|#\d+\s+\S+\s+\(|package:|dart:)",
+  r'\b(?:NoSuchMethodError|LateInitializationError|StateError|TypeError|'
+  r'AssertionError|RangeError|ArgumentError|UnsupportedError|'
+  r'UnimplementedError|StackOverflowError|OutOfMemoryError|'
+  r'ConcurrentModificationError)\b|'
+  r'\bBad state:|\bInvalid argument(?:\(s\)| \()|\bUnsupported operation:|'
+  r"\bNull check operator|\bis not a subtype of type\b|\bAssertion failed|"
+  r'\bStack Overflow\b|\bOut of Memory\b|\bConcurrent modification|'
+  r"\bUnimplemented|XMLHttpRequest|Instance of '|#\d+\s+\S+\s+\(|package:|dart:)",
 );
 
 final RegExp _looksLikeHtml = RegExp(r'<!doctype|<html', caseSensitive: false);

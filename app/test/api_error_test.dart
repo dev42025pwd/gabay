@@ -27,6 +27,7 @@ DioException _dio({
 }
 
 void main() {
+  _regressionRawDartErrors();
   late AppLocalizations l10n;
   setUpAll(() async => l10n = await loadEnglish());
 
@@ -140,6 +141,93 @@ void main() {
       final cleaned = sanitize(long);
       expect(cleaned.length, kMaxErrorTextLength);
       expect(cleaned.endsWith('…'), isTrue);
+    });
+  });
+}
+
+class _Holder {
+  late final int value;
+}
+
+/// Hides a value from the compiler so a deliberate bad cast or null check is
+/// a runtime error, not a compile-time one.
+Object? _opaque(Object? value) => int.parse('1') == 1 ? value : 'unused';
+
+/// A real call on null, through dynamic.
+void _callMissing(Object? target) {
+  // ignore: avoid_dynamic_calls
+  (target as dynamic).missing();
+}
+
+/// Real unbounded recursion: Dart throws a StackOverflowError.
+int _recurse(int n) => _recurse(n + 1) + 1;
+
+/// Regression test for review finding 1: `sanitizeErrorText` let Dart core
+/// errors through ("Bad state: No element", "RangeError (length): ...",
+/// "Invalid argument(s): ...", "Null check operator used on a null value").
+/// Every string below is the real `'$e'` of a real throw, never hand-typed.
+void _regressionRawDartErrors() {
+  group('sanitizeErrorText: real Dart error strings (review finding 1)', () {
+    late AppLocalizations l10n;
+    setUpAll(() async => l10n = await loadEnglish());
+
+    final throwers = <String, void Function()>{
+      'StateError (List.first)': () => <int>[].first,
+      'StateError (explicit)': () => throw StateError('boom'),
+      'RangeError (index)': () => <int>[1][5],
+      'RangeError.value': () => throw RangeError.value(3, 'x'),
+      'ArgumentError': () => throw ArgumentError('bad value'),
+      'ArgumentError.value': () => throw ArgumentError.value(1, 'n', 'no'),
+      'UnsupportedError': () => List<int>.unmodifiable([1]).add(2),
+      'UnimplementedError': () => throw UnimplementedError('later'),
+      'TypeError (null cast)': () => _opaque(null) as String,
+      'TypeError (type cast)': () => _opaque('text') as int,
+      'null check': () => _opaque(null)!.toString(),
+      'NoSuchMethodError': () => _callMissing(_opaque(null)),
+      'LateInitializationError': () {
+        _Holder().value.toString();
+      },
+      'AssertionError': () => throw AssertionError('failed'),
+      'StackOverflowError (real recursion)': () => _recurse(0),
+      'OutOfMemoryError': () => throw const OutOfMemoryError(),
+      'ConcurrentModificationError': () {
+        final list = [1, 2, 3];
+        for (final _ in list) {
+          list.add(4);
+        }
+      },
+      'FormatException': () => int.parse('x'),
+      'TimeoutException': () => throw TimeoutException('slow'),
+    };
+
+    for (final entry in throwers.entries) {
+      test(entry.key, () {
+        Object? caught;
+        try {
+          entry.value();
+        } catch (e) {
+          caught = e;
+        }
+        expect(caught, isNotNull, reason: '${entry.key} did not throw');
+        final raw = '$caught';
+        expect(
+          sanitizeErrorText(raw, l10n),
+          l10n.errorGeneric,
+          reason: 'leaked: $raw',
+        );
+      });
+    }
+
+    test('ordinary sentences with those words still pass', () {
+      for (final sentence in [
+        'The list is invalid. Please check each item.',
+        'No element was selected.',
+        'Null values are not allowed here.',
+        'Type a name to continue.',
+        'A range of 3 to 5 guests is allowed.',
+      ]) {
+        expect(sanitizeErrorText(sentence, l10n), sentence);
+      }
     });
   });
 }

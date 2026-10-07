@@ -30,6 +30,17 @@ void main() {
       expect(message, allOf(contains('Code'), contains('3')));
     });
 
+    // Regression test: maxLength used to measure the TRIMMED value, so "abc "
+    // (4 characters, as sent) passed a limit of 3 (review finding 5).
+    test('measures the value as it will be sent, spaces included', () {
+      final validate = Validators.maxLength(l10n, 'Code', 3);
+      expect(validate('abc '), l10n.validatorTooLong('Code', 3));
+      expect(validate(' abc'), l10n.validatorTooLong('Code', 3));
+      expect(validate('  a  '), l10n.validatorTooLong('Code', 3));
+      expect(validate(' ab'), isNull);
+      expect(validate('   '), isNull);
+    });
+
     test('accepts the limit, empty and null', () {
       final validate = Validators.maxLength(l10n, 'Code', 3);
       expect(validate('abc'), isNull);

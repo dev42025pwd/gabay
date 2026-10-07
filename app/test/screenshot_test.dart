@@ -6,10 +6,13 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gabay/core/config/surface_info.dart';
+import 'package:gabay/l10n/app_localizations.dart';
+import 'package:gabay/shared/components/messaging/message_notifier.dart';
 
 import 'support/shell_harness.dart';
 
-/// Renders PNGs of both empty shells (L121): light and dark, phone and tablet.
+/// Renders PNGs (L121): both shells empty (light and dark, phone and tablet),
+/// plus the About page and the error and success banners (phone, light, dark).
 ///
 ///   flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=DIR
 ///
@@ -55,37 +58,86 @@ void main() {
     await _loadFont('MaterialIcons', ['materialicons-regular.otf']);
   });
 
-  for (final surface in [SurfaceInfo.mobile, SurfaceInfo.admin]) {
-    for (final brightness in Brightness.values) {
-      for (final device in _devices.entries) {
-        final name = '${surface.surface.name}_${brightness.name}_${device.key}';
-        testWidgets('shell screenshot $name', (tester) async {
-          setLogicalSize(tester, device.value);
-          tester.platformDispatcher.platformBrightnessTestValue = brightness;
-          addTearDown(
-            tester.platformDispatcher.clearPlatformBrightnessTestValue,
-          );
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
 
-          final boundaryKey = GlobalKey();
-          await tester.pumpWidget(
-            RepaintBoundary(key: boundaryKey, child: shellApp(surface)),
-          );
-          await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
+  /// One screenshot scenario: builds the shell, runs [steps] to reach the
+  /// screen, saves the PNG, then lets any message timer finish.
+  void scenario(
+    String name,
+    SurfaceInfo surface,
+    Brightness brightness,
+    Size size,
+    Future<void> Function(WidgetTester tester) steps,
+  ) {
+    testWidgets('screenshot $name', (tester) async {
+      setLogicalSize(tester, size);
+      tester.platformDispatcher.platformBrightnessTestValue = brightness;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
-          if (!writing) return;
-          await tester.runAsync(() async {
-            final boundary =
-                boundaryKey.currentContext!.findRenderObject()!
-                    as RenderRepaintBoundary;
-            final image = await boundary.toImage(pixelRatio: 1);
-            final data = await image.toByteData(format: ui.ImageByteFormat.png);
-            final dir = Directory(_shotsOut)..createSync(recursive: true);
-            File('${dir.path}/$name.png')
-                .writeAsBytesSync(data!.buffer.asUint8List());
-          });
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(key: boundaryKey, child: shellApp(surface)),
+      );
+      await tester.pumpAndSettle();
+      await steps(tester);
+      expect(tester.takeException(), isNull);
+
+      if (writing) {
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: 1);
+          final data = await image.toByteData(format: ui.ImageByteFormat.png);
+          final dir = Directory(_shotsOut)..createSync(recursive: true);
+          File('${dir.path}/$name.png')
+              .writeAsBytesSync(data!.buffer.asUint8List());
         });
       }
+      // Let a banner's auto-dismiss timer run out so the test ends clean.
+      await tester.pump(kErrorMessageDuration + const Duration(seconds: 1));
+    });
+  }
+
+  for (final surface in [SurfaceInfo.mobile, SurfaceInfo.admin]) {
+    for (final brightness in Brightness.values) {
+      final prefix = '${surface.surface.name}_${brightness.name}';
+
+      // The empty shell, phone and tablet.
+      for (final device in _devices.entries) {
+        scenario(
+          '${prefix}_${device.key}',
+          surface,
+          brightness,
+          device.value,
+          (tester) async {},
+        );
+      }
+
+      // The About page and both banners, phone only.
+      final phone = _devices['phone']!;
+      scenario('${prefix}_about_phone', surface, brightness, phone, (
+        tester,
+      ) async {
+        await tester.tap(find.text(l10n.aboutAction));
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.whatsNewTitle), findsOneWidget);
+      });
+      scenario('${prefix}_error_banner_phone', surface, brightness, phone, (
+        tester,
+      ) async {
+        await tester.tap(find.text(l10n.showErrorAction));
+        await tester.pump();
+        expect(find.textContaining(l10n.sampleError), findsOneWidget);
+      });
+      scenario('${prefix}_success_banner_phone', surface, brightness, phone, (
+        tester,
+      ) async {
+        await tester.tap(find.text(l10n.showSuccessAction));
+        await tester.pump();
+        expect(find.textContaining(l10n.sampleSuccess), findsOneWidget);
+      });
     }
   }
 }

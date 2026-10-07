@@ -25,8 +25,11 @@ final Provider<void Function()> unauthenticatedHandlerProvider =
 /// the providers above at call time (`ref.read`), so a token rotation re-binds
 /// without rebuilding the client or dropping requests in flight.
 final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(baseUrl: ref.watch(apiBaseUrlProvider))
+  final client = ApiClient(baseUrl: ref.watch(apiBaseUrlProvider))
     ..tokenProvider = (() => ref.read(sessionTokenProvider))
     ..tenantIdProvider = (() => ref.read(activeTenantIdProvider))
     ..onUnauthenticated = (() => ref.read(unauthenticatedHandlerProvider)());
+  // Release the HTTP connections when the scope goes away.
+  ref.onDispose(() => client.dio.close(force: true));
+  return client;
 });

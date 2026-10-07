@@ -9,5 +9,14 @@ template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
 output-class: AppLocalizations
 # Generated Dart is committed beside the ARB files and excluded from analysis.
-# A missing key in a non-template locale is an error, never a silent fallback.
+#
+# A key that a non-template locale lacks does NOT fail generation: the app
+# shows the English text and gen-l10n only prints a status line. Two guards
+# stand in for that failure:
+#   1. the report below lists every untranslated key per locale (written to the
+#      app folder as untranslated.json, which app/.gitignore keeps out of git);
+#   2. test/arb_integrity_test.dart fails when any app_<locale>.arb lacks a key
+#      of the template (or has an unknown one).
+untranslated-messages-file: untranslated.json
+# `AppLocalizations.of(context)` returns a non-null value.
 nullable-getter: false

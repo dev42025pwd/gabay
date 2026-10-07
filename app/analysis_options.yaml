@@ -25,6 +25,7 @@ analyzer:
     prefer_const_constructors: error      # keeps rebuilds cheap on low-end phones
     prefer_const_declarations: error
     unawaited_futures: error              # a dropped Future hides a failed save
+    discarded_futures: error              # same, inside a sync callback: onPressed: () { vm.save(); }
     always_declare_return_types: error    # signatures are the documentation
     avoid_dynamic_calls: error            # payloads are typed at the boundary
     use_build_context_synchronously: error  # context after await is a crash
@@ -57,6 +58,7 @@ linter:
     - prefer_const_constructors
     - prefer_const_declarations
     - unawaited_futures
+    - discarded_futures
     - always_declare_return_types
     - avoid_dynamic_calls
     - use_build_context_synchronously

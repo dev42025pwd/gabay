@@ -8,8 +8,10 @@ import 'message_notifier.dart';
 /// `context.showError(e)` and `context.showSuccess('...')`.
 /// `ScaffoldMessenger.showSnackBar` is prohibited (linter `no-snackbar`, S4).
 extension MessagingContext on BuildContext {
-  MessageNotifier get _messages =>
-      ProviderScope.containerOf(this).read(messageProvider.notifier);
+  MessageNotifier get _messages => ProviderScope.containerOf(
+    this,
+    listen: false,
+  ).read(messageProvider.notifier);
 
   /// [error] may be a caught exception (shown through `formatApiError`) or a
   /// ready-made string (shown through `sanitizeErrorText`). The friendly copy

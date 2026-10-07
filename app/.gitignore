@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# flutter gen-l10n report of untranslated keys (l10n.yaml); regenerated each run
+/untranslated.json

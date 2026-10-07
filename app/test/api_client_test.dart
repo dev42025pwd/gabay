@@ -15,6 +15,7 @@ class FakeAdapter implements HttpClientAdapter {
 
   final int status;
   final List<RequestOptions> requests = [];
+  bool closed = false;
 
   @override
   Future<ResponseBody> fetch(
@@ -33,7 +34,7 @@ class FakeAdapter implements HttpClientAdapter {
   }
 
   @override
-  void close({bool force = false}) {}
+  void close({bool force = false}) => closed = true;
 }
 
 ApiClient _client(
@@ -260,6 +261,19 @@ void main() {
   });
 
   group('providers', () {
+    test('disposing the container closes the HTTP client (review N3)', () {
+      final adapter = FakeAdapter();
+      final container = ProviderContainer(
+        overrides: [
+          apiBaseUrlProvider.overrideWithValue('http://api.test.invalid'),
+        ],
+      );
+      container.read(apiClientProvider).dio.httpClientAdapter = adapter;
+      expect(adapter.closed, isFalse);
+      container.dispose();
+      expect(adapter.closed, isTrue);
+    });
+
     test(
       'apiClientProvider wires the three callbacks to the Phase 2 slots',
       () async {

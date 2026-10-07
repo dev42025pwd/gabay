@@ -30,6 +30,12 @@ void main() {
     });
   }
 
+  // plan.html L123: terracotta until the brand colour is known. Changing the
+  // seed is a ruling, so a change here must change this test on purpose.
+  test('the seed is terracotta #C1623D (L123)', () {
+    expect(GabayTokens.seed, const Color(0xFFC1623D));
+  });
+
   test('light and dark tokens differ', () {
     expect(
       GabayTokens.light.successContainer,

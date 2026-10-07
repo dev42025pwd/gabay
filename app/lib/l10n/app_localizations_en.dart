@@ -139,10 +139,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get changelogMobile_0_1_0_a =>
+  String get changelogMobile_e001_a =>
       'The Gabay shopper app now starts. It has no features yet.';
 
   @override
-  String get changelogAdmin_0_1_0_a =>
+  String get changelogAdmin_e001_a =>
       'The Gabay admin page now starts. It has no features yet.';
 }

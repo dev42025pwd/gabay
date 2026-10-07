@@ -100,8 +100,8 @@
     }
   },
 
-  "changelogMobile_0_1_0_a": "The Gabay shopper app now starts. It has no features yet.",
-  "@changelogMobile_0_1_0_a": { "description": "Shopper-app changelog, version 0.1.0, first bullet. Plain language for shoppers." },
-  "changelogAdmin_0_1_0_a": "The Gabay admin page now starts. It has no features yet.",
-  "@changelogAdmin_0_1_0_a": { "description": "Admin changelog, version 0.1.0, first bullet. Plain language for mall staff." }
+  "changelogMobile_e001_a": "The Gabay shopper app now starts. It has no features yet.",
+  "@changelogMobile_e001_a": { "description": "Shopper-app changelog, entry e001, first bullet. Plain language for shoppers." },
+  "changelogAdmin_e001_a": "The Gabay admin page now starts. It has no features yet.",
+  "@changelogAdmin_e001_a": { "description": "Admin changelog, entry e001, first bullet. Plain language for mall staff." }
 }

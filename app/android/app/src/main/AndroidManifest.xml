@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this to reach the API; debug and profile add it
+         through their own manifests. Network only: no location, Bluetooth or
+         background permission belongs here until its feature (foreground rule). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="gabay"
+        android:label="Gabay"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

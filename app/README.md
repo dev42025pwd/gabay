@@ -1,17 +1,16 @@
-# gabay
+# Gabay app
 
-A new Flutter project.
+One Flutter project, two entry points (Blueprint §2.3):
 
-## Getting Started
+- `lib/main_mobile.dart`: the shopper app (Android 7.0+, iOS 15+).
+- `lib/main_admin.dart`: the admin web page.
 
-This project is a starting point for a Flutter application.
+How to run, test, build and render the screenshots: **`INSTALL.md` in the
+repository root, section A.3**. The layout of `lib/` (`core/`, `shared/`,
+`features/`) and the rules it follows are in the Engineering Standards §4 and
+`CLAUDE.md` at the root. Wording is in `lib/l10n/*.arb`, never in Dart.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Web manifest colours (`web/manifest.json` sits outside the Dart colour-token
+rule): `theme_color` is the brand seed `#C1623D` (`GabayTokens.seed`), and
+`background_color` is the light scheme's `surface` colour derived from that
+seed (`#FFF8F6`), so the splash screen matches the first frame.
