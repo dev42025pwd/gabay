@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -117,7 +118,12 @@ void main() {
   group('changelogs and their ARB keys', () {
     final keyPattern = RegExp(r'^changelog(Mobile|Admin)_e(\d{3})_([a-z])$');
     late Set<String> arbKeys;
+    late Map<String, Object?> arbValues;
     setUpAll(() {
+      // Values only: duplicate keys are rejected by their own test above.
+      arbValues = json.decode(
+        File('$_arbDir/$_template').readAsStringSync(),
+      ) as Map<String, Object?>;
       arbKeys = messageKeys(
         topLevelKeys(File('$_arbDir/$_template').readAsStringSync()),
       );
@@ -150,11 +156,18 @@ void main() {
               isNotEmpty,
               reason: 'no ARB keys for ${surface.key} entry $padded',
             );
-            // The entry reads exactly the keys that exist for it.
+            // The entry shows exactly the ARB text of ITS OWN keys (this surface,
+            // this entry number, in letter order): a mobile entry wired to an
+            // admin key, or to another entry's key, fails here.
+            entryKeys.sort();
+            final expected = [
+              for (final key in entryKeys) arbValues[key]! as String,
+            ];
             expect(
-              entry.bullets(l10n).length,
-              entryKeys.length,
-              reason: '${surface.key} e$padded',
+              entry.bullets(l10n),
+              expected,
+              reason:
+                  '${surface.key} e$padded must read its own keys $entryKeys',
             );
           }
         });

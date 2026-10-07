@@ -210,11 +210,22 @@ void _regressionRawDartErrors() {
         }
         expect(caught, isNotNull, reason: '${entry.key} did not throw');
         final raw = '$caught';
-        expect(
-          sanitizeErrorText(raw, l10n),
-          l10n.errorGeneric,
-          reason: 'leaked: $raw',
-        );
+        // Bare, with leading whitespace, and inside the wrappers a catch block
+        // commonly adds (the anchored rules must allow them).
+        for (final text in [
+          raw,
+          '  $raw',
+          '\n$raw',
+          'Exception: $raw',
+          'Error: $raw',
+          'Unhandled Exception: $raw',
+        ]) {
+          expect(
+            sanitizeErrorText(text, l10n),
+            l10n.errorGeneric,
+            reason: 'leaked: $text',
+          );
+        }
       });
     }
 
@@ -229,5 +240,25 @@ void _regressionRawDartErrors() {
         expect(sanitizeErrorText(sentence, l10n), sentence);
       }
     });
+
+    // Regression test for review NEW-1: the sanitizer was too broad and replaced
+    // plausible domain wording ("package:" anywhere, "Concurrent modification"
+    // anywhere) with the generic copy. Real Dart error strings are matched only
+    // at the START of the text; these backend messages must reach the user.
+    for (final sentence in [
+      'The map package: Level 2 failed to publish.',
+      'Concurrent modification: someone else saved this venue first. Reload and try again.',
+      'Cannot publish: the level is in a bad state: 3 walkways need review.',
+      'This unit has an unsupported operation: it cannot be moved to Level 3.',
+      'Venue Aurora: invalid argument count in route 4, check the stops.',
+      'Walkway check: assertion failed for Level 2, confirm it and publish again.',
+      'Stack of 3 levels is out of memory order; reorder the levels.',
+      'Unimplemented for this venue type: ask your administrator.',
+      'The dart: frame of this shop is outside the mall plan.',
+    ]) {
+      test('domain message is shown, not replaced: ', () {
+        expect(sanitizeErrorText(sentence, l10n), sentence);
+      });
+    }
   });
 }
