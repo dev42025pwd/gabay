@@ -134,7 +134,9 @@ function entryRange(changelogSrc, surface, number) {
   const ranges = entryRanges(changelogSrc, surface);
   if (number === undefined || number === null) return ranges[0] ?? null;
   const numberOf = (r) => Number(/number:\s*(\d+)/.exec(changelogSrc.slice(r.from, r.to))?.[1]);
-  return ranges.find((r) => numberOf(r) === number) ?? null;
+  // The LAST one: a draft pasted above the original may still carry the old number, and the entry being
+  // committed is the original, which always sits below it.
+  return ranges.findLast((r) => numberOf(r) === number) ?? null;
 }
 
 /** { fallback, topVersion, topDate, topNumber } for one surface; a missing piece is null. */

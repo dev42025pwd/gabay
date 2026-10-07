@@ -55,7 +55,9 @@ function addDraft(dir, number = 2, bullets = '_mobileE002') {
 
 test('tests (R1): none reads the live version, changelog or ARB files (they move with every stamped commit)', () => {
   const dir = __dirname;
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.test.js'))) {
+  // The one allowed reader, by name: it only checks that the stamp's parser still reads the live files.
+  const EXEMPT = 'live-files.test.js';
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.test.js') && f !== EXEMPT)) {
     const src = fs.readFileSync(path.join(dir, file), 'utf8');
     assert.doesNotMatch(src, /read\(\s*REAL\s*,/, `${file} reads a file of the real repo`);
     assert.doesNotMatch(src, /join\(\s*REAL\s*,\s*['"]app\//, `${file} reads the real app/`);

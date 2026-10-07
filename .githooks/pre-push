@@ -5,7 +5,8 @@
 # verify checks the WORKING TREE, so it only speaks for what is pushed when the pushed commit IS the
 # checked-out one and the tree is clean. This hook therefore
 #   1. reads the refs git is about to push (stdin: "<local ref> <local sha> <remote ref> <remote sha>")
-#      and refuses unless every one, apart from deletions, points at the current HEAD: check out the
+#      and refuses unless every one, apart from deletions, points at the current HEAD (a tag is peeled to
+#      the commit it names; a tag of a tree or blob has none and is refused): check out the
 #      branch you are pushing and push from it. A deletion (local sha all zeros) pushes no code, so a
 #      push of only deletions passes without verify;
 #   2. refuses while code has uncommitted or untracked changes (documents, *.md, do not count);
@@ -28,12 +29,14 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     "$zero" | 0000000000000000000000000000000000000000000000000000000000000000) continue ;;
   esac
   code_refs=$((code_refs + 1))
-  [ "$local_sha" = "$head" ] || wrong="$wrong $local_ref"
+  # A tag points at a tag object, not a commit: peel it. A tag of a tree or blob has no commit at all.
+  peeled=$(git rev-parse --verify -q "${local_sha}^{commit}" 2>/dev/null)
+  [ -n "$peeled" ] && [ "$peeled" = "$head" ] || wrong="$wrong $local_ref"
 done
 # Only deletions (or nothing): no code is being pushed, so there is nothing to verify.
 [ "$code_refs" -eq 0 ] && exit 0
 if [ -n "$wrong" ]; then
-  echo "pre-push: verify checks what is checked out, and these refs are not the checked-out commit:$wrong" >&2
+  echo "pre-push: verify checks what is checked out, and these refs, each peeled to its commit, are not the checked-out commit:$wrong" >&2
   echo "Check out the branch you are pushing and push from it." >&2
   exit 1
 fi

@@ -33,20 +33,24 @@ const isMetadataKey = (key) => key.startsWith('@');
 
 /**
  * The reason of a "Changelog waived: <reason>" line in the assistant's last message, or null.
- * The line may start with a list marker (- * +) and may be bold; the words are matched in any case;
- * lines inside ``` code fences are ignored (an example is not a waiver); and the reason must be
- * real: the template text <reason>, or text with no letter in it (".", "...", "123"), does not count.
+ * The line may start with a markdown heading (#..######) and/or a list marker (- * + or 1. 1)), and
+ * may be bold; the words are matched in any case; lines inside ``` or ~~~ code fences are ignored
+ * (an example is not a waiver); and the reason must be real: the template text <reason>, or text with
+ * no letter in it (".", "...", "123"), does not count.
  */
 const WAIVER_LINE =
-  /^[ \t]*(?:[-*+][ \t]+)?(?:\*\*|__)?[ \t]*changelog waived[ \t]*(?:\*\*|__)?[ \t]*:[ \t]*(?:\*\*|__)?[ \t]*(\S.*)$/i;
+  /^[ \t]*(?:#{1,6}[ \t]+)?(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:\*\*|__)?[ \t]*changelog waived[ \t]*(?:\*\*|__)?[ \t]*:[ \t]*(?:\*\*|__)?[ \t]*(\S.*)$/i;
+const FENCE = /^[ \t]*(```|~~~)/;
 function waiverReason(message) {
-  let inFence = false;
+  let fence = null; // the marker that opened the fence we are in, so ``` does not close ~~~
   for (const line of String(message ?? '').split(/\r?\n/)) {
-    if (/^[ \t]*```/.test(line)) {
-      inFence = !inFence;
+    const opens = FENCE.exec(line)?.[1];
+    if (opens) {
+      if (fence === null) fence = opens;
+      else if (fence === opens) fence = null;
       continue;
     }
-    if (inFence) continue;
+    if (fence !== null) continue;
     const reason = WAIVER_LINE.exec(line)?.[1]
       .replace(/(\*\*|__)\s*$/, '')
       .trim();
