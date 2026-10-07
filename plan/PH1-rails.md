@@ -60,7 +60,7 @@ Each slice ends with its evidence pasted into the slice report (outputs with exi
 - The seed skips the penthouse with a clear message when `sources/internal/` is absent (a clean clone).
 - Check: `git status` lists no APK, no internal data and no `.env`; first local commit made; nothing pushed.
 
-### S2 — API skeleton (`functions/`) — BUILT 2026-10-07 by api-coder; awaiting dod-reviewer
+### S2 — API skeleton (`functions/`) — DONE 2026-10-07 (report: `phase-reports/phase-1/S2.md`)
 Checklist items, adapted where Cloud Functions differ (§6 lists each adaptation):
 - **§3.1** middleware order: `trust proxy` hop count from env (default 1) → `x-powered-by` off → `helmet` → `cors` allow-list from `CORS_ORIGINS` (loud warning on the permissive fallback) → 5 MB body limit (`MAX_JSON_BODY`) → `requestId` (L126: incoming `X-Request-Id` if sane, else a new UUID; echoed; bound to the log) → `actorContext` slot (L126: Phase 2 fills it) → audit-logger slot (filled in Phase 2) → `/api` no-store headers → rate-limiter slot (Phase 2) → routes → 404 → error handler.
 - **§3.16** config: `.env.example` heavily commented; the env loaded by absolute path; fail fast on missing required config; the `GlobalSetting` resolver (frozen defaults, 30 s cache, never throws, `PUBLIC_FLAGS` allow-list).
@@ -77,7 +77,7 @@ Checklist items, adapted where Cloud Functions differ (§6 lists each adaptation
 - Pins: express 5, pg 8, decimal.js 10, helmet 8, cors 2, express-rate-limit 8, multer 2, firebase-functions 7, firebase-admin 14, zod, pino; exact versions read from npm on the day, rechecked against the Blueprint (a moved major is raised with you, not bumped).
 - Evidence (api-coder, 2026-10-07; full output in the slice report): `npm ci` exit 0 in `functions/` and `db/tools/`; `node --test` in `functions/` 39 pass, 0 fail, exit 0 (twice); `db/tools` tests 5 pass, exit 0; `npm run lint` and `format:check` exit 0, each exit 1 on a deliberately bad file (deleted); `setup-db` dev exit 0 with 56 tables, 133 indexes, 1 trigger, six venues, six accounts; `--bootstrap` exit 0; `migrate` with no migrations exit 0; the Functions emulator answered `GET /demo-gabay/asia-southeast1/api/api/health` with `{"status":"ok","db":"ok"}`. Choices not in this plan: no dotenv (Node's `process.loadEnvFile`); `db/tools/` has its own package; DATE columns are returned as text by the pool.
 
-### S3 — App skeleton (`app/`)
+### S3 — App skeleton (`app/`) — DONE 2026-10-07 (report: `phase-reports/phase-1/S3.md`)
 - `flutter create --org com.dynamiqes --project-name gabay --platforms android,ios,web`; `minSdk 24`; iOS deployment target 15.0.
 - **§4.1** `lib/core/` (config, network, theme, services), `lib/shared/` (components, widgets, utils, navigation), `lib/features/` (empty, with the fixed shape documented), `main_mobile.dart`, `main_admin.dart`. No `kIsWeb` forks in shared trees.
 - **§4.2** one `ProviderScope`; providers typed at file scope; services take no `ref`.
@@ -90,7 +90,7 @@ Checklist items, adapted where Cloud Functions differ (§6 lists each adaptation
 - Tests: widget tests for both shells, the theme in both brightnesses, `formatApiError`, the interceptors with a fake adapter; **screenshots rendered by a test** of both empty shells, light and dark, phone and tablet (L121).
 - **Built 2026-10-07 by flutter-coder; evidence** (all exit 0, run in `app/`): `flutter pub get`; `flutter analyze` "No issues found!"; `flutter test` 73 tests, "All tests passed!" (run twice, same result); `flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<dir>` wrote the 8 PNGs (`{mobile,admin}_{light,dark}_{phone,tablet}.png`) and without the define writes nothing and passes; `flutter build web -t lib/main_admin.dart` and `flutter build apk --debug -t lib/main_mobile.dart` both built. A deliberately bad file (a dropped Future, `print`, an unused import) made `flutter analyze` exit 1 and was removed. `minSdk = 24`, `applicationId = "com.dynamiqes.gabay"`, `IPHONEOS_DEPLOYMENT_TARGET = 15.0` (3 build configurations) and `platform :ios, '15.0'` in `ios/Podfile`. Resolved pins (`pubspec.lock`): flutter_riverpod 3.4.3 (riverpod 3.4.3), dio 5.11.1, go_router 18.0.2, cupertino_icons 2.0.0 (added by `flutter create`; kept so iOS builds find CupertinoIcons), flutter_lints 6.0.0 (lints 6.1.0). Full output is in the S3 report; reviewers skip the generated `android/`, `ios/`, `web/` folders.
 
-### S4 — Structural linters (`tools/lint/`)
+### S4 — Structural linters (`tools/lint/`) — DONE 2026-10-07 (report: `phase-reports/phase-1/S4.md`)
 Each is about 60 lines, names the file and line it fails on, and has a test that feeds it a bad sample and expects the failure.
 
 | Linter | Catches | Source |
