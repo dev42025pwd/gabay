@@ -2,7 +2,7 @@
 // scratch repositories (L129). Each hook is shown blocking a bad case and passing a good one.
 'use strict';
 
-const test = require('node:test');
+const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -39,7 +39,10 @@ function withRepo(fn, extra) {
 }
 
 /** Records a verify result for the repo's current code, as `npm run verify` would. */
-function recordVerify(dir, { result = 'green', failed = [], partial = false } = {}) {
+function recordVerify(
+  dir,
+  { result = 'green', failed = [], partial = false, ran = 0, total = 15 } = {},
+) {
   const { fingerprint, writeState } = require(path.join(dir, 'tools', 'fingerprint.js'));
   writeState(
     {
@@ -47,7 +50,8 @@ function recordVerify(dir, { result = 'green', failed = [], partial = false } = 
       result,
       partial,
       failed,
-      checks: [],
+      checks: Array.from({ length: ran }, (_, i) => ({ name: `check-${i}`, ok: true })),
+      totalChecks: total,
       finishedAt: new Date().toISOString(),
     },
     dir,
@@ -115,11 +119,14 @@ test('stop-verify: stop_hook_active does NOT release the block (ruling L129 b)',
 
 test('stop-verify: a FAILED run on this code lets the session stop, with a "verify FAILED" notice naming the checks', () => {
   withRepo((dir) => {
-    recordVerify(dir, { result: 'red', failed: ['eslint', 'flutter-test'] });
+    recordVerify(dir, { result: 'red', failed: ['eslint', 'flutter-test'], ran: 2 });
     const r = hook(dir, 'stop-verify', { stop_hook_active: false });
     assert.equal(r.status, 0);
     assert.equal(r.json.decision, undefined, 'not a block');
-    assert.equal(r.json.systemMessage, 'verify FAILED on the current code: eslint, flutter-test');
+    assert.equal(
+      r.json.systemMessage,
+      'verify FAILED on the current code: 2 of 15 checks ran; failed: eslint, flutter-test',
+    );
     // ...and a red run on OLDER code still blocks: it says nothing about this code.
     write(dir, 'functions/src/app.js', "'use strict';\n// changed after the red run\n");
     assert.equal(hook(dir, 'stop-verify', {}).json.decision, 'block');
@@ -186,18 +193,16 @@ test('stop-screens: the work counts even when it was committed during the sessio
   });
 });
 
-test('stop-screens: block first, then (stop_hook_active) allow with the notice', () => {
+test('stop-screens (L130): stop_hook_active no longer releases the block', () => {
   withRepo((dir) => {
     startSession(dir);
-    write(dir, 'app/lib/shared/components/card.dart', 'void card() {}\n');
-    assert.equal(
-      hook(dir, 'stop-screens', { ...SESSION, stop_hook_active: false }).json.decision,
-      'block',
-    );
-    const again = hook(dir, 'stop-screens', { ...SESSION, stop_hook_active: true });
-    assert.equal(again.status, 0);
-    assert.equal(again.json.decision, undefined);
-    assert.match(again.json.systemMessage, /screens changed without a changelog entry/);
+    write(dir, 'app/lib/shared/components/card.dart', 'void card() {}');
+    for (const active of [false, true]) {
+      const r = hook(dir, 'stop-screens', { ...SESSION, stop_hook_active: active });
+      assert.equal(r.status, 0);
+      assert.equal(r.json.decision, 'block', `stop_hook_active=${active}`);
+      assert.match(r.json.reason, /Changelog waived:/, 'the way out is named');
+    }
   });
 });
 

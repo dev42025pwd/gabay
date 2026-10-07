@@ -32,13 +32,29 @@ function checkChangelogDart(src) {
     const next = src.indexOf('List<ChangelogEntry>', at + 1);
     const block = src.slice(at, next === -1 ? src.length : next);
     const seen = new Set();
-    for (const m of block.matchAll(/number:\s*(\d+)/g)) {
-      if (seen.has(m[1])) {
-        problems.push({
-          message: `changelog.dart: the ${surface} changelog has entry number ${m[1]} twice`,
-        });
+    const byBullets = new Map(); // bullets function -> entry number that already uses it
+    for (const entry of block.split('ChangelogEntry(').slice(1)) {
+      const number = /number:\s*(\d+)/.exec(entry)?.[1];
+      if (number !== undefined) {
+        if (seen.has(number)) {
+          problems.push({
+            message: `changelog.dart: the ${surface} changelog has entry number ${number} twice`,
+          });
+        }
+        seen.add(number);
       }
-      seen.add(m[1]);
+      // A renumbered copy still points at the old entry's bullets: two entries, one text.
+      const bullets = /bullets:\s*(\w+)/.exec(entry)?.[1];
+      if (bullets !== undefined) {
+        const other = byBullets.get(bullets);
+        if (other !== undefined && other !== number) {
+          const [a, b] = [Number(other), Number(number)].sort((x, y) => x - y);
+          problems.push({
+            message: `changelog.dart: the ${surface} changelog entries ${a} and ${b} both use bullets ${bullets}; each entry needs its own text`,
+          });
+        }
+        byBullets.set(bullets, number);
+      }
     }
   }
   return problems;

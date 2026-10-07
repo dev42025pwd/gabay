@@ -1,7 +1,7 @@
 // no-bare-textfield, colour-literals and no-snackbar: the three text-pattern linters for Dart.
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const { lint, at } = require('./helper');
 

@@ -2,7 +2,7 @@
 // the real hooks, linters and version files (L129; standard §8.1).
 'use strict';
 
-const test = require('node:test');
+const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

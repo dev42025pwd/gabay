@@ -2,7 +2,7 @@
 // left listening is found and stopped (so `npm run verify` never leaks an emulator).
 'use strict';
 
-const test = require('node:test');
+const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const net = require('node:net');

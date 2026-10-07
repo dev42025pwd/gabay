@@ -1,7 +1,7 @@
 // S4 re-check (dod-reviewer on 57e7616): I-1 and nits 1, 3, 4, and design choice 1's message.
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

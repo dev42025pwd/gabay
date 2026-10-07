@@ -3,7 +3,7 @@
 // The long full run (schema, seed, emulator, Flutter) is shown by hand in the slice report.
 'use strict';
 
-const test = require('node:test');
+const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -38,6 +38,13 @@ function scratch(extra = {}) {
   return dir;
 }
 
+/** The environment for a child verify: this one, minus the parent's node:test context (a child `node --test` would then refuse to run files). */
+function childEnv(extra) {
+  const env = { ...process.env, ...extra };
+  delete env.NODE_TEST_CONTEXT;
+  return env;
+}
+
 const verify = (dir, args, { env = {}, node = process.execPath, preload } = {}) => {
   const r = spawnSync(
     node,
@@ -45,7 +52,7 @@ const verify = (dir, args, { env = {}, node = process.execPath, preload } = {}) 
     {
       cwd: dir,
       encoding: 'utf8',
-      env: { ...process.env, ...env },
+      env: childEnv(env),
     },
   );
   const state = fs.existsSync(path.join(dir, '.verify', 'last-run.json'))
@@ -191,6 +198,41 @@ test('a check that changes code (or an edit during the run) makes the run fail: 
     assert.match(r.out, /^FAIL code-changed-during-run/m);
     assert.deepEqual(r.state.failed, ['code-changed-during-run']);
     assert.equal(r.state.result, 'red');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- S5 review I1: a test glob that matches nothing exits 0 with "# tests 0" ---------------------------
+
+test('a test check that ran no tests fails, however the runner exited (I1)', () => {
+  const dir = scratch({
+    'package.json': JSON.stringify({
+      scripts: { 'lint:test': 'node --test "nomatch/**/*.test.js"' },
+    }),
+  });
+  try {
+    const r = verify(dir, ['--only', 'linter-tests']);
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /^FAIL linter-tests/m);
+    assert.match(r.out, /no tests ran/);
+    assert.deepEqual(r.state.failed, ['linter-tests']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a test check passes when tests ran (I1)', () => {
+  const dir = scratch({
+    'package.json': JSON.stringify({
+      scripts: { 'lint:test': 'node --test "tests/**/*.test.js"' },
+    }),
+    'tests/a.test.js': "require('node:test')('one', () => {});\n",
+  });
+  try {
+    const r = verify(dir, ['--only', 'linter-tests']);
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /^ok\s+linter-tests/m);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

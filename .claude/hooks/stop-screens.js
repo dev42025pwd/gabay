@@ -1,15 +1,19 @@
-// Stop hook (main session): the session may not finish when user-facing screens changed and no
-// changelog entry came with them (standard §4.8, WORKING_AGREEMENT §6).
+// Stop hook (main session only; registered under Stop, never SubagentStop): the session may not finish
+// when user-facing screens changed and no changelog entry came with them (standard §4.8,
+// WORKING_AGREEMENT §6). Ruling L130: it blocks until there is an entry, OR the Stop event's
+// last_assistant_message holds a line that starts "Changelog waived:" followed by a reason on that line
+// (the product owner reads the reason). stop_hook_active does NOT release it.
 //
-// "Changed" is measured from the session's baseline (the HEAD recorded by session-baseline.js; HEAD itself
-// when there is none) to the working tree, so work committed during the session still counts.
-//   screens:   app/lib/features/**/views/**, app/lib/shared/components/**, app/lib/shared/widgets/**, or a
-//              key of app/lib/l10n/app_en.arb that is not a changelog key
+// "Changed" is measured from the session's baseline (the HEAD recorded by session-baseline.js; HEAD
+// itself when there is none) to the working tree, so work committed during the session still counts.
+//   screens:   any file under app/lib/features/**, app/lib/shared/components|widgets|navigation/**, or
+//              app/lib/core/theme/** (a rename counts: the new path is there), or a key of
+//              app/lib/l10n/app_en.arb that is not a changelog key. An ARB "@key" entry is translator
+//              metadata, not wording a user sees, so it does not count.
 //   changelog: a real change to app/lib/core/config/changelog.dart, or a changelog* key in the ARB file.
-//              The pre-commit hook rewrites the top entry's version and date on every commit that touches
-//              a surface; that stamp alone is NOT an entry, so version and date values are ignored here.
-// First time: block. If stop_hook_active is true and it still holds, allow with a notice ("shown, not
-// trapped", the spirit of L129): the product owner sees it.
+//              "Real" means: comments, whitespace and the version and date values are ignored. The
+//              pre-commit hook rewrites the top entry's version and date on every commit that touches a
+//              surface; that stamp alone is NOT an entry.
 'use strict';
 
 const { execFileSync } = require('node:child_process');
@@ -20,11 +24,13 @@ const { ROOT, readEvent, baselineFile, block, notice } = require('./lib');
 const ARB = 'app/lib/l10n/app_en.arb';
 const CHANGELOG = 'app/lib/core/config/changelog.dart';
 const SCREEN_PATHS = [
-  /^app\/lib\/features\/.+\/views\/.+/,
-  /^app\/lib\/shared\/components\//,
-  /^app\/lib\/shared\/widgets\//,
+  /^app\/lib\/features\/.+/,
+  /^app\/lib\/shared\/(components|widgets|navigation)\/.+/,
+  /^app\/lib\/core\/theme\/.+/,
 ];
 const isChangelogKey = (key) => /^@?changelog/.test(key);
+const isMetadataKey = (key) => key.startsWith('@');
+const WAIVER = /^[ \t]*Changelog waived:[ \t]*(\S.*)$/m;
 
 const git = (args) =>
   execFileSync('git', args, {
@@ -82,24 +88,28 @@ function changedKeys(before, after) {
   );
 }
 
-/** changelog.dart with every version and date value blanked, so a version stamp compares equal. */
-const withoutStamp = (text) =>
-  (text ?? '').replace(/(version:\s*')[^']*(')/g, '$1$2').replace(/(date:\s*')[^']*(')/g, '$1$2');
+/** changelog.dart without comments and whitespace, and with every version and date value blanked. */
+const withoutNoise = (text) =>
+  (text ?? '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/(version:\s*')[^']*(')/g, '$1$2')
+    .replace(/(date:\s*')[^']*(')/g, '$1$2')
+    .replace(/\s+/g, '');
 
 function assess(base) {
   const paths = changedPaths(base);
-  const screens = paths.filter((p) => SCREEN_PATHS.some((re) => re.test(p)));
+  const screens = paths.filter((p) => !/\.md$/i.test(p) && SCREEN_PATHS.some((re) => re.test(p)));
   let arbChanged = [];
   if (paths.includes(ARB)) arbChanged = changedKeys(baseText(base, ARB), diskText(ARB));
-  const copyKeys = arbChanged.filter((k) => !isChangelogKey(k));
-  if (copyKeys.length)
-    screens.push(
-      `${ARB} (${copyKeys.slice(0, 3).join(', ')}${copyKeys.length > 3 ? ', ...' : ''})`,
-    );
+  const wording = arbChanged.filter((k) => !isMetadataKey(k) && !isChangelogKey(k));
+  if (wording.length) {
+    screens.push(`${ARB} (${wording.slice(0, 3).join(', ')}${wording.length > 3 ? ', ...' : ''})`);
+  }
   const entryInDart =
     paths.includes(CHANGELOG) &&
-    withoutStamp(baseText(base, CHANGELOG)) !== withoutStamp(diskText(CHANGELOG));
-  const entryInArb = arbChanged.some(isChangelogKey);
+    withoutNoise(baseText(base, CHANGELOG)) !== withoutNoise(diskText(CHANGELOG));
+  const entryInArb = arbChanged.some((k) => !isMetadataKey(k) && isChangelogKey(k));
   return { screens, hasEntry: entryInDart || entryInArb };
 }
 
@@ -113,12 +123,13 @@ async function main() {
   }
   if (result.screens.length === 0 || result.hasEntry) return;
   const list = result.screens.slice(0, 6).join(', ') + (result.screens.length > 6 ? ', ...' : '');
-  if (event.stop_hook_active) {
-    notice(`screens changed without a changelog entry: ${list}`);
+  const waiver = WAIVER.exec(String(event.last_assistant_message ?? ''));
+  if (waiver) {
+    notice(`changelog waived for the screen changes (${list}): ${waiver[1].trim()}`);
     return;
   }
   block(
-    `Screens changed (${list}) with no changelog entry. Add one to the surface's changelog (app/lib/core/config/changelog.dart and its bullet in app/lib/l10n/app_en.arb), then finish.`,
+    `Screens changed (${list}) with no changelog entry. Add one to the surface's changelog (app/lib/core/config/changelog.dart and its bullet in app/lib/l10n/app_en.arb), or, if no user-visible change is meant, put a line "Changelog waived: <reason>" in your final message.`,
   );
 }
 

@@ -28,10 +28,10 @@ What the hooks do (`WORKING_AGREEMENT.md` §6):
 
 | Hook | Does |
 |---|---|
-| `.githooks/pre-commit` | refuses a staged `.env` (not `.env.example`), a repeated changelog entry, and files the structural linters refuse (`node tools/lint/run.js --files ...`, and `migrations-immutable --staged`); then raises the patch version of each app surface the commit touches (0.1.0 to 0.1.1) and stamps that surface's top changelog entry with the version and today's date in Asia/Manila (L129). A version you raised by hand is kept. It also works for `git commit -- <paths>`. |
+| `.githooks/pre-commit` | refuses a staged `.env` (not `.env.example`), a repeated changelog entry, and what the structural linters refuse in the STAGED content (`migrations-immutable --staged` too); then raises the patch version of each app surface the commit touches (0.1.0 to 0.1.1) and stamps that surface's top changelog entry with the version and today's date in Asia/Manila (L129). A version you raised by hand is kept. It also works for `git commit -- <paths>`. |
 | `.githooks/post-commit` | puts the index back in step after a stamped `git commit -- <paths>` |
-| `.githooks/pre-push` | runs `npm run verify`; the push is refused if it fails |
-| `.claude/settings.json` | the main session may not finish until `npm run verify` has run on the current code (a failed run is shown, not a trap); nor when screens changed with no changelog entry; and the schema-to-form drift linter runs after every Dart edit |
+| `.githooks/pre-push` | refuses the push while code has uncommitted or untracked changes (verify checks the working tree, so it would say nothing about the pushed commits), then runs `npm run verify`; the push is refused if it fails |
+| `.claude/settings.json` | the main session may not finish until `npm run verify` has run on the current code (a failed run is shown, not a trap); nor when screens changed with no changelog entry, unless the final message has a line `Changelog waived: <reason>` (L130); and the schema-to-form drift linter runs after every Dart edit |
 
 ## Stack (Blueprint Part 1 holds the pins)
 

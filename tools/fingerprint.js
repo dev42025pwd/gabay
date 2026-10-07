@@ -17,7 +17,12 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const CODE_PREFIXES = ['app/', 'functions/', 'db/', 'tools/', '.githooks/', '.claude/hooks/'];
-const CODE_FILES = new Set(['package.json', 'firebase.json', '.claude/settings.json']);
+const CODE_FILES = new Set([
+  'package.json',
+  'firebase.json',
+  '.claude/settings.json',
+  '.gitignore',
+]);
 /** Not code even when it sits under a code folder. */
 const NOT_CODE = [/\.md$/i];
 

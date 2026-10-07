@@ -1,7 +1,7 @@
 // The runner: arguments, which files are skipped, exit codes, and the shared scanner.
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

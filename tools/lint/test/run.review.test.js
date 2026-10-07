@@ -1,7 +1,7 @@
 // S4 review I2 (the runner must not pass silently) and nit 3 (migration names, any case, any folder).
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

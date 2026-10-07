@@ -1,7 +1,7 @@
 // tools/fingerprint.js: the code fingerprint shared by `npm run verify` and the Stop hook (L129).
 'use strict';
 
-const test = require('node:test');
+const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

@@ -3,7 +3,7 @@
 // exit code is set by the test (the real verify takes minutes and is proven separately).
 'use strict';
 
-const test = require('node:test');
+const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

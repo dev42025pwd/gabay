@@ -1,7 +1,7 @@
 // S4 review C1 and I1: SQL fragments that build a query without looking like a whole statement.
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const { lint, at } = require('./helper');
 

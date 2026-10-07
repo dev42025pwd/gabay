@@ -22,13 +22,21 @@ const COPIED = [
   'app/lib/l10n/app_en.arb',
 ];
 
+/**
+ * A test folder or node_modules inside the repository: not copied into a scratch repo. It looks at
+ * the path RELATIVE to the repository, so a repository that itself lives under a "test" folder works.
+ */
+function isTestPath(relative) {
+  return relative.split(/[\\/]/).some((part) => part === 'test' || part === 'node_modules');
+}
+
 function copy(rel, to) {
   const from = path.join(REAL, rel);
   const target = path.join(to, rel);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.cpSync(from, target, {
     recursive: true,
-    filter: (src) => !/[\\/]node_modules[\\/]/.test(src) && !/[\\/]test[\\/]/.test(src),
+    filter: (src) => !isTestPath(path.relative(REAL, src)),
   });
 }
 
@@ -86,4 +94,4 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 const headFile = (dir, rel) => git(dir, ['show', `HEAD:${rel}`]).out;
 const remove = (dir) => fs.rmSync(dir, { recursive: true, force: true });
 
-module.exports = { REAL, scratchRepo, git, write, read, headFile, remove };
+module.exports = { isTestPath, REAL, scratchRepo, git, write, read, headFile, remove };

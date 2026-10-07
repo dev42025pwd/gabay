@@ -1,7 +1,7 @@
 // position-privacy and foreground-manifest.
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const { lint, at } = require('./helper');
 

@@ -1,13 +1,32 @@
 #!/bin/sh
 # Gabay pre-push (standard §8.1, L121): the push is refused unless `npm run verify` is green.
 # Incident this prevents: broken code reaching the shared branch because the local checks were skipped.
-# It runs tools/verify.js under Node 22 (the same file `npm run verify` runs); its exit code is the
+#
+# verify checks the WORKING TREE, not the commits being pushed. So a green verify proves nothing about
+# the pushed commits when code has uncommitted or untracked changes: this hook refuses the push first
+# (documents, *.md, do not count). Commit or stash them. (Alternative passed over: verify in a clean
+# worktree of the pushed commit; node_modules and the Flutter dependencies would have to be rebuilt on
+# every push.)
+#
+# Then it runs tools/verify.js under Node 22 (the same file `npm run verify` runs); its exit code is the
 # number of failed checks, so any failure blocks the push. It takes minutes: it applies the schema,
 # seeds the database and runs the Flutter tests. Skip it only with `git push --no-verify`, and CI
 # (lint.yml) will still refuse the merge.
 root=$(git rev-parse --show-toplevel) || exit 1
-. "$root/.githooks/node.sh"
 cd "$root" || exit 1
+
+# The same set of paths the code fingerprint covers (tools/fingerprint.js).
+dirty=$(git -c core.quotePath=false status --porcelain --untracked-files=all -- \
+  app functions db tools .githooks .claude/hooks .claude/settings.json \
+  package.json firebase.json .gitignore ':(exclude)*.md')
+if [ -n "$dirty" ]; then
+  echo "pre-push: uncommitted or untracked code, so verify would not describe what you are pushing:" >&2
+  echo "$dirty" | sed 's/^/  /' >&2
+  echo "Commit or stash these, then push again." >&2
+  exit 1
+fi
+
+. "$root/.githooks/node.sh"
 gabay_node tools/verify.js
 status=$?
 if [ "$status" -ne 0 ]; then

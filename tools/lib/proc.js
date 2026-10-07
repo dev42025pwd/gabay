@@ -118,12 +118,15 @@ async function waitPortsFree(ports, ms) {
 function listeners(port) {
   const pids = new Set();
   if (WINDOWS) {
-    const out =
-      spawnSync('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8', windowsHide: true }).stdout ??
-      '';
-    for (const line of out.split('\n')) {
-      const cols = line.trim().split(/\s+/);
-      if (cols[3] === 'LISTENING' && cols[1]?.endsWith(`:${port}`)) pids.add(Number(cols[4]));
+    // IPv4 and IPv6 are listed separately; a server bound to ::1 only (localhost on Node 18+) is in tcpv6.
+    for (const protocol of ['tcp', 'tcpv6']) {
+      const out =
+        spawnSync('netstat', ['-ano', '-p', protocol], { encoding: 'utf8', windowsHide: true })
+          .stdout ?? '';
+      for (const line of out.split('\n')) {
+        const cols = line.trim().split(/\s+/);
+        if (cols[3] === 'LISTENING' && cols[1]?.endsWith(`:${port}`)) pids.add(Number(cols[4]));
+      }
     }
   } else {
     const out =

@@ -1,6 +1,6 @@
 'use strict';
 
-const test = require('node:test');
+const test = require('../../test/timeout');
 const assert = require('node:assert/strict');
 const { lint, at, SCHEMA } = require('./helper');
 

@@ -22,7 +22,12 @@
 // After EVERY run, green or red, .verify/last-run.json records the code fingerprint, the result and
 // the failed checks; the Claude Stop hook reads it (L129). --only a,b runs some checks (a "partial"
 // run: it never counts as a verify for the Stop hook). Servers a check starts are always stopped, and
-// a listener left on their ports is itself a failure.
+// a listener left on their ports is itself a failure. An interrupt stops only what THIS run started
+// (its command trees, and the ports of servers it started); a process it did not start is never touched.
+//
+// TEST SEAMS (used by tools/test, not for normal use): GABAY_VERIFY_EMULATOR_TIMEOUT_MS shortens the
+// emulator check's timeout; GABAY_VERIFY_TEST_INTERRUPT_MS makes the run call its Ctrl-C cleanup after
+// that many milliseconds, because a real Ctrl-C cannot be sent from a script on Windows.
 'use strict';
 
 const fs = require('node:fs');
@@ -71,16 +76,34 @@ const timed = async (fn) => {
   return { ...result, seconds: (Date.now() - start) / 1000 };
 };
 
-/** A check that is one command. */
+/** How many tests node --test reports (its TAP "# tests N" line, or the spec reporter's "tests N"), or null. */
+function testsRan(output) {
+  const m = /^(?:#|ℹ)\s+tests\s+(\d+)/m.exec(output);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * A check that is one command. With { tests: true } it also fails when the run reports no tests:
+ * `node --test "<glob>"` exits 0 when the glob matches nothing, which would pass a check that
+ * checked nothing.
+ */
 const command =
-  (commandLine, { cwd = ROOT, timeoutMs = TIMEOUT_MS.default } = {}) =>
+  (commandLine, { cwd = ROOT, timeoutMs = TIMEOUT_MS.default, tests = false } = {}) =>
   async () => {
     const r = await runCommand(commandLine, { cwd, timeoutMs });
-    const note = r.timedOut
+    let note = r.timedOut
       ? `\nTIMED OUT after ${timeoutMs / 1000} s; the process tree was stopped.`
       : '';
-    return { ok: r.code === 0 && !r.timedOut, output: tail(r.output) + note };
+    let ok = r.code === 0 && !r.timedOut;
+    if (ok && tests && !(testsRan(r.output) > 0)) {
+      ok = false;
+      note += '\nno tests ran (0, or no "# tests" line): the test glob probably matches nothing.';
+    }
+    return { ok, output: tail(r.output) + note };
   };
+
+/** Ports of servers THIS run has started and not yet seen stop: the only ones an interrupt may sweep. */
+const startedPorts = new Set();
 
 /** A check that starts servers: refuses to start on busy ports, and fails if any listener is left. */
 const withServers = (ports, run) => async () => {
@@ -91,9 +114,12 @@ const withServers = (ports, run) => async () => {
       output: `Cannot start: ${busy.join(', ')} already in use. Stop that process (an emulator you started?) and run verify again.`,
     };
   }
+  // The ports were free a moment ago, so a listener on them from here on is ours.
+  ports.forEach((p) => startedPorts.add(p));
   const result = await run();
   await waitPortsFree(ports, SHUTDOWN_GRACE_MS); // a normal shutdown takes a few seconds
   const orphans = sweepPorts(ports);
+  ports.forEach((p) => startedPorts.delete(p));
   if (orphans.length) {
     const list = orphans.map((o) => `port ${o.port} pid ${o.pid}`).join(', ');
     return { ok: false, output: `${result.output}\nORPHAN left behind and now stopped: ${list}` };
@@ -199,12 +225,12 @@ const CHECKS = [
   { name: 'node-version', run: nodeVersion, fatal: true },
   { name: 'node-check', run: nodeCheck },
   { name: 'structural-linters', run: structuralLinters },
-  { name: 'linter-tests', run: command('npm run lint:test') },
-  { name: 'tools-tests', run: command('npm run tools:test') },
+  { name: 'linter-tests', run: command('npm run lint:test', { tests: true }) },
+  { name: 'tools-tests', run: command('npm run tools:test', { tests: true }) },
   { name: 'eslint', run: command(eslintCommand()) },
   { name: 'prettier', run: command(prettierCommand()) },
-  { name: 'api-tests', run: command('npm run api:test') },
-  { name: 'db-tools-tests', run: command('npm --prefix db/tools test') },
+  { name: 'api-tests', run: command('npm run api:test', { tests: true }) },
+  { name: 'db-tools-tests', run: command('npm --prefix db/tools test', { tests: true }) },
   { name: 'schema-run-1', run: command('npm run setup-db -- --skip-seed --stop-on-error') },
   { name: 'schema-run-2', run: command('npm run setup-db -- --skip-seed --stop-on-error') },
   {
@@ -243,7 +269,7 @@ async function main() {
   const stop = (signal) => {
     console.error(`\n${signal}: stopping every command and server verify started...`);
     killAll();
-    sweepPorts([...new Set([...FUNCTIONS_PORTS, ...SEED_PORTS])]);
+    sweepPorts([...startedPorts]); // only servers this run started; a foreign listener is never touched
     process.exit(130);
   };
   process.on('SIGINT', () => stop('SIGINT'));
@@ -293,6 +319,7 @@ async function main() {
     partial: only !== null,
     failed,
     checks: results,
+    totalChecks: CHECKS.length,
     finishedAt: new Date().toISOString(),
     seconds: Number(total),
     node: process.versions.node,
