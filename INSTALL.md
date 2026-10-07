@@ -38,6 +38,30 @@ npm run seed         # needs Java 11+ for the Auth emulator; fill PG* and SEED_P
 
 It creates the two test tenants, their venues and the six `@gabay.test` accounts; see `db/seeds/README.md`. Put your spike exports in `db/seeds/sources/spike-exports/` and run it again.
 
+### A.1c The API and the database tools (Phase 1, slice S2)
+
+Node 22 is required (see A.2 for fnm). Fill `.env` from `.env.example` first (the `PG*` keys are required; the API stops at start-up and names any missing key).
+
+```sh
+cd functions && npm ci && cd ..      # the API's pinned packages (exact versions, committed lockfile)
+cd db/tools && npm ci && cd ../..    # the database scripts' own packages (pg 8.23.1)
+
+npm run api:test      # the API tests (node --test) against the local gabay_dev; they create only TEMP tables
+npm run api:lint      # ESLint and Prettier check; both exit non-zero on a violation
+npm run setup-db      # dev mode: db/schema.sql -> db/migrations -> the test seed (needs Java 11+). RESETS gabay_dev
+npm run setup-db -- --bootstrap     # schema -> reference seed (platform lookups, roles) -> tenant provisioning (Phase 2)
+npm run migrate       # apply db/migrations in order (none exist yet; it says so and exits 0)
+```
+
+`setup-db` options: `--stop-on-error`, `--skip-schema`, `--skip-migrations`, `--skip-seed`. It prints the schema's table, index and trigger counts (expected 56, 133, 1). The API tests need a schema in `gabay_dev`; `setup-db` creates it.
+
+To run the API in the Functions emulator (no Firebase project, nothing is deployed):
+
+```sh
+db/seeds/node_modules/.bin/firebase emulators:start --only functions --project demo-gabay
+curl http://127.0.0.1:5001/demo-gabay/asia-southeast1/api/api/health     # {"status":"ok","db":"ok"}
+```
+
 ### A.2 Added in Phase 1 (not yet written)
 
 - Flutter 3.47.x and Dart 3.13.x; Android SDK (API 24–37); Xcode on the team's Mac for iOS (P1-05).

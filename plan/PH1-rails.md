@@ -59,7 +59,7 @@ Each slice ends with its evidence pasted into the slice report (outputs with exi
 - The seed skips the penthouse with a clear message when `sources/internal/` is absent (a clean clone).
 - Check: `git status` lists no APK, no internal data and no `.env`; first local commit made; nothing pushed.
 
-### S2 — API skeleton (`functions/`)
+### S2 — API skeleton (`functions/`) — BUILT 2026-10-07 by api-coder; awaiting dod-reviewer
 Checklist items, adapted where Cloud Functions differ (§6 lists each adaptation):
 - **§3.1** middleware order: `trust proxy` hop count from env (default 1) → `x-powered-by` off → `helmet` → `cors` allow-list from `CORS_ORIGINS` (loud warning on the permissive fallback) → 5 MB body limit (`MAX_JSON_BODY`) → audit-logger slot (filled in Phase 2) → `/api` no-store headers → rate-limiter slot (Phase 2) → routes → 404 → error handler.
 - **§3.16** config: `.env.example` heavily commented; the env loaded by absolute path; fail fast on missing required config; the `GlobalSetting` resolver (frozen defaults, 30 s cache, never throws, `PUBLIC_FLAGS` allow-list).
@@ -74,6 +74,7 @@ Checklist items, adapted where Cloud Functions differ (§6 lists each adaptation
 - ESLint + Prettier with rules that fail the build.
 - Tests with Node's built-in runner (`node --test`), against the local `gabay_dev`: error shape, the middleware order, pagination's count/page agreement, the actor context, the settings resolver's safe default on DB failure, `/api/health` through the Functions emulator.
 - Pins: express 5, pg 8, decimal.js 10, helmet 8, cors 2, express-rate-limit 8, multer 2, firebase-functions 7, firebase-admin 14, zod, pino; exact versions read from npm on the day, rechecked against the Blueprint (a moved major is raised with you, not bumped).
+- Evidence (api-coder, 2026-10-07; full output in the slice report): `npm ci` exit 0 in `functions/` and `db/tools/`; `node --test` in `functions/` 39 pass, 0 fail, exit 0 (twice); `db/tools` tests 5 pass, exit 0; `npm run lint` and `format:check` exit 0, each exit 1 on a deliberately bad file (deleted); `setup-db` dev exit 0 with 56 tables, 133 indexes, 1 trigger, six venues, six accounts; `--bootstrap` exit 0; `migrate` with no migrations exit 0; the Functions emulator answered `GET /demo-gabay/asia-southeast1/api/api/health` with `{"status":"ok","db":"ok"}`. Choices not in this plan: no dotenv (Node's `process.loadEnvFile`); `db/tools/` has its own package; DATE columns are returned as text by the pool.
 
 ### S3 — App skeleton (`app/`)
 - `flutter create --org com.dynamiqes --project-name gabay --platforms android,ios,web`; `minSdk 24`; iOS deployment target 15.0.

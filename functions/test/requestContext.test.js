@@ -1,0 +1,43 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const express = require('express');
+const { runWithActor, getActorId, getTenantId } = require('../src/utils/requestContext');
+const { listen } = require('./helpers');
+
+test('actor context: null outside a request, the actor inside, null again after', async () => {
+  assert.equal(getActorId(), null);
+  assert.equal(getTenantId(), null);
+  const inside = await runWithActor(42, async () => {
+    await new Promise((resolve) => setImmediate(resolve)); // survives an async hop
+    return [getActorId(), getTenantId()];
+  });
+  assert.deepEqual(inside, [42, null]);
+  assert.equal(getActorId(), null);
+});
+
+test('actor context: the tenant slot is carried when a caller sets it', () => {
+  runWithActor(1, () => assert.equal(getTenantId(), 7), { tenantId: 7 });
+});
+
+test('actor context: concurrent requests never see each other', async () => {
+  const app = express();
+  app.use((req, res, next) => runWithActor(Number(req.query.u), next));
+  app.get('/who', async (req, res) => {
+    await new Promise((resolve) => setTimeout(resolve, 20 - Number(req.query.u))); // finish out of order
+    res.json({ actor: getActorId() });
+  });
+  const s = await listen(app);
+  try {
+    const answers = await Promise.all(
+      [1, 2, 3, 4, 5].map((u) => fetch(`${s.url}/who?u=${u}`).then((r) => r.json())),
+    );
+    assert.deepEqual(
+      answers.map((a) => a.actor),
+      [1, 2, 3, 4, 5],
+    );
+  } finally {
+    await s.close();
+  }
+});

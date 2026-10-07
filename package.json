@@ -6,6 +6,10 @@
     "node": "22.x"
   },
   "scripts": {
-    "seed": "npm --prefix db/seeds run seed"
+    "seed": "npm --prefix db/seeds run seed",
+    "setup-db": "npm --prefix db/tools run setup-db --",
+    "migrate": "npm --prefix db/tools run migrate",
+    "api:test": "npm --prefix functions test",
+    "api:lint": "npm --prefix functions run lint && npm --prefix functions run format:check"
   }
 }

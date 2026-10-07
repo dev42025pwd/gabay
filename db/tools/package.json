@@ -1,0 +1,17 @@
+{
+  "name": "gabay-db-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gabay's database scripts: the migration runner and the setup-db orchestrator (standard §8.2). Kept apart from the function bundle.",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "migrate": "node migrate.js",
+    "setup-db": "node setup-db.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "pg": "8.23.1"
+  }
+}
