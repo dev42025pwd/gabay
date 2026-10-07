@@ -1,7 +1,8 @@
 // The Express app, built in the standard's load-bearing order (§3.1; plan/PH1-rails.md S2):
 //
 //   trust proxy -> x-powered-by off -> helmet -> cors allow-list -> JSON body limit
-//   -> audit logger (slot) -> /api no-store -> rate limiter (slot) -> routes -> 404 -> errors
+//   -> requestId -> actorContext (slot) -> audit logger (slot) -> /api no-store
+//   -> rate limiter (slot) -> routes -> 404 -> errors
 //
 // Cloud Functions owns TLS, the server and listen(), so the standard's TLS options, static files,
 // SPA fallback and "connect, then listen" do not apply (plan §6). createApp() returns the app and
@@ -16,7 +17,12 @@ const { getConfig } = require('./config');
 const { getDb } = require('./db');
 const { createLogger } = require('./utils/logger');
 const { createErrorHandler, notFound } = require('./utils/errors');
+const { createRequestId } = require('./middleware/requestId');
+const { actorContext } = require('./middleware/actorContext');
 const { healthRoutes } = require('./routes/health');
+
+/** Response headers a browser page may read: the request id, so a user can quote it in a report. */
+const EXPOSED_HEADERS = ['X-Request-Id'];
 
 /**
  * CORS allow-list from CORS_ORIGINS (§3.1). A request with no Origin (curl, server-to-server)
@@ -27,10 +33,13 @@ function corsMiddleware(config, logger) {
     logger.warn(
       'CORS_ORIGINS is empty: allowing EVERY origin. Set CORS_ORIGINS to the admin web page address before any deploy.',
     );
-    return cors();
+    return cors({ exposedHeaders: EXPOSED_HEADERS });
   }
   const allowed = new Set(config.corsOrigins);
-  return cors({ origin: (origin, callback) => callback(null, !origin || allowed.has(origin)) });
+  return cors({
+    origin: (origin, callback) => callback(null, !origin || allowed.has(origin)),
+    exposedHeaders: EXPOSED_HEADERS,
+  });
 }
 
 /** SLOT, filled in Phase 2 (§3.6): audit rows for POST/PUT/DELETE, written on res.on('finish'). */
@@ -68,6 +77,8 @@ function createApp({
   app.use(helmet());
   app.use(corsMiddleware(config, logger));
   app.use(express.json({ limit: config.maxJsonBody })); // never a blanket 50 MB; big files go through multer
+  app.use(createRequestId(logger));
+  app.use(actorContext); // the actor is null until Phase 2 sign-in (L126)
   app.use(auditLoggerSlot);
   app.use('/api', apiNoStore);
   app.use('/api', rateLimiterSlot);

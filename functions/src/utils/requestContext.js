@@ -22,4 +22,7 @@ const getActorId = () => als.getStore()?.userId ?? null;
  */
 const getTenantId = () => als.getStore()?.tenantId ?? null;
 
-module.exports = { runWithActor, getActorId, getTenantId };
+/** True inside a request's context (even with no actor yet), false in a script or a test. */
+const inRequestContext = () => als.getStore() !== undefined;
+
+module.exports = { runWithActor, getActorId, getTenantId, inRequestContext };

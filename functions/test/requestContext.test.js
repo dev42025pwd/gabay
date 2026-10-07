@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { runWithActor, getActorId, getTenantId } = require('../src/utils/requestContext');
+const {
+  runWithActor,
+  getActorId,
+  getTenantId,
+  inRequestContext,
+} = require('../src/utils/requestContext');
+const { actorContext } = require('../src/middleware/actorContext');
 const { listen } = require('./helpers');
 
 test('actor context: null outside a request, the actor inside, null again after', async () => {
@@ -37,6 +43,23 @@ test('actor context: concurrent requests never see each other', async () => {
       answers.map((a) => a.actor),
       [1, 2, 3, 4, 5],
     );
+  } finally {
+    await s.close();
+  }
+});
+
+test('actorContext slot: runs the rest of the request inside a context with no actor yet (Phase 2 fills it)', async () => {
+  const app = express();
+  app.use(actorContext);
+  app.get('/ctx', async (req, res) => {
+    await new Promise((resolve) => setImmediate(resolve));
+    res.json({ inContext: inRequestContext(), actor: getActorId(), tenant: getTenantId() });
+  });
+  const s = await listen(app);
+  try {
+    assert.equal(inRequestContext(), false, 'not in a context outside a request');
+    const body = await fetch(`${s.url}/ctx`).then((r) => r.json());
+    assert.deepEqual(body, { inContext: true, actor: null, tenant: null });
   } finally {
     await s.close();
   }

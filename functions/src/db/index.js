@@ -5,6 +5,7 @@
 const pg = require('pg');
 const { getConfig } = require('../config');
 const { createLogger } = require('../utils/logger');
+const { isConnectionError } = require('./connectionError');
 
 const PG_DATE_OID = 1082;
 
@@ -56,10 +57,24 @@ function createDb(config, logger = createLogger(config.logLevel)) {
     'database pool created',
   );
 
+  /**
+   * Tags a connection-level failure (refused, unknown host, pool timeout, server shutdown) with
+   * `dbUnavailable`, so the error handler can answer 503 on any route (S2 review, Important 2).
+   * Statement errors (a unique violation, a bad column) are left alone: those are 4xx or 500.
+   */
+  async function tagUnavailable(run) {
+    try {
+      return await run();
+    } catch (err) {
+      if (isConnectionError(err)) err.dbUnavailable = true;
+      throw err;
+    }
+  }
+
   /** Runs one parameterized statement on the pool. */
   async function query(text, params) {
     assertParams(text, params);
-    return pool.query(text, params);
+    return tagUnavailable(() => pool.query(text, params));
   }
 
   /**
@@ -67,28 +82,33 @@ function createDb(config, logger = createLogger(config.logLevel)) {
    * params rule as `query` and runs on the transaction's own connection.
    */
   async function withTransaction(fn) {
-    const client = await pool.connect();
-    const tx = {
-      query: async (text, params) => {
-        assertParams(text, params);
-        return client.query(text, params);
-      },
-    };
-    try {
-      await client.query('BEGIN');
-      const result = await fn(tx);
-      await client.query('COMMIT');
-      return result;
-    } catch (err) {
+    return tagUnavailable(async () => {
+      const client = await pool.connect();
+      const tx = {
+        query: async (text, params) => {
+          assertParams(text, params);
+          return client.query(text, params);
+        },
+      };
+      let lost = false;
       try {
-        await client.query('ROLLBACK');
-      } catch (rollbackErr) {
-        logger.error({ err: rollbackErr }, 'rollback failed');
+        await client.query('BEGIN');
+        const result = await fn(tx);
+        await client.query('COMMIT');
+        return result;
+      } catch (err) {
+        lost = isConnectionError(err);
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackErr) {
+          lost = true;
+          logger.error({ err: rollbackErr }, 'rollback failed');
+        }
+        throw err;
+      } finally {
+        client.release(lost); // a lost connection is destroyed, not returned to the pool
       }
-      throw err;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   const close = () => pool.end();

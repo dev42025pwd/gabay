@@ -16,7 +16,11 @@ function dateOnly(value) {
     const match = DATE_ONLY.exec(value.trim());
     if (!match) return null;
     const day = match[0];
-    return Number.isNaN(Date.parse(`${day}T00:00:00Z`)) ? null : day;
+    // Round-trip: Date rolls 2026-02-31 over to 2026-03-03, so a day that changes was never a real one.
+    const parsed = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === day
+      ? day
+      : null;
   }
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);

@@ -69,15 +69,17 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
       `SELECT TenantId, SettingKey, SettingValue
          FROM gabay.GlobalSetting
         WHERE TenantId = $1 OR TenantId IS NULL
-        ORDER BY TenantId NULLS FIRST`,
+        ORDER BY TenantId NULLS FIRST`, // tidy output only: the precedence is applied in JS below
       [tenantId],
     );
+    // Precedence is applied here, not trusted to the SQL's ORDER BY: platform rows first, then this
+    // tenant's own rows replace them. A row for any other tenant is ignored (rule 2, defence in depth).
+    const known = result.rows.filter((row) => Object.hasOwn(DEFAULTS, row.settingkey));
+    const platform = known.filter((row) => row.tenantid === null);
+    const own = tenantId === null ? [] : known.filter((row) => Number(row.tenantid) === tenantId);
     const values = new Map();
-    // Platform rows come first, so a tenant override replaces them.
-    for (const row of result.rows) {
-      if (Object.hasOwn(DEFAULTS, row.settingkey)) {
-        values.set(row.settingkey, parseValue(row.settingvalue, DEFAULTS[row.settingkey]));
-      }
+    for (const row of [...platform, ...own]) {
+      values.set(row.settingkey, parseValue(row.settingvalue, DEFAULTS[row.settingkey]));
     }
     return values;
   }

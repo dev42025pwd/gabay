@@ -18,6 +18,16 @@ test('dates: dateOnly gives YYYY-MM-DD from text, from an instant (UTC), or null
   assert.equal(dateOnly(20261007), null);
 });
 
+test('dates: an impossible calendar date is null, not silently rolled over (regression: S2 review, nit 1)', () => {
+  assert.equal(dateOnly('2026-02-31'), null);
+  assert.equal(dateOnly('2026-02-31T10:00:00Z'), null);
+  assert.equal(dateOnly('2026-04-31'), null);
+  assert.equal(dateOnly('2025-02-29'), null, 'not a leap year');
+  assert.equal(dateOnly('2024-02-29'), '2024-02-29', 'a leap day is real');
+  assert.equal(dateOnly('2026-00-10'), null);
+  assert.equal(dateOnly('2026-12-00'), null);
+});
+
 test('dates: projectDates rewrites only the named columns that exist', () => {
   const row = { startdate: new Date('2026-01-31T00:00:00Z'), enddate: null, label: 'x' };
   const out = projectDates(['startdate', 'enddate', 'missing'])(row);

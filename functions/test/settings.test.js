@@ -65,6 +65,20 @@ test('settings: a tenant override beats the platform row, and values parse to th
   assert.deepEqual(db.state.calls[0], [5], 'the tenant id is a bound parameter');
 });
 
+test('settings: tenant beats platform whatever order the rows arrive in (regression: S2 review, Important 3)', async () => {
+  // The tenant row is deliberately FIRST. Precedence must not depend on the SQL's ORDER BY.
+  const db = fakeDb([row(5, 'routing.stairsSaveM', '90'), row(null, 'routing.stairsSaveM', '200')]);
+  const s = createSettings(db.query, fakeLogger());
+  assert.equal(await s.getSetting('routing.stairsSaveM', 5), 90);
+  // Defence in depth (rule 2): another tenant's row is ignored even if one ever slipped through.
+  assert.equal(await s.getSetting('routing.stairsSaveM', 6), 200);
+  const platform = createSettings(
+    fakeDb([row(null, 'routing.stairsSaveM', '200')]).query,
+    fakeLogger(),
+  );
+  assert.equal(await platform.getSetting('routing.stairsSaveM'), 200);
+});
+
 test('settings: cached for 30 s, then re-read; invalidate() forces a re-read now', async () => {
   let clock = 1_000;
   const db = fakeDb([row(null, 'routing.stairsSaveM', '100')]);

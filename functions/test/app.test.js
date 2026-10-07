@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { createDb } = require('../src/db');
 const { testConfig, fakeLogger, startApp } = require('./helpers');
 
-test('app: the middleware stack is in the standard order (§3.1)', async () => {
+test('app: the middleware stack is in the standard order (§3.1, L126)', async () => {
   const s = await startApp();
   try {
     const names = s.app.router.stack.map((layer) => layer.name);
@@ -13,6 +13,8 @@ test('app: the middleware stack is in the standard order (§3.1)', async () => {
       'helmetMiddleware',
       'corsMiddleware',
       'jsonParser',
+      'requestId',
+      'actorContext',
       'auditLoggerSlot',
       'apiNoStore',
       'rateLimiterSlot',
@@ -105,6 +107,11 @@ test('app: CORS allows a listed origin, not an unlisted one, and warns when the 
     assert.equal(ok.headers.get('access-control-allow-origin'), 'http://admin.test');
     const no = await fetch(`${listed.url}/api/health`, { headers: { origin: 'http://evil.test' } });
     assert.equal(no.headers.get('access-control-allow-origin'), null);
+    assert.match(
+      ok.headers.get('access-control-expose-headers') ?? '',
+      /X-Request-Id/i,
+      'a browser may read the request id',
+    );
     assert.equal(listed.logger.calls.warn.length, 0);
 
     assert.equal(open.logger.calls.warn.length, 1, 'the permissive fallback is announced');

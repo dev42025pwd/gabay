@@ -13,7 +13,7 @@ function healthRoutes(db, logger) {
       await db.query('SELECT 1', []);
       res.json({ status: 'ok', db: 'ok' });
     } catch (err) {
-      logger.error({ err }, 'health check: database unreachable');
+      (req.log ?? logger).error({ err }, 'health check: database unreachable');
       res.status(503).json({ error: 'Database unavailable' });
     }
   });

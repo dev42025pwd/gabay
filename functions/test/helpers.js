@@ -16,14 +16,24 @@ function testConfig(overrides = {}) {
   return parseConfig({ ...process.env, ...overrides });
 }
 
-/** A logger that records calls instead of printing them. */
-function fakeLogger() {
-  const calls = { info: [], warn: [], error: [] };
+/**
+ * A logger that records calls instead of printing them. child(bindings) returns a logger that records
+ * into the same calls, with the bindings merged into the first (object) argument, as pino does.
+ */
+function fakeLogger(bindings = {}, calls = { info: [], warn: [], error: [] }) {
   const record =
     (level) =>
-    (...args) =>
-      calls[level].push(args);
-  return { calls, info: record('info'), warn: record('warn'), error: record('error') };
+    (first, ...rest) =>
+      calls[level].push(
+        typeof first === 'string' ? [first, ...rest] : [{ ...bindings, ...first }, ...rest],
+      );
+  return {
+    calls,
+    info: record('info'),
+    warn: record('warn'),
+    error: record('error'),
+    child: (more) => fakeLogger({ ...bindings, ...more }, calls),
+  };
 }
 
 /** One-connection pool: TEMP tables live in a session, so every query must share it. */

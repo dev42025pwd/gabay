@@ -14,6 +14,7 @@ function httpError(httpStatus, message, { expose = false } = {}) {
 }
 
 const GENERIC_500 = 'Internal server error';
+const DB_UNAVAILABLE = 'Database unavailable';
 const PG_UNIQUE_VIOLATION = '23505';
 
 /** A PostgreSQL error: a five-character SQLSTATE `code` plus a `severity`, both set by pg. */
@@ -31,6 +32,8 @@ const BODY_ERRORS = {
 /** Maps any thrown value to { status, message, log }. `log` is true when it should be logged as an error. */
 function describeError(err) {
   if (BODY_ERRORS[err?.type]) return { ...BODY_ERRORS[err.type], log: false };
+  // Tagged by the db layer: refused, unknown host, pool timeout, server shutdown (any route, not only /health).
+  if (err?.dbUnavailable === true) return { status: 503, message: DB_UNAVAILABLE, log: true };
   if (isPgError(err)) {
     // Inspected, never echoed (§3.8): the driver's text can name tables and columns.
     if (err.code === PG_UNIQUE_VIOLATION) {
@@ -50,7 +53,9 @@ function describeError(err) {
 function createErrorHandler(logger) {
   return function errorHandler(err, req, res, _next) {
     const { status, message, log } = describeError(err);
-    if (log) logger.error({ err, method: req.method, path: req.path }, 'request failed');
+    // req.log carries the request id (requestId middleware); errors raised before it ran use the root logger.
+    if (log)
+      (req.log ?? logger).error({ err, method: req.method, path: req.path }, 'request failed');
     if (res.headersSent) return res.destroy(err);
     res.status(status).json({ error: message });
   };
@@ -61,4 +66,11 @@ function notFound(req, res) {
   res.status(404).json({ error: 'Not found' });
 }
 
-module.exports = { httpError, describeError, createErrorHandler, notFound, GENERIC_500 };
+module.exports = {
+  httpError,
+  describeError,
+  createErrorHandler,
+  notFound,
+  GENERIC_500,
+  DB_UNAVAILABLE,
+};
