@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-Phase 1 was declared on 2026-10-07 (L122). There is still no git repo or product code, only the Phase 0 documents and the test seed. The repository holds `Engineering Standards.html` (the Dynamiq engineering standard, v1.0, owned by Allan Young, deputy Raphael Mendoza), `plan.html` (the decision log), `GABAY_PRD.md`, `GABAY_MASTER_BLUEPRINT.md`, `FEATURE_PIPELINE.md`, `EXCEPTIONS.md`, `db/schema.sql` (PostgreSQL) with `db/SCHEMA_READING_GUIDE.md`, and the §2 stubs (README, INSTALL, `.env.example`, the E2E manuals, `Smoke_Test_Guide.md`, `DEPLOYMENT_RUNBOOK.md`, `INCIDENTS.md`). There is no git repo, `pubspec.yaml`, backend, build, lint, or test command. Do not invent commands. Add them here once they exist.
+Phase 1 was declared on 2026-10-07 (L122). There is still no git repo or product code, only the Phase 0 documents and the test seed. The repository holds `Engineering Standards.html` (the Dynamiq engineering standard, v1.0, owned by Allan Young, deputy Raphael Mendoza), `plan.html` (the decision log), `db/schema.sql` (PostgreSQL) with `db/SCHEMA_READING_GUIDE.md`, the root files (README, INSTALL, REVIEW, `.env.example`) and the documents under `docs/` (L125): `docs/product/` (`GABAY_PRD.md`, `GABAY_MASTER_BLUEPRINT.md`, `FEATURE_PIPELINE.md`), `docs/process/` (`WORKING_AGREEMENT.md`, `EXCEPTIONS.md`), `docs/testing/` (the E2E manuals, `Smoke_Test_Guide.md`), `docs/ops/` (`DEPLOYMENT_RUNBOOK.md`, `INCIDENTS.md`) and `docs/reference/` (the design notes). README, CLAUDE.md, REVIEW.md (standard §8.6: "at the repo root") and INSTALL.md stay at the root. There is no git repo, `pubspec.yaml`, backend, build, lint, or test command. Do not invent commands. Add them here once they exist.
 
 **Local database (L109, L115):** PostgreSQL 18.6 is installed on the developer's machine (`C:\Program Files\PostgreSQL\18`, port 5432, database `gabay_dev`; the password is in the developer's local `.env`, never committed). Check the schema with `psql -U postgres -h localhost -d gabay_dev -v ON_ERROR_STOP=1 -f db/schema.sql`, run twice; both runs must exit 0. **The test seed (L120)** is the only code so far, built before Phase 1 on the owner's permission for that task alone: `cd db/seeds && npm run seed` (local Auth emulator, project `demo-gabay`). Any other code waits for a plan the product owner has approved.
 
 The standard is a single-page viewer. Its content is Markdown inside `<script type="text/plain" id="src-...">` blocks, rendered by JavaScript, so read the raw file rather than stripping the HTML. Grep for `^#{1,3} ` to find sections. The blocks are `start-here`, `checklist` (the normative standard, §1–§14 plus Appendices A and B), `lifecycle`, `order` (Appendix C, build order), `sdlc`, `audit`, `worksheet`, then `prd`, `blueprint` and `pipeline`.
 
-**The `prd`, `blueprint` and `pipeline` blocks are worked examples for an invented domain (RetailPOS).** Its specifics (BIR receipts, TenantId+BranchId, shifts, stock movements) are not requirements for this project. Gabay's own domain is in `GABAY_PRD.md`, `GABAY_MASTER_BLUEPRINT.md` and `plan.html`.
+**The `prd`, `blueprint` and `pipeline` blocks are worked examples for an invented domain (RetailPOS).** Its specifics (BIR receipts, TenantId+BranchId, shifts, stock movements) are not requirements for this project. Gabay's own domain is in `docs/product/GABAY_PRD.md`, `docs/product/GABAY_MASTER_BLUEPRINT.md` and `plan.html`.
 
 **Design standard (plan.html L83–L88, L92, L99).**
 - **Main reference (L85, L92, L99):** `Gabay Demo.apk`, the `demo_app` release build of 2026-10-06 (SHA-256 74467157…11EED), which replaced Demo Prototype 4. Its source is the Flutter project `C:\Users\User\FlutterProjects\demo_app`; it has no git history, so copy the source to the scratchpad before the owner rebuilds, for the next diff. Everything in it is built in the user-facing app, in tier order.
@@ -100,8 +100,8 @@ than presenting it as settled.
 Run the verification command and paste its output. If a test fails, fix the code, not the test. A feature is done only when every item in the §9 definition of done is satisfied or waived in one line.
 
 **How we work (L121): read these before any work; they carry what this file only points to.**
-- `WORKING_AGREEMENT.md`: ask, never assume (anything the spec or plan doesn't settle is asked; internal choices are listed as DESIGN CHOICES); approvals (the product owner approves the spec, the plan and the PR; the author never approves its own work); cadence (per feature, phase gates with a signed gate report, no sprints); evidence (pasted output with exit codes, test-rendered screenshots for screen changes, a traceability table); test rules (fix code not tests, flaky = failure, regression tests name the bug, no coverage percentage); hooks; the repository. **New rulings about how we work are recorded there in the same turn.**
-- `FEATURE_PIPELINE.md` §5: the definition of done (the standard's 15 items with enforcers, plus G1–G4).
+- `docs/process/WORKING_AGREEMENT.md`: ask, never assume (anything the spec or plan doesn't settle is asked; internal choices are listed as DESIGN CHOICES); approvals (the product owner approves the spec, the plan and the PR; the author never approves its own work); cadence (per feature, phase gates with a signed gate report, no sprints); evidence (pasted output with exit codes, test-rendered screenshots for screen changes, a traceability table); test rules (fix code not tests, flaky = failure, regression tests name the bug, no coverage percentage); hooks; the repository. **New rulings about how we work are recorded there in the same turn.**
+- `docs/product/FEATURE_PIPELINE.md` §5: the definition of done (the standard's 15 items with enforcers, plus G1–G4).
 - `REVIEW.md`: the review passes dod-reviewer runs.
 - Verification block (Phase 1): `npm run verify` at the repo root runs every linter, the schema twice, the seed, `flutter analyze` and all tests, and ends `ALL GREEN`; exit code = failures. Until it exists, paste each check's own output.
 
@@ -110,7 +110,8 @@ Run the verification command and paste its output. If a test fails, fix the code
 Subagents load this file. These rules apply to every agent in `.claude/agents/`. Keep this section when CLAUDE.md is rewritten at Phase 1.
 
 - **Phase 1 gate:** agents are dormant until Phase 1. Phase 1 starts when the Phase 0 gate is met
-  (GABAY_PRD.md, GABAY_MASTER_BLUEPRINT.md Parts 1–3 with db/schema.sql, FEATURE_PIPELINE.md) and
+  (docs/product/: GABAY_PRD.md, GABAY_MASTER_BLUEPRINT.md Parts 1–3 with db/schema.sql,
+  FEATURE_PIPELINE.md) and
   the product owner has declared it, recorded as a line `Phase 1 declared <date> (L-row)` in this
   file. If that line is absent, stop and ask.
 
@@ -140,8 +141,8 @@ Subagents load this file. These rules apply to every agent in `.claude/agents/`.
   (cite them). Extract on the second use, except parts the standard or Blueprint mandates (C2).
   Clear names, one responsibility per file.
 - **Dependencies:** versions come from the Blueprint Part 1 pins, never from another repo (including
-  gabay_spike). A new dependency needs a Blueprint pin and, if it is outside §1, an `EXCEPTIONS.md`
-  entry (C8). Limits are named constants, env values or settings (C8).
+  gabay_spike). A new dependency needs a Blueprint pin and, if it is outside §1, an
+  `docs/process/EXCEPTIONS.md` entry (C8). Limits are named constants, env values or settings (C8).
 - **Tests:** an existing test changes only when `plan/<id>.md` names the test and the spec change
   behind it (C1). List every test you changed, with a one-line reason.
 - **Done:** every §9 item is met or waived in one line. dod-reviewer's check is an AI self-check; the

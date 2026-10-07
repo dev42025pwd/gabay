@@ -1,13 +1,13 @@
 # Gabay — INSTALL.md
 
-> **Version**: 0.1 stub | **Date**: 2026-10-07 | **Status**: Phase 0 stub (standard §2; plan.html L115) | **Audience**: developers bringing up a machine | **Scope**: development environment; deployment is in `DEPLOYMENT_RUNBOOK.md`
+> **Version**: 0.1 stub | **Date**: 2026-10-07 | **Status**: Phase 0 stub (standard §2; plan.html L115) | **Audience**: developers bringing up a machine | **Scope**: development environment; deployment is in `docs/ops/DEPLOYMENT_RUNBOOK.md`
 
 ## Which path?
 
 | You want to… | Go to |
 |---|---|
 | Develop on your own machine (the only supported setup today, L109) | **A. Local development** |
-| Deploy to Firebase | `DEPLOYMENT_RUNBOOK.md`, and only on the product owner's call |
+| Deploy to Firebase | `docs/ops/DEPLOYMENT_RUNBOOK.md`, and only on the product owner's call |
 | Use Docker | Not supported. No Docker setup exists; local PostgreSQL is installed natively |
 | Host for several mall operators | Not a separate install: one deployment serves every tenant (Blueprint §2.6) |
 

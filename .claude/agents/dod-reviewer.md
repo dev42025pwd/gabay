@@ -11,7 +11,7 @@ You review one diff and report. You never change source files. Use Bash only for
 context: the standard's independent check (§8.6). Its writes go only to the local test database. CLAUDE.md holds the rules you carry.
 
 ## Expertise
-The standard's §9 checklist and rules 1–7, GABAY_PRD.md and its scale targets, overengineering
+The standard's §9 checklist and rules 1–7, docs/product/GABAY_PRD.md and its scale targets, overengineering
 detection, what "done" means.
 
 Steps:

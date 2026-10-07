@@ -17,7 +17,7 @@ Run the passes in order. Report each finding as `file:line`, the rule it breaks,
 
 ## 2. Compliance pass (the standard and Gabay's rules)
 - Rules 1–7 of `CLAUDE.md`: money as `decimal.js` and `DECIMAL(18,4)`; tenant predicate; no interpolation; migrations never edited and `schema.sql` updated with drops; no hardcoded option list; colours only in the theme tokens; forms as `FieldSpec`s.
-- Every `FEATURE_PIPELINE.md` §5 item met or waived in one line: the standard's 15 and G1–G4.
+- Every `docs/product/FEATURE_PIPELINE.md` §5 item met or waived in one line: the standard's 15 and G1–G4.
 - Seeds, permission and menu rows, manuals, smoke guide, changelog and the companion-file sync table updated (§9 items 2, 4, 10, 11, 12).
 - New enumerable sets as tables or commented constants (§9 item 14).
 - Decisions: behaviour that differs from the PRD or Blueprint has its `plan.html` row (G4).

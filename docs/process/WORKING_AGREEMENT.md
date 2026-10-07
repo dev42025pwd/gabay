@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.3 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.4 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -72,6 +72,8 @@ One-time, after cloning: `git config core.hooksPath .githooks` (README).
 A private GitHub repository under `dev42025pwd`, with GitHub Actions for CI. It is created, and anything pushed, only on the product owner's go, after they sign in to the GitHub CLI as that account: `dev42025pwd/gabay`, at Phase 1's CI slice (L123).
 
 **Never in git (L123):** `Gabay Demo.apk` (too large for a repository) and `db/seeds/sources/internal/` (the penthouse, internal only, L48), besides `.env` and generated output. A clean clone seeds without the penthouse.
+
+**Where documents live (L125):** README.md, CLAUDE.md, REVIEW.md (standard §8.6) and INSTALL.md at the root; every other project document under `docs/`, by purpose: `product/` (PRD, Blueprint, pipeline), `process/` (this file, EXCEPTIONS), `testing/` (E2E manuals, smoke guide), `ops/` (runbook, incidents, and later the per-release deploy plans), `reference/` (background only). Pipeline artifacts stay in `intent/`, `spec/` and `plan/`; `plan.html`, the standard and the reference HTML stay at the root. A new document goes in the folder that matches its purpose; a new folder is a ruling.
 
 **Node:** Node 22 for Gabay (the Cloud Functions runtime), through fnm, which reads `.nvmrc` per folder; the machine's Node 24 stays the default elsewhere (L123, amended by L124: nvm-windows switches every terminal at once).
 

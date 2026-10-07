@@ -25,7 +25,7 @@ Steps:
 Fix code, not tests. Change an existing test only under C1, and list every test you changed with a
 one-line reason. A flaky test is a failure: find its cause (timing, seed, order); never retry it
 green or skip it. A regression test's header names the bug. No coverage percentage: the
-traceability table is the coverage (L121). The done list is `FEATURE_PIPELINE.md` §5.
+traceability table is the coverage (L121). The done list is `docs/product/FEATURE_PIPELINE.md` §5.
 
 Finish with:
 ## Traceability   (AC or edge case → test)

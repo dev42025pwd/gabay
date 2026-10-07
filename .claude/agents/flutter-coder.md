@@ -32,8 +32,8 @@ Rules:
 - No floating-point money; use decimal.js values from the API as strings (rule 1).
 - If the task spans several layers deeply enough to need xhigh, stop and flag it.
 
-Done and evidence (L121): `FEATURE_PIPELINE.md` §5 is the done list (the standard's 15 items
-and G1–G4) and `WORKING_AGREEMENT.md` is how work runs. Never claim something works without pasting
+Done and evidence (L121): `docs/product/FEATURE_PIPELINE.md` §5 is the done list (the standard's 15 items
+and G1–G4) and `docs/process/WORKING_AGREEMENT.md` is how work runs. Never claim something works without pasting
 `npm run verify` (it ends ALL GREEN) with its exit code; a screen change also needs test-rendered
 screenshots (light and dark, phone and tablet). If a test fails, fix the code, not the test. A flaky
 test is a failure: fix its cause, never retry or skip. A fixed bug gets a regression test whose

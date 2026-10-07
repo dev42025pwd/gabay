@@ -2,7 +2,7 @@
 
 > **Version**: 0.1 stub | **Date**: 2026-10-07 | **Status**: Phase 0 stub (standard §2; plan.html L115) | **Audience**: anyone cloning the repo | **Scope**: stack, layout, doc index, first-time setup, commands
 
-Gabay is an indoor wayfinding app for shopping malls in the Philippines: a shopper app (Android and iOS) that finds stores and guides people across floors, and an admin web page where mall staff draw and publish their maps. See `GABAY_PRD.md` §1 for the product, and `plan.html` for every decision (L1–L117).
+Gabay is an indoor wayfinding app for shopping malls in the Philippines: a shopper app (Android and iOS) that finds stores and guides people across floors, and an admin web page where mall staff draw and publish their maps. See `docs/product/GABAY_PRD.md` §1 for the product, and `plan.html` for every decision (L1–L117).
 
 ## State
 
@@ -23,7 +23,7 @@ Without this the pre-commit and pre-push hooks never run (standard §2, §8.1). 
 - **Database:** PostgreSQL (Cloud SQL through Firebase SQL Connect, Singapore), raw parameterized SQL through `pg`, no ORM. PostgreSQL 18 locally (L115).
 - **Sign-in:** Firebase Auth. **Files:** Cloud Storage for Firebase. **Admin hosting:** Firebase Hosting.
 - **On the phone:** each mall's published map is a read-only SQLite package (FTS5, R*Tree, a CSR walkway graph); routing and positioning run on the phone; positions never leave it (invariant 4).
-- Deviations from the Dynamiq standard §1 are in `EXCEPTIONS.md` (E-02 to E-14, signed L115).
+- Deviations from the Dynamiq standard §1 are in `docs/process/EXCEPTIONS.md` (E-02 to E-14, signed L115).
 
 **Local first (L109):** everything runs on the developer's machine (Firebase Emulator Suite and a local PostgreSQL). Nothing is deployed to Firebase, and no store build is published, until the product owner calls it.
 
@@ -36,23 +36,27 @@ Without this the pre-commit and pre-push hooks never run (standard §2, §8.1). 
 | `lib/` | Flutter: `core/` (positioning, routing, package, map3d, voice), `features/` (shopper, editor, admin) |
 | `.githooks/` | pre-commit and pre-push hooks (Phase 1) |
 | `.claude/agents/` | the build agents, dormant until Phase 1 (L64) |
+| `docs/` | the project documents, grouped by purpose (L125); README, CLAUDE.md, REVIEW.md and INSTALL.md stay at the root |
 
 ## Documents
 
 | Document | Answers |
 |---|---|
-| `GABAY_PRD.md` | Why, and what each feature must do |
-| `GABAY_MASTER_BLUEPRINT.md` | How: stack pins, architecture, schema intent, module anchors |
-| `FEATURE_PIPELINE.md` | What is built, in what order, and its status |
+| `docs/product/GABAY_PRD.md` | Why, and what each feature must do |
+| `docs/product/GABAY_MASTER_BLUEPRINT.md` | How: stack pins, architecture, schema intent, module anchors |
+| `docs/product/FEATURE_PIPELINE.md` | What is built, in what order, and its status |
 | `plan.html` | Every decision, with evidence (decision log L1–L117) |
-| `EXCEPTIONS.md` | Signed deviations from the standard, with expiry dates |
+| `docs/process/WORKING_AGREEMENT.md` | How we work: decisions, approvals, evidence, tests, the repository |
+| `docs/process/EXCEPTIONS.md` | Signed deviations from the standard, with expiry dates |
 | `db/schema.sql` | The PostgreSQL schema (56 tables) |
 | `INSTALL.md` | Bringing up a development machine |
-| `DEPLOYMENT_RUNBOOK.md` | Deploying to Firebase, on the product owner's call |
-| `E2E_Test_Cases_Manual.md`, `E2E_Frontend_Test_Cases_Manual.md` | Release-gate manuals (Phase 1+) |
-| `Smoke_Test_Guide.md` | The whole-system smoke pass (Phase 1+) |
-| `INCIDENTS.md` | Incidents, newest first |
+| `docs/ops/DEPLOYMENT_RUNBOOK.md` | Deploying to Firebase, on the product owner's call |
+| `docs/testing/E2E_Test_Cases_Manual.md`, `docs/testing/E2E_Frontend_Test_Cases_Manual.md` | Release-gate manuals (Phase 1+) |
+| `docs/testing/Smoke_Test_Guide.md` | The whole-system smoke pass (Phase 1+) |
+| `docs/ops/INCIDENTS.md` | Incidents, newest first |
 | `CLAUDE.md` | The contract for AI agents working here |
+| `REVIEW.md` | The review passes |
+| `docs/reference/Indoor mall navigation app design notes and decisions.md` | Background design notes only (L110) |
 | `Engineering Standards.html` | The Dynamiq standard v1.0 |
 
 ## Commands

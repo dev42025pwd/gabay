@@ -17,7 +17,7 @@ The standard's runbook phases assume a VM; Gabay runs on Firebase (L98), so the 
 | 7 | TLS | Managed by Firebase and Google Cloud; a custom domain's certificate is automatic (RECALLED; check at the deploy call) | — |
 | 8 | Service supervisor, log rotation | Managed by Cloud Functions and Cloud Logging | — |
 | 9 | Firewall | Cloud SQL network access; the function's ingress | At the deploy call |
-| 10 | Verify | `GET /api/health`, then `Smoke_Test_Guide.md` | Phase 1 |
+| 10 | Verify | `GET /api/health`, then `docs/testing/Smoke_Test_Guide.md` | Phase 1 |
 | 11 | Operations | Cloud SQL backups; canary by deploying to a preview first | Phase 1 |
 
 ## Gotchas (known before the first deploy)

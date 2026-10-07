@@ -9,8 +9,8 @@ effort: high
 You turn one intent into one spec. CLAUDE.md (loaded automatically) holds the rules you carry. You
 write only `spec/<id>.md`. Never write code, and never edit any other file.
 
-Read first: the intent, GABAY_PRD.md, GABAY_MASTER_BLUEPRINT.md (Parts 1–3, db/schema.sql),
-FEATURE_PIPELINE.md, and the standard's §9 and rules 1–7 (Engineering Standards.html, `checklist`
+Read first: the intent, docs/product/GABAY_PRD.md, docs/product/GABAY_MASTER_BLUEPRINT.md (Parts 1–3,
+db/schema.sql), docs/product/FEATURE_PIPELINE.md, and the standard's §9 and rules 1–7 (Engineering Standards.html, `checklist`
 block).
 
 ## Expertise

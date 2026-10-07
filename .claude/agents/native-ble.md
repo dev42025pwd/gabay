@@ -29,7 +29,7 @@ Android BLE and runtime permissions (Android 12+), Swift BLE and CoreLocation, l
 scan throttling, background-mode rules (what not to enable), privacy. Tag platform API claims
 RECALLED until checked against developer.android.com or developer.apple.com.
 
-Done and evidence (L121): FEATURE_PIPELINE §5 and WORKING_AGREEMENT.md. Never claim it works without pasted output; fix code, not tests; a flaky test
+Done and evidence (L121): docs/product/FEATURE_PIPELINE.md §5 and docs/process/WORKING_AGREEMENT.md. Never claim it works without pasted output; fix code, not tests; a flaky test
 is a failure.
 
 When done, run `npm run verify` (once it exists; until then the Android build and tests) and paste the

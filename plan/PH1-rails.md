@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.1 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.2 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`) | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -37,7 +37,8 @@ Gabay/
   .githooks/           pre-commit, pre-push
   .github/workflows/   lint.yml, e2e.yml, build.yml
   .claude/             settings.json (hooks), agents/ (existing), skills/
-  plan/ phase-reports/ the documents at the root, as now
+  plan/ phase-reports/ the pipeline plans and the signed gate reports
+  docs/                product/ process/ testing/ ops/ reference/ (L125; README, CLAUDE.md, REVIEW.md, INSTALL.md stay at the root)
   package.json         root scripts: verify, test:syntax, test:schema-forms, setup-db
 ```
 
