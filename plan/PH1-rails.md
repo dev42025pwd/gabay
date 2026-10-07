@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.3 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.4 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -97,16 +97,16 @@ Each is about 60 lines, names the file and line it fails on, and has a test that
 |---|---|---|
 | `schema-drops` | a `CREATE TABLE` without its `DROP TABLE` | §8.2 |
 | `schema-forms` | a `FieldSpec` that disagrees with `schema.sql` (type, nullability, length, scale); passes trivially until Phase 3's first form | §7.2 |
-| `no-bare-textfield` | `TextFormField` / `TextField` inside `features/**/views/` | rule 7, gate |
+| `no-bare-textfield` | `TextField`, `TextFormField`, `CupertinoTextField` (prefixed, `.new`, or through a `typedef`) anywhere in `app/lib` except `app/lib/shared/forms/` (L128) | rule 7, gate |
 | `colour-literals` | `Color(0x…)`, `Colors.black/white/grey…`, `primaryColor` outside the tokens file | rule 6, §4.7, gate |
 | `sql-interpolation` | a `${…}` or `+` string inside a SQL text passed to `query`, except identifiers from an allow-list map | rule 3, gate |
 | `tenant-predicate` | a SQL text touching a tenant-scoped table (read from `schema.sql`) with no `TenantId` predicate | rule 2, Blueprint catastrophic set |
-| `position-privacy` | network or upload code outside `lib/core/analytics/` that imports the position stream | invariant 4, Blueprint catastrophic set |
+| `position-privacy` | an import of `core/positioning` outside the allow-list (`core/positioning`, `core/routing`, `core/map3d`, `core/analytics`, `features/shopper`; L128); and network or upload code outside `lib/core/analytics/` in the same file as the position stream | invariant 4, Blueprint catastrophic set |
 | `foreground-manifest` | background location or background BLE in `AndroidManifest.xml`; an "Always" location key in `Info.plist` | Blueprint, Foreground rule |
 | `migrations-immutable` | an edit to a committed migration; an unpadded number | rule 4, §8.2 |
 | `no-snackbar` | `ScaffoldMessenger…showSnackBar` | §4.6 |
 
-Deferred to the slice that creates the thing they guard: published-version immutability (P0-03; the database trigger already exists) and the Public-Read package allow-list (the first public route).
+Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error text to users" lint, which FEATURE_PIPELINE §5.1 names as enforcers. Deferred to the slice that creates the thing they guard: published-version immutability (P0-03; the database trigger already exists) and the Public-Read package allow-list (the first public route).
 
 ### S5 — Hooks and `npm run verify`
 - L126 (from the S2 review): `verify` also starts the Functions emulator, checks `GET …/api/api/health` answers `{ status: "ok", db: "ok" }` with an `X-Request-Id`, and stops it; ESLint, Prettier and the tests cover `db/tools/` as well as `functions/`.

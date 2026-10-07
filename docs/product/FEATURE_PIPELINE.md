@@ -613,9 +613,9 @@ An entry is `DONE` only when **every item below is met, or waived in one line th
 |---|---|---|
 | 1 | `db/schema.sql` updated (every `CREATE TABLE` with its `DROP`) and a new, never-edited migration file | pre-commit hook (refuses edits to a committed migration; checks the teardown) and CI |
 | 2 | Seed data updated (the test seed `db/seeds/`, and statutory rows where they apply) | `REVIEW.md` compliance pass |
-| 3 | Backend routes guarded in order: role → permission → tenant scope → validation | structural lint and the `REVIEW.md` security pass |
+| 3 | Backend routes guarded in order: role → permission → tenant scope → validation | structural lint (built in Phase 2 with sign-in, L128) and the `REVIEW.md` security pass |
 | 4 | Permission and menu rows seeded for the new routes; menu tree updated | `REVIEW.md` compliance pass |
-| 5 | Lists and forms through the shared scaffolds; errors through `formatApiError`; all four list states (loading, empty, error, data) | lint (bare `TextFormField`, raw exception text) and `REVIEW.md` |
+| 5 | Lists and forms through the shared scaffolds; errors through `formatApiError`; all four list states (loading, empty, error, data) | lint (bare `TextFormField`: S4; raw exception text: Phase 2, L128) and `REVIEW.md` |
 | 6 | Notifications or SSE wired if the feature notifies anyone (fan-out reaches at least one recipient in the seed) | e2e suite |
 | 7 | List refresh on return verified (`didPopNext`) | e2e suite |
 | 8 | Dark mode pass: no `primaryColor`, no hardcoded colour (rule 6) | structural lint |
