@@ -140,6 +140,11 @@
 | cors | 2.x | 2.8.6 | 2026-10-02 (L81) | None published |
 | express-rate-limit | 8.x | 8.7.0 | 2026-10-02 (L81) | None published |
 | multer | 2.x | 2.4.0 | 2026-10-02 (L81) | None published (1.x is superseded by the 2.x security fixes) |
+| zod | 4.x | 4.6.5 | 2026-10-07 (S2 of `plan/PH1-rails.md`, L123; named by the standard, §3.7) | None published |
+| pino | 10.x | 10.4.0 | 2026-10-07 (S2, L123; the standard's structured logger) | None published |
+| eslint, @eslint/js (dev) | 10.x | 10.12.0, 10.0.1 (Node ^22.13 or ≥24) | 2026-10-07 (S2, L123; standard §7.2) | None published |
+| globals (dev) | 17.x | 17.13.0 | 2026-10-07 (S2, L123; ESLint's environment list) | None published |
+| prettier (dev) | 3.x | 3.9.9 | 2026-10-07 (S2, L123; standard §7.2) | None published |
 | pino | 10.x | 10.3.1 | 2026-10-02 (L81) | None published |
 | zod | 4.x | 4.6.5 | 2026-10-02 (L81) | None published |
 | firebase-tools | 15.x | 15.32.1 (needs Node ≥ 20) | 2026-10-05 (L93); 2026-10-06 (L98) | None published. The deploy CLI for the admin page (E-05), the function and SQL Connect (L98); ships in no build |

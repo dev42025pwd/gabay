@@ -149,7 +149,7 @@ Deferred to the slice that creates the thing they guard: published-version immut
 | §3.1 "DB connect first, then `listen()`" | No `listen()`: the function is exported. The pool is created at cold start; `/api/health` and a first-request check return 503 with a log line when the database is unreachable | Cloud Functions owns the server |
 | §3.1 graceful shutdown (P1) | Deferred to the SSE slice (P1-01) | No long-lived streams in Phase 1 |
 | §3.9 `.input(name, type, value)`, `OUTPUT inserted.*` | `$1…$n` parameters; `RETURNING *` | `pg` and PostgreSQL (E-06, E-07) |
-| A.6 `GO` splitter | Not applicable. Each schema or migration file runs as one `pg` query inside a transaction (RECALLED: `pg` runs several statements in one simple query when no parameters are passed; checked in S2 before relying on it) | `GO` is a SQL Server batch separator |
+| A.6 `GO` splitter | Not applicable. Each schema or migration file runs as one `pg` query inside a transaction, with no parameters. Verified 2026-10-07 on the local database: three statements in one parameterless `query` returned three results; with parameters, PostgreSQL refuses ("cannot insert multiple commands into a prepared statement") | `GO` is a SQL Server batch separator |
 | §3.11 `OFFSET/FETCH` | `LIMIT/OFFSET` | PostgreSQL |
 
 ## 7. Open items (asked when the slice reaches them, not assumed)
