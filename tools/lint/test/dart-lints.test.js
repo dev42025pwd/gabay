@@ -33,9 +33,17 @@ test('no-bare-textfield (I4): it applies to every file under app/lib, not only f
     'app/lib/core/x.dart',
     'app/lib/main_admin.dart',
   ]) {
-    assert.deepEqual(at(lint('no-bare-textfield', { [file]: bad })), [`${file}:1:no-bare-textfield`], file);
+    assert.deepEqual(
+      at(lint('no-bare-textfield', { [file]: bad })),
+      [`${file}:1:no-bare-textfield`],
+      file,
+    );
   }
-  assert.deepEqual(lint('no-bare-textfield', { 'app/test/x_test.dart': bad }), [], 'tests are not app/lib');
+  assert.deepEqual(
+    lint('no-bare-textfield', { 'app/test/x_test.dart': bad }),
+    [],
+    'tests are not app/lib',
+  );
 });
 
 test('no-bare-textfield (I4): CupertinoTextField, an import prefix, .new and a typedef alias are caught', () => {
@@ -60,7 +68,10 @@ final s = 'TextField(';
 Widget a() => AppTextField(spec: f);
 final t = TextField;
 `;
-  assert.deepEqual(lint('no-bare-textfield', { 'app/lib/shared/forms/field_builder.dart': widget }), []);
+  assert.deepEqual(
+    lint('no-bare-textfield', { 'app/lib/shared/forms/field_builder.dart': widget }),
+    [],
+  );
   assert.deepEqual(lint('no-bare-textfield', { [VIEW]: harmless }), []);
 });
 
@@ -77,13 +88,23 @@ final f = Colors.grey.shade200;
   const found = lint('colour-literals', { 'app/lib/features/demo/views/a.dart': dart });
   assert.deepEqual(
     at(found).map((s) => s.split(':').slice(1).join(':')),
-    ['1:colour-literals', '2:colour-literals', '3:colour-literals', '4:colour-literals', '5:colour-literals', '6:colour-literals'],
+    [
+      '1:colour-literals',
+      '2:colour-literals',
+      '3:colour-literals',
+      '4:colour-literals',
+      '5:colour-literals',
+      '6:colour-literals',
+    ],
   );
 });
 
 test('colour-literals (I3): Color.from*, 0X hex, CupertinoColors, prefixed Colors, primaryColor anywhere and ${Colors.x} fail', () => {
   const cases = [
-    ['Color.from(alpha: 1, red: 0, green: 0, blue: 0)', 'const a = Color.from(alpha: 1, red: 0, green: 0, blue: 0);'],
+    [
+      'Color.from(alpha: 1, red: 0, green: 0, blue: 0)',
+      'const a = Color.from(alpha: 1, red: 0, green: 0, blue: 0);',
+    ],
     ['Color.fromARGB', 'final a = Color.fromARGB(1, 2, 3, 4);'],
     ['0X hex', 'const a = Color(0XFF000000);'],
     ['CupertinoColors', 'final a = CupertinoColors.black;'],
@@ -109,12 +130,15 @@ final d = theme.primaryColorLight;
 });
 
 test('colour-literals: the gate sample, Colors.black in a view, fails', () => {
-  const found = lint('colour-literals', { [VIEW]: 'Widget w() {\n  return Container(color: Colors.black);\n}\n' });
+  const found = lint('colour-literals', {
+    [VIEW]: 'Widget w() {\n  return Container(color: Colors.black);\n}\n',
+  });
   assert.deepEqual(at(found), [`${VIEW}:2:colour-literals`]);
 });
 
 test('colour-literals: the tokens file, comments, strings, colorScheme and code outside lib/ pass', () => {
-  const tokens = 'const seed = Color(0xFFC1623D);\nfinal w = Colors.white;\nfinal t = ThemeData(primaryColor: x);\n';
+  const tokens =
+    'const seed = Color(0xFFC1623D);\nfinal w = Colors.white;\nfinal t = ThemeData(primaryColor: x);\n';
   const clean = `// Colors.black and Color(0xFF000000) are forbidden here
 /* final x = Colors.red; */
 final s = 'Colors.red';
@@ -122,7 +146,10 @@ final ok = Theme.of(context).colorScheme.primary;
 `;
   assert.deepEqual(lint('colour-literals', { 'app/lib/core/theme/gabay_tokens.dart': tokens }), []);
   assert.deepEqual(lint('colour-literals', { [VIEW]: clean }), []);
-  assert.deepEqual(lint('colour-literals', { 'app/test/theme_test.dart': 'final a = Colors.red;\n' }), []);
+  assert.deepEqual(
+    lint('colour-literals', { 'app/test/theme_test.dart': 'final a = Colors.red;\n' }),
+    [],
+  );
 });
 
 test('colour-literals: generated l10n code and build output are skipped', () => {

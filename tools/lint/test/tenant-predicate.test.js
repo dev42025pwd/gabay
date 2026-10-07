@@ -54,20 +54,44 @@ const c = 'Select a venue from the list';
 // ---- S4 review C2: a join, a comparison or a comment is not a tenant predicate ------------------
 
 const C2_BAD = [
-  ['a join on TenantId is not a binding', 'SELECT * FROM gabay.Venue v JOIN gabay.Level b ON b.TenantId = v.TenantId WHERE v.VenueId = $1'],
+  [
+    'a join on TenantId is not a binding',
+    'SELECT * FROM gabay.Venue v JOIN gabay.Level b ON b.TenantId = v.TenantId WHERE v.VenueId = $1',
+  ],
   ['TenantId <> $1', 'SELECT * FROM gabay.Venue WHERE TenantId <> $1'],
   ['TenantId IS NOT NULL', 'SELECT * FROM gabay.Venue WHERE TenantId IS NOT NULL'],
   ['TenantId only in a -- comment', 'SELECT * FROM gabay.Venue WHERE Name = $1 -- TenantId = $2'],
-  ['TenantId only in a block comment', 'SELECT * FROM gabay.Venue /* TenantId = $1 */ WHERE Name = $1'],
-  ['TenantId only inside a string literal', "SELECT * FROM gabay.Venue WHERE Name = 'TenantId = $1'"],
-  ['a string literal that mentions TenantId = 0', "SELECT * FROM gabay.Venue WHERE Name <> 'TenantId = 0'"],
+  [
+    'TenantId only in a block comment',
+    'SELECT * FROM gabay.Venue /* TenantId = $1 */ WHERE Name = $1',
+  ],
+  [
+    'TenantId only inside a string literal',
+    "SELECT * FROM gabay.Venue WHERE Name = 'TenantId = $1'",
+  ],
+  [
+    'a string literal that mentions TenantId = 0',
+    "SELECT * FROM gabay.Venue WHERE Name <> 'TenantId = 0'",
+  ],
   ['SELECT TenantId IS NULL AS platform', 'SELECT TenantId IS NULL AS platform FROM gabay.Venue'],
-  ['INSERT ... SELECT with no predicate', 'INSERT INTO gabay.Venue (TenantId, Name) SELECT TenantId, Name FROM gabay.Level'],
+  [
+    'INSERT ... SELECT with no predicate',
+    'INSERT INTO gabay.Venue (TenantId, Name) SELECT TenantId, Name FROM gabay.Level',
+  ],
   ['INSERT with a literal tenant value', 'INSERT INTO gabay.Venue (TenantId, Name) VALUES (1, $1)'],
-  ['INSERT where one row has a literal tenant', 'INSERT INTO gabay.Venue (TenantId, Name) VALUES ($1, $2), (5, $3)'],
+  [
+    'INSERT where one row has a literal tenant',
+    'INSERT INTO gabay.Venue (TenantId, Name) VALUES ($1, $2), (5, $3)',
+  ],
   ['INSERT with no TenantId column', 'INSERT INTO gabay.Venue (Name) VALUES ($1)'],
-  ['second statement has no predicate', 'UPDATE gabay.Venue SET Name = $1 WHERE TenantId = $2; DELETE FROM gabay.Level WHERE LevelId = $3'],
-  ['UPDATE that sets TenantId but does not filter on it', 'UPDATE gabay.Venue SET TenantId = $1 WHERE VenueId = $2'],
+  [
+    'second statement has no predicate',
+    'UPDATE gabay.Venue SET Name = $1 WHERE TenantId = $2; DELETE FROM gabay.Level WHERE LevelId = $3',
+  ],
+  [
+    'UPDATE that sets TenantId but does not filter on it',
+    'UPDATE gabay.Venue SET TenantId = $1 WHERE VenueId = $2',
+  ],
   ['TenantId compared with a non-parameter', 'SELECT * FROM gabay.Venue WHERE TenantId = 5'],
 ];
 
@@ -114,7 +138,8 @@ test('tenant-predicate (C1): a join on TenantId in runPaged does not count, and 
 test('tenant-predicate (C1): runPaged on a table without TenantId, the declaration itself, and an annotated call pass', () => {
   const role = `runPaged({ query, select: 'r.Code', from: 'gabay.Role r', where: 'r.Code ILIKE $1', params: [], paging });\n`;
   assert.deepEqual(run(role), []);
-  const decl = 'async function runPaged({ query, select, from, where = "", params = [], paging }) { return 1; }\n';
+  const decl =
+    'async function runPaged({ query, select, from, where = "", params = [], paging }) { return 1; }\n';
   assert.deepEqual(run(decl), []);
   const note = PAGED("'v.Name ILIKE $1'").replace(
     '  return runPaged({',
@@ -149,5 +174,8 @@ test('tenant-predicate: --files mode checks listed files; a changed schema.sql w
 
 test('tenant-predicate: only functions/src is checked', () => {
   const bad = "db.query('SELECT * FROM gabay.Venue', []);\n";
-  assert.deepEqual(lint('tenant-predicate', { 'db/schema.sql': SCHEMA, 'functions/test/x.js': bad }), []);
+  assert.deepEqual(
+    lint('tenant-predicate', { 'db/schema.sql': SCHEMA, 'functions/test/x.js': bad }),
+    [],
+  );
 });

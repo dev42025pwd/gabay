@@ -71,10 +71,12 @@ function parseArgs(argv) {
     else opts.names.push(a);
   }
   // The escape hatch is for a tree you chose on purpose: on the real repo it would hide a missing path.
-  if (opts.allowPartial && !rootGiven) throw new Error('--allow-partial only works together with --root');
+  if (opts.allowPartial && !rootGiven)
+    throw new Error('--allow-partial only works together with --root');
   const known = LINTERS.map((l) => l.name);
   const unknown = opts.names.filter((n) => !known.includes(n));
-  if (unknown.length) throw new Error(`unknown linter ${unknown.join(', ')} (known: ${known.join(', ')})`);
+  if (unknown.length)
+    throw new Error(`unknown linter ${unknown.join(', ')} (known: ${known.join(', ')})`);
   return opts;
 }
 
@@ -103,7 +105,8 @@ function runLinters(opts) {
   const ctx = createContext(opts);
   const selected = LINTERS.filter((l) => opts.names.length === 0 || opts.names.includes(l.name));
   const results = [];
-  if (opts.layout) results.push({ name: 'repo-layout', violations: layoutViolations(opts.root), scanned: 0 });
+  if (opts.layout)
+    results.push({ name: 'repo-layout', violations: layoutViolations(opts.root), scanned: 0 });
   for (const linter of selected) {
     ctx.startCount();
     let violations;
@@ -111,7 +114,9 @@ function runLinters(opts) {
       violations = unique(linter.run(ctx));
     } catch (err) {
       // A linter that crashes must fail the run, never pass silently.
-      violations = [{ file: '(linter)', line: 0, rule: linter.name, message: `crashed: ${err.stack || err}` }];
+      violations = [
+        { file: '(linter)', line: 0, rule: linter.name, message: `crashed: ${err.stack || err}` },
+      ];
     }
     results.push({ name: linter.name, violations, scanned: ctx.scannedCount() });
   }
@@ -126,11 +131,17 @@ function main() {
     console.error(err.message);
     process.exit(2);
   }
-  const { results, count } = runLinters({ ...opts, layout: opts.files === null && !opts.allowPartial });
+  const { results, count } = runLinters({
+    ...opts,
+    layout: opts.files === null && !opts.allowPartial,
+  });
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   for (const { name, violations, scanned } of results) {
     for (const v of violations) console.log(`${v.file}:${v.line}: ${v.rule}: ${v.message}`);
-    const files = name === 'repo-layout' ? '' : ` (${plural(scanned, 'file')}${violations.length ? `, ${violations.length} violation(s)` : ''})`;
+    const files =
+      name === 'repo-layout'
+        ? ''
+        : ` (${plural(scanned, 'file')}${violations.length ? `, ${violations.length} violation(s)` : ''})`;
     console.log(`${violations.length === 0 ? 'ok  ' : 'FAIL'} ${name}${files}`);
   }
   const linters = results.filter((r) => r.name !== 'repo-layout').length;

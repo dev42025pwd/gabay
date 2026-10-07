@@ -83,7 +83,9 @@ function parseSchema(text) {
   lines.forEach((raw, i) => {
     const line = i + 1;
     if (!table) {
-      const create = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:gabay\.)?(\w+)\s*\(/i.exec(raw);
+      const create = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:gabay\.)?(\w+)\s*\(/i.exec(
+        raw,
+      );
       if (create) {
         table = { name: create[1], line, columns: new Map() };
         tables.set(create[1].toLowerCase(), table);

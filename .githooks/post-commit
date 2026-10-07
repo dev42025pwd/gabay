@@ -1,0 +1,17 @@
+#!/bin/sh
+# Gabay post-commit: puts the index back in step after a stamped `git commit -- <paths>`.
+#
+# Incident this prevents: with `git commit -- <paths>` git builds the commit from a TEMPORARY index and
+# only afterwards installs the real index, which was computed before pre-commit ran. The version stamp
+# lives in the temporary index and the working tree, so afterwards HEAD and the working tree hold the
+# stamped files while the real index still holds the old ones, and `git status` shows a staged change
+# that REVERSES the stamp. pre-commit records the stamped paths in .git/gabay-restage; here, once the
+# commit is done, those index entries are reset to HEAD. For a plain `git commit` it is a no-op.
+marker="$(git rev-parse --absolute-git-dir)/gabay-restage"
+[ -f "$marker" ] || exit 0
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  git reset -q -- "$file" 2>/dev/null
+done <"$marker"
+rm -f "$marker"
+exit 0

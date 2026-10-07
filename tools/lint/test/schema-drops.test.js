@@ -28,6 +28,9 @@ test('schema-drops: every table dropped passes; so does a repo with no schema', 
 test('schema-drops: the real db/schema.sql passes (56 tables, 56 drops)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  const real = fs.readFileSync(path.resolve(__dirname, '..', '..', '..', 'db', 'schema.sql'), 'utf8');
+  const real = fs.readFileSync(
+    path.resolve(__dirname, '..', '..', '..', 'db', 'schema.sql'),
+    'utf8',
+  );
   assert.deepEqual(lint('schema-drops', { 'db/schema.sql': real }), []);
 });

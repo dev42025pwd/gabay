@@ -1,0 +1,16 @@
+#!/bin/sh
+# Gabay pre-push (standard §8.1, L121): the push is refused unless `npm run verify` is green.
+# Incident this prevents: broken code reaching the shared branch because the local checks were skipped.
+# It runs tools/verify.js under Node 22 (the same file `npm run verify` runs); its exit code is the
+# number of failed checks, so any failure blocks the push. It takes minutes: it applies the schema,
+# seeds the database and runs the Flutter tests. Skip it only with `git push --no-verify`, and CI
+# (lint.yml) will still refuse the merge.
+root=$(git rev-parse --show-toplevel) || exit 1
+. "$root/.githooks/node.sh"
+cd "$root" || exit 1
+gabay_node tools/verify.js
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "pre-push: npm run verify failed ($status check(s)); the push is refused." >&2
+fi
+exit "$status"

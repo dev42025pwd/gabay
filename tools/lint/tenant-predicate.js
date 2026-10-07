@@ -70,7 +70,8 @@ function valueRows(text) {
     else if (text[i] === '(') {
       let depth = 1;
       let j = i + 1;
-      for (; j < text.length && depth > 0; j += 1) depth += text[j] === '(' ? 1 : text[j] === ')' ? -1 : 0;
+      for (; j < text.length && depth > 0; j += 1)
+        depth += text[j] === '(' ? 1 : text[j] === ')' ? -1 : 0;
       rows.push(text.slice(i + 1, j - 1));
       i = j;
     } else break;
@@ -80,12 +81,18 @@ function valueRows(text) {
 
 /** null when the statement is fine, else what is wrong with it. */
 function problemWith(statement) {
-  const insert = /^\s*INSERT\s+INTO\s+(?:gabay\.)?\w+\s*\(([^)]*)\)\s*VALUES\s*([\s\S]*)$/i.exec(statement);
+  const insert = /^\s*INSERT\s+INTO\s+(?:gabay\.)?\w+\s*\(([^)]*)\)\s*VALUES\s*([\s\S]*)$/i.exec(
+    statement,
+  );
   if (insert) {
-    const at = insert[1].split(',').map((c) => c.trim().toLowerCase()).indexOf('tenantid');
+    const at = insert[1]
+      .split(',')
+      .map((c) => c.trim().toLowerCase())
+      .indexOf('tenantid');
     if (at === -1) return 'INSERT has no TenantId column';
     const rows = valueRows(insert[2]);
-    const bound = rows.length > 0 && rows.every((row) => PARAMETER.test((splitTopLevel(row)[at] ?? '').trim()));
+    const bound =
+      rows.length > 0 && rows.every((row) => PARAMETER.test((splitTopLevel(row)[at] ?? '').trim()));
     return bound ? null : 'INSERT does not bind TenantId to a $n parameter in every row';
   }
   const where = /\bWHERE\b([\s\S]*)$/i.exec(statement);
@@ -94,8 +101,13 @@ function problemWith(statement) {
 
 /** [problem, tables] for the first failing statement of `text` that touches a tenant-scoped table, or null. */
 function check(text, scoped) {
-  for (const statement of cleanSql(text).split(';').map((s) => s.trim()).filter(Boolean)) {
-    const tables = [...new Set([...statement.matchAll(TABLE_REF)].map((m) => (m[1] ?? m[2]).toLowerCase()))].filter((t) => scoped.has(t));
+  for (const statement of cleanSql(text)
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean)) {
+    const tables = [
+      ...new Set([...statement.matchAll(TABLE_REF)].map((m) => (m[1] ?? m[2]).toLowerCase())),
+    ].filter((t) => scoped.has(t));
     if (tables.length === 0) continue;
     const problem = problemWith(statement);
     if (problem) return [problem, tables];
@@ -111,8 +123,16 @@ function run(ctx) {
   for (const file of ctx.list((f) => IN_API.test(f), { widenOn: [SCHEMA] })) {
     const src = ctx.read(file);
     const sites = [
-      ...findSql(src).filter((s) => s.statement).map((s) => ({ line: s.line, text: s.text, what: 'SQL' })),
-      ...findRunPagedCalls(src).map((c) => ({ line: c.line, text: c.text, what: 'runPaged call', literal: c.whereLiteral, unreadable: c.unreadable })),
+      ...findSql(src)
+        .filter((s) => s.statement)
+        .map((s) => ({ line: s.line, text: s.text, what: 'SQL' })),
+      ...findRunPagedCalls(src).map((c) => ({
+        line: c.line,
+        text: c.text,
+        what: 'runPaged call',
+        literal: c.whereLiteral,
+        unreadable: c.unreadable,
+      })),
     ];
     for (const site of sites) {
       const bad = site.unreadable ? true : check(site.text, scoped);
@@ -133,7 +153,10 @@ function run(ctx) {
         continue;
       }
       const [problem, names] = bad;
-      const hint = site.literal === false ? ' (where must be a string literal at the call site so the predicate can be checked)' : '';
+      const hint =
+        site.literal === false
+          ? ' (where must be a string literal at the call site so the predicate can be checked)'
+          : '';
       found.push(
         violation(
           file,

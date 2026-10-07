@@ -9,7 +9,8 @@ const { spawnSync } = require('node:child_process');
 const { lint, at, tree, SCHEMA } = require('./helper');
 
 const API = 'functions/src/routes/venues.js';
-const tenant = (js, extra) => lint('tenant-predicate', { 'db/schema.sql': SCHEMA, [API]: js }, extra);
+const tenant = (js, extra) =>
+  lint('tenant-predicate', { 'db/schema.sql': SCHEMA, [API]: js }, extra);
 const RUN = path.resolve(__dirname, '..', 'run.js');
 
 // ---- I-1: a runPaged call that cannot be read is a violation, not a pass -------------------------
@@ -51,8 +52,10 @@ for (const [name, js] of Object.entries(UNREADABLE)) {
 }
 
 test('tenant-predicate (I-1): a literal from and where, and a literal from on a table without TenantId, still pass', () => {
-  const ok = "runPaged({ query, select: 'v.Name', from: 'gabay.Venue v', where: 'v.TenantId = $1', params: [], paging });\n";
-  const role = 'runPaged({ query, select: "r.Code", from: "gabay.Role r", where: whereSql, params: [], paging });\n';
+  const ok =
+    "runPaged({ query, select: 'v.Name', from: 'gabay.Venue v', where: 'v.TenantId = $1', params: [], paging });\n";
+  const role =
+    'runPaged({ query, select: "r.Code", from: "gabay.Role r", where: whereSql, params: [], paging });\n';
   assert.deepEqual(tenant(ok), []);
   assert.deepEqual(tenant(role), []);
 });
@@ -67,8 +70,17 @@ final c = MyColors.black;
 final d = WidgetStateColor.resolveWith((s) => x);
 `;
   assert.deepEqual(lint('colour-literals', { [view]: fine }), []);
-  for (const bad of ['Colors.black', 'm.Colors.black', 'CupertinoColors.black', 'material.Colors.grey.shade200']) {
-    assert.deepEqual(at(lint('colour-literals', { [view]: `final a = ${bad};\n` })), [`${view}:1:colour-literals`], bad);
+  for (const bad of [
+    'Colors.black',
+    'm.Colors.black',
+    'CupertinoColors.black',
+    'material.Colors.grey.shade200',
+  ]) {
+    assert.deepEqual(
+      at(lint('colour-literals', { [view]: `final a = ${bad};\n` })),
+      [`${view}:1:colour-literals`],
+      bad,
+    );
   }
 });
 
@@ -80,8 +92,16 @@ test('run (nit 3): --allow-partial without --root exits 2; with --root it works'
   assert.match(alone.stderr, /--allow-partial only works together with --root/);
   const root = tree({ 'README.md': 'x' });
   try {
-    assert.equal(spawnSync(process.execPath, [RUN, '--root', root, '--allow-partial'], { encoding: 'utf8' }).status, 0);
-    assert.equal(spawnSync(process.execPath, [RUN, '--allow-partial', '--root', root], { encoding: 'utf8' }).status, 0);
+    assert.equal(
+      spawnSync(process.execPath, [RUN, '--root', root, '--allow-partial'], { encoding: 'utf8' })
+        .status,
+      0,
+    );
+    assert.equal(
+      spawnSync(process.execPath, [RUN, '--allow-partial', '--root', root], { encoding: 'utf8' })
+        .status,
+      0,
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -110,7 +130,16 @@ test('foreground-manifest (nit 4): single-quoted android:foregroundServiceType a
 test('sql-interpolation: when the only SQL signal is a quote-wrapped ${}, the message says why and what to do', () => {
   const found = lint('sql-interpolation', { [API]: "const m = `venue '${id}' not found`;\n" });
   assert.deepEqual(at(found), [`${API}:1:sql-interpolation`]);
-  assert.match(found[0].message, /a \$\{\} wrapped in single quotes is treated as SQL; bind it as \$n, or if this is not SQL use double quotes/);
-  const real = lint('sql-interpolation', { [API]: "const q = `SELECT * FROM gabay.Venue WHERE Name = '${n}'`;\n" });
-  assert.doesNotMatch(real[0].message, /wrapped in single quotes/, 'a real SQL statement keeps the general message');
+  assert.match(
+    found[0].message,
+    /a \$\{\} wrapped in single quotes is treated as SQL; bind it as \$n, or if this is not SQL use double quotes/,
+  );
+  const real = lint('sql-interpolation', {
+    [API]: "const q = `SELECT * FROM gabay.Venue WHERE Name = '${n}'`;\n",
+  });
+  assert.doesNotMatch(
+    real[0].message,
+    /wrapped in single quotes/,
+    'a real SQL statement keeps the general message',
+  );
 });

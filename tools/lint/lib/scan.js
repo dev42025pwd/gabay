@@ -11,7 +11,29 @@
 // literal is recognised by the usual "previous character" heuristic.
 'use strict';
 
-const REGEX_PRECEDERS = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '<', '>', '~', '^']);
+const REGEX_PRECEDERS = new Set([
+  '',
+  '(',
+  ',',
+  '=',
+  ':',
+  '[',
+  '!',
+  '&',
+  '|',
+  '?',
+  '{',
+  '}',
+  ';',
+  '+',
+  '-',
+  '*',
+  '%',
+  '<',
+  '>',
+  '~',
+  '^',
+]);
 
 function scan(src, { lang }) {
   const tokens = [];
@@ -73,7 +95,15 @@ function scan(src, { lang }) {
     const bodyStart = start + (triple ? 3 : 1);
     const closed = triple ? src.startsWith(q.repeat(3), i) : src[i] === q;
     const end = Math.min(n, closed ? i + (triple ? 3 : 1) : i);
-    tokens.push({ type: 'string', quote: q, raw, start, end, depth, text: src.slice(bodyStart, closed ? i : end) });
+    tokens.push({
+      type: 'string',
+      quote: q,
+      raw,
+      start,
+      end,
+      depth,
+      text: src.slice(bodyStart, closed ? i : end),
+    });
     return end;
   }
 
@@ -157,7 +187,8 @@ function codeOnly(src, lang) {
       } else if (src[i] === '$' && src[i + 1] === '{') {
         let depth = 1;
         let j = i + 2;
-        for (; j < t.end && depth > 0; j += 1) depth += src[j] === '{' ? 1 : src[j] === '}' ? -1 : 0;
+        for (; j < t.end && depth > 0; j += 1)
+          depth += src[j] === '{' ? 1 : src[j] === '}' ? -1 : 0;
         for (let k = i + 2; k < j - 1; k += 1) chars[k] = src[k];
         i = j - 1;
       }

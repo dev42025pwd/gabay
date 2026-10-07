@@ -32,7 +32,11 @@ test('sql-interpolation (C1): a ${} template that is the value of select, from, 
 test('sql-interpolation (C1): a quote-wrapped interpolation or a $n placeholder beside ${} marks a template as SQL', () => {
   assert.deepEqual(at(run("const a = `Name = '${n}'`;\n")), [`${FILE}:1:sql-interpolation`]);
   assert.deepEqual(at(run('const a = `LIMIT $1 ${x}`;\n')), [`${FILE}:1:sql-interpolation`]);
-  assert.deepEqual(run('const a = `Could not find venue ${id}`;\n'), [], 'prose without a quote or placeholder');
+  assert.deepEqual(
+    run('const a = `Could not find venue ${id}`;\n'),
+    [],
+    'prose without a quote or placeholder',
+  );
   assert.deepEqual(run('const a = { title: `Venue ${id}` };\n'), [], 'a key that is not a SQL key');
 });
 

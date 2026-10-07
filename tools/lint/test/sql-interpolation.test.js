@@ -24,7 +24,11 @@ test('sql-interpolation: SQL joined to a variable with + fails (either side)', (
 const b = filter + ' ORDER BY Name';
 const c = 'SELECT * FROM gabay.Venue ' + 'WHERE x = 1 ' + clause;
 `;
-  assert.deepEqual(at(run(js)), [`${FILE}:1:sql-interpolation`, `${FILE}:2:sql-interpolation`, `${FILE}:3:sql-interpolation`]);
+  assert.deepEqual(at(run(js)), [
+    `${FILE}:1:sql-interpolation`,
+    `${FILE}:2:sql-interpolation`,
+    `${FILE}:3:sql-interpolation`,
+  ]);
 });
 
 test('sql-interpolation: parameterized SQL, literal-only concatenation and plain prose pass', () => {
@@ -61,7 +65,10 @@ const a = \`SELECT * FROM gabay.Venue ORDER BY \${orderBy}\`;
 
 test('sql-interpolation: only functions/src is checked', () => {
   const bad = 'const a = `SELECT * FROM gabay.Venue WHERE x = ${y}`;\n';
-  assert.deepEqual(lint('sql-interpolation', { 'functions/test/x.js': bad, 'db/seeds/lib/db.js': bad }), []);
+  assert.deepEqual(
+    lint('sql-interpolation', { 'functions/test/x.js': bad, 'db/seeds/lib/db.js': bad }),
+    [],
+  );
 });
 
 test('sql-interpolation: a regex literal with a quote in it does not derail the scan', () => {

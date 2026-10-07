@@ -42,9 +42,16 @@ test('run (I2): in whole-repo mode a missing db/schema.sql, app/lib or functions
     assert.match(r.stdout, /app\/lib:0: repo-layout: .*missing/);
     assert.match(r.stdout, /functions\/src:0: repo-layout: .*missing/);
   });
-  withTree({ 'db/schema.sql': SCHEMA, 'app/lib/main.dart': 'void main() {}\n', 'functions/src/app.js': "'use strict';\n" }, (root) => {
-    assert.equal(cli('--root', root).status, 0);
-  });
+  withTree(
+    {
+      'db/schema.sql': SCHEMA,
+      'app/lib/main.dart': 'void main() {}\n',
+      'functions/src/app.js': "'use strict';\n",
+    },
+    (root) => {
+      assert.equal(cli('--root', root).status, 0);
+    },
+  );
 });
 
 test('run (I2): the layout check is off for --files runs and for --allow-partial', () => {

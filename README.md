@@ -14,7 +14,24 @@ Gabay is an indoor wayfinding app for shopping malls in the Philippines: a shopp
 git config core.hooksPath .githooks
 ```
 
-Without this the pre-commit and pre-push hooks never run (standard §2, §8.1). The `.githooks/` folder is created in Phase 1.
+Without this the pre-commit and pre-push hooks never run (standard §2, §8.1).
+
+## Checking your work
+
+```sh
+npm run verify        # in Git Bash: fnm exec --using=22 -- npm.cmd run verify
+```
+
+One line per check (Node 22, `node --check`, the structural linters and their tests, ESLint and Prettier, the API and database-tool tests, the schema applied twice, the seed, the Functions emulator's health, `flutter analyze`, `flutter test`), then `ALL GREEN` or the list of failures. The exit code is the number of failures. It takes minutes and resets the local `gabay_dev` database (the seed refills it). Every run, green or red, is recorded in `.verify/last-run.json` with a fingerprint of the code it checked. `npm run verify -- --only eslint,prettier` runs some checks; that is a partial run and never counts as a verify.
+
+What the hooks do (`WORKING_AGREEMENT.md` §6):
+
+| Hook | Does |
+|---|---|
+| `.githooks/pre-commit` | refuses a staged `.env` (not `.env.example`), a repeated changelog entry, and files the structural linters refuse (`node tools/lint/run.js --files ...`, and `migrations-immutable --staged`); then raises the patch version of each app surface the commit touches (0.1.0 to 0.1.1) and stamps that surface's top changelog entry with the version and today's date in Asia/Manila (L129). A version you raised by hand is kept. It also works for `git commit -- <paths>`. |
+| `.githooks/post-commit` | puts the index back in step after a stamped `git commit -- <paths>` |
+| `.githooks/pre-push` | runs `npm run verify`; the push is refused if it fails |
+| `.claude/settings.json` | the main session may not finish until `npm run verify` has run on the current code (a failed run is shown, not a trap); nor when screens changed with no changelog entry; and the schema-to-form drift linter runs after every Dart edit |
 
 ## Stack (Blueprint Part 1 holds the pins)
 
@@ -34,7 +51,8 @@ Without this the pre-commit and pre-push hooks never run (standard §2, §8.1). 
 | `api/` | Express app, routes, services, engines (publish, graph, planner, live status) |
 | `db/` | `schema.sql` (the target schema), migrations (Phase 1), `SCHEMA_READING_GUIDE.md` |
 | `lib/` | Flutter: `core/` (positioning, routing, package, map3d, voice), `features/` (shopper, editor, admin) |
-| `.githooks/` | pre-commit and pre-push hooks (Phase 1) |
+| `.githooks/` | pre-commit, post-commit and pre-push hooks |
+| `tools/` | `verify.js` (`npm run verify`), `lint/` (the structural linters), `hooks/` (the pre-commit logic) |
 | `.claude/agents/` | the build agents, dormant until Phase 1 (L64) |
 | `docs/` | the project documents, grouped by purpose (L125); README, CLAUDE.md, REVIEW.md and INSTALL.md stay at the root |
 

@@ -23,7 +23,13 @@ test('migrations-immutable: unpadded, capitalised and non-NNNN names fail; good 
     'db/migrations/1_add_x.sql:1:migrations-immutable',
     'db/migrations/add_y.sql:1:migrations-immutable',
   ]);
-  assert.deepEqual(lint('migrations-immutable', { 'db/migrations/0001_a.sql': SQL, 'db/migrations/0002_b.sql': SQL }), []);
+  assert.deepEqual(
+    lint('migrations-immutable', {
+      'db/migrations/0001_a.sql': SQL,
+      'db/migrations/0002_b.sql': SQL,
+    }),
+    [],
+  );
   assert.deepEqual(lint('migrations-immutable', { 'README.md': 'no migrations folder' }), []);
 });
 
@@ -39,14 +45,29 @@ test('migrations-immutable: two migrations with the same number fail', () => {
 // ---- git modes, on a temporary repository (the real repo's history is never touched) -----------
 
 const git = (cwd, ...args) =>
-  execFileSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=Test', '-c', 'core.autocrlf=false', ...args], {
-    cwd,
-    encoding: 'utf8',
-  });
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.email=t@example.test',
+      '-c',
+      'user.name=Test',
+      '-c',
+      'core.autocrlf=false',
+      ...args,
+    ],
+    {
+      cwd,
+      encoding: 'utf8',
+    },
+  );
 
 /** A repo with 0001 and 0002 committed on main. */
 function repoWithMigrations() {
-  const root = tree({ 'db/migrations/0001_a.sql': 'CREATE TABLE a (x INT);\n', 'db/migrations/0002_b.sql': 'CREATE TABLE b (x INT);\n' });
+  const root = tree({
+    'db/migrations/0001_a.sql': 'CREATE TABLE a (x INT);\n',
+    'db/migrations/0002_b.sql': 'CREATE TABLE b (x INT);\n',
+  });
   git(root, 'init', '-q', '-b', 'main');
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', 'migrations');
@@ -57,7 +78,8 @@ const write = (root, rel, text) => {
   fs.writeFileSync(path.join(root, rel), text);
 };
 const staged = (root) =>
-  runLinters({ names: ['migrations-immutable'], files: null, staged: true, base: null, root }).results[0].violations;
+  runLinters({ names: ['migrations-immutable'], files: null, staged: true, base: null, root })
+    .results[0].violations;
 
 test('migrations-immutable --staged: editing, deleting or renaming a committed migration fails; adding one passes', () => {
   const root = repoWithMigrations();
@@ -99,7 +121,8 @@ test('migrations-immutable --base: an edit between REF and HEAD fails; a pure ad
     git(root, 'add', '-A');
     git(root, 'commit', '-q', '-m', 'add');
     const against = (base) =>
-      runLinters({ names: ['migrations-immutable'], files: null, staged: false, base, root }).results[0].violations;
+      runLinters({ names: ['migrations-immutable'], files: null, staged: false, base, root })
+        .results[0].violations;
     assert.deepEqual(against('main'), []);
 
     write(root, 'db/migrations/0002_b.sql', 'CREATE TABLE b (x TEXT);\n');
@@ -114,7 +137,13 @@ test('migrations-immutable --base: an edit between REF and HEAD fails; a pure ad
 test('migrations-immutable: git modes outside a repository report a violation instead of passing silently', () => {
   const root = tree({ 'db/migrations/0001_a.sql': SQL });
   try {
-    const found = runLinters({ names: ['migrations-immutable'], files: null, staged: true, base: null, root }).results[0].violations;
+    const found = runLinters({
+      names: ['migrations-immutable'],
+      files: null,
+      staged: true,
+      base: null,
+      root,
+    }).results[0].violations;
     assert.equal(found.length, 1);
     assert.match(found[0].message, /could not ask git/);
   } finally {

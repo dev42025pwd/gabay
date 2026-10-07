@@ -1,0 +1,36 @@
+#!/bin/sh
+# Gabay pre-commit (standard §8.1). Enabled once per clone with:  git config core.hooksPath .githooks
+# Order matters: the secret guard is pure shell and runs first, so it fires even when Node is missing.
+
+# --- 1. Secret guard --------------------------------------------------------------------------
+# Incident this prevents: a real .env committed with the database password and keys, forcing a full
+# credential rotation and a history rewrite (standard §3.16, §8.1). Any staged .env* is refused except
+# the committed templates (.env.example and friends).
+refused=""
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  base=${file##*/}
+  case "$base" in
+    .env*)
+      case "$base" in
+        *.example | *.sample | *.template | *.dist) ;;
+        *) refused="$refused $file" ;;
+      esac
+      ;;
+  esac
+done <<EOF
+$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
+EOF
+if [ -n "$refused" ]; then
+  echo "pre-commit: refusing to commit secrets:$refused" >&2
+  echo "  A real .env never goes into git. Unstage it:  git restore --staged <file>" >&2
+  echo "  (.env.example, .env.sample, .env.template and .env.dist are allowed.)" >&2
+  exit 1
+fi
+
+# --- 2. The rest, in Node 22 ------------------------------------------------------------------
+# changelog duplicate guard, structural linters for the staged files, version bump + changelog stamp.
+root=$(git rev-parse --show-toplevel) || exit 1
+. "$root/.githooks/node.sh"
+gabay_node "$root/tools/hooks/pre-commit.js"
+exit $?

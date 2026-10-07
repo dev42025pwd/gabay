@@ -14,7 +14,10 @@ const IN_LIB = /^app\/lib\/.+\.dart$/;
 const ALLOWED_DIR = 'app/lib/shared/forms/';
 const WIDGET = '(?:TextField|TextFormField|CupertinoTextField|CupertinoTextFormFieldRow)';
 const BUILT = new RegExp(`\\b(${WIDGET})\\s*(?:\\(|\\.\\s*new\\b)`, 'g');
-const ALIASED = new RegExp(`\\btypedef\\s+\\w+\\s*(?:<[^>]*>)?\\s*=\\s*(?:\\w+\\s*\\.\\s*)?(${WIDGET})\\b`, 'g');
+const ALIASED = new RegExp(
+  `\\btypedef\\s+\\w+\\s*(?:<[^>]*>)?\\s*=\\s*(?:\\w+\\s*\\.\\s*)?(${WIDGET})\\b`,
+  'g',
+);
 
 function run(ctx) {
   const found = [];

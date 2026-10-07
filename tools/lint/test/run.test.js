@@ -13,7 +13,9 @@ const { scan, codeOnly } = require('../lib/scan');
 const RUN = path.resolve(__dirname, '..', 'run.js');
 const BAD_VIEW = 'app/lib/features/demo/views/v.dart';
 const cli = (root, ...args) =>
-  spawnSync(process.execPath, [RUN, '--root', root, '--allow-partial', ...args], { encoding: 'utf8' });
+  spawnSync(process.execPath, [RUN, '--root', root, '--allow-partial', ...args], {
+    encoding: 'utf8',
+  });
 
 test('run: all ten linters are registered, with the fixed rule names', () => {
   assert.deepEqual(
@@ -34,7 +36,15 @@ test('run: all ten linters are registered, with the fixed rule names', () => {
 });
 
 test('run: parseArgs reads names, --files lists, --staged, --base and rejects unknown input', () => {
-  const o = parseArgs(['schema-forms', '--files', 'a.dart', 'b.js', '--staged', '--base', 'origin/main']);
+  const o = parseArgs([
+    'schema-forms',
+    '--files',
+    'a.dart',
+    'b.js',
+    '--staged',
+    '--base',
+    'origin/main',
+  ]);
   assert.deepEqual(o.names, ['schema-forms']);
   assert.deepEqual(o.files, ['a.dart', 'b.js']);
   assert.equal(o.staged, true);
@@ -58,7 +68,12 @@ test('run: exit code is the violation count, output is path:line: rule: message'
 });
 
 test('run: exit code is capped at 255; a clean tree exits 0; a bad argument exits 2', () => {
-  const many = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`app/lib/features/f/views/v${i}.dart`, 'x() => TextField();\n']));
+  const many = Object.fromEntries(
+    Array.from({ length: 300 }, (_, i) => [
+      `app/lib/features/f/views/v${i}.dart`,
+      'x() => TextField();\n',
+    ]),
+  );
   const root = tree(many);
   try {
     assert.equal(cli(root, 'no-bare-textfield').status, 255);
@@ -77,19 +92,26 @@ test('run: exit code is capped at 255; a clean tree exits 0; a bad argument exit
 });
 
 test('run: --files lints only the listed files', () => {
-  const root = tree({ [BAD_VIEW]: 'a() => TextField();\n', 'app/lib/features/demo/views/w.dart': 'a() => TextField();\n' });
+  const root = tree({
+    [BAD_VIEW]: 'a() => TextField();\n',
+    'app/lib/features/demo/views/w.dart': 'a() => TextField();\n',
+  });
   try {
     const r = cli(root, 'no-bare-textfield', '--files', BAD_VIEW);
     assert.equal(r.status, 1);
     assert.match(r.stdout, /v\.dart:1:/);
     assert.doesNotMatch(r.stdout, /w\.dart/);
-    assert.equal(cli(root, '--files', 'README.md').status, 0, 'a listed file that does not exist is ignored');
+    assert.equal(
+      cli(root, '--files', 'README.md').status,
+      0,
+      'a listed file that does not exist is ignored',
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('run: node_modules, build, .dart_tool, generated l10n and the linters\' own fixtures are never linted', () => {
+test("run: node_modules, build, .dart_tool, generated l10n and the linters' own fixtures are never linted", () => {
   const bad = 'a() => TextField();\nb() => Colors.red;\n';
   const root = tree({
     'app/lib/features/x/views/node_modules/a.dart': bad,
@@ -100,7 +122,10 @@ test('run: node_modules, build, .dart_tool, generated l10n and the linters\' own
   });
   try {
     assert.equal(cli(root).status, 0);
-    assert.equal(cli(root, '--files', 'tools/lint/test/fixtures/app/lib/features/x/views/d.dart').status, 0);
+    assert.equal(
+      cli(root, '--files', 'tools/lint/test/fixtures/app/lib/features/x/views/d.dart').status,
+      0,
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -113,7 +138,13 @@ test('run: a linter that crashes fails the run instead of passing', () => {
     throw new Error('boom');
   };
   try {
-    const { count, results } = runLinters({ names: ['schema-drops'], files: null, staged: false, base: null, root });
+    const { count, results } = runLinters({
+      names: ['schema-drops'],
+      files: null,
+      staged: false,
+      base: null,
+      root,
+    });
     assert.equal(count, 1);
     assert.match(results[0].violations[0].message, /crashed: .*boom/s);
   } finally {
@@ -125,7 +156,8 @@ test('run: a linter that crashes fails the run instead of passing', () => {
 // ---- the scanner ------------------------------------------------------------------------------
 
 test('scan: comments, strings, templates (with nested ${}) and regex literals are told apart from code', () => {
-  const js = "const a = 1; // c1\nconst b = 'x // not a comment';\nconst t = `a ${f(`inner ${g}`)} b`;\nconst r = /['\"`]/g; /* c2 */\n";
+  const js =
+    "const a = 1; // c1\nconst b = 'x // not a comment';\nconst t = `a ${f(`inner ${g}`)} b`;\nconst r = /['\"`]/g; /* c2 */\n";
   const tokens = scan(js, { lang: 'js' });
   assert.deepEqual(
     tokens.filter((t) => t.depth === 0).map((t) => t.type),
@@ -138,7 +170,8 @@ test('scan: comments, strings, templates (with nested ${}) and regex literals ar
 });
 
 test('scan: Dart triple-quoted and raw strings and // inside a URL string', () => {
-  const dart = "final u = 'https://example.test/a'; // real comment\nfinal t = '''multi\nline // no''';\nfinal r = r'\\d // no';\n";
+  const dart =
+    "final u = 'https://example.test/a'; // real comment\nfinal t = '''multi\nline // no''';\nfinal r = r'\\d // no';\n";
   const code = codeOnly(dart, 'dart');
   assert.ok(!code.includes('example'));
   assert.ok(!code.includes('real comment'));

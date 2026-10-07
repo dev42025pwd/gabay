@@ -88,7 +88,7 @@ async function runMigrations(client, dir = MIGRATIONS_DIR) {
       else console.table(rows);
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
-      throw new Error(`${m.name} failed and was rolled back: ${err.message}`);
+      throw new Error(`${m.name} failed and was rolled back: ${err.message}`, { cause: err });
     }
   }
   console.log(`${migrations.length} migration(s) applied.`);

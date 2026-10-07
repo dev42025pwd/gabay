@@ -35,3 +35,6 @@ Thumbs.db
 # Claude Code: per-machine files (settings.json and agents/ are committed, standard §8.6)
 .claude/settings.local.json
 .claude/*.lock
+
+# npm run verify: the last run's result and the Claude session baselines (L129; tools/fingerprint.js)
+.verify/

@@ -44,10 +44,21 @@ function kindsFor(col) {
   if (col.array) return [];
   if (col.isFk && /^(INT|INTEGER|BIGINT|SMALLINT)$/.test(col.type)) return ['fk', 'fkMulti'];
   const byType = {
-    VARCHAR: ['text', 'memo'], CHAR: ['text', 'memo'], TEXT: ['text', 'memo'], JSONB: ['memo'], UUID: ['text'],
-    INT: ['integer'], INTEGER: ['integer'], BIGINT: ['integer'], SMALLINT: ['integer'],
-    DECIMAL: ['decimal', 'money'], NUMERIC: ['decimal', 'money'],
-    DATE: ['date'], TIMESTAMPTZ: ['datetime'], TIMESTAMP: ['datetime'], BOOLEAN: ['flag'],
+    VARCHAR: ['text', 'memo'],
+    CHAR: ['text', 'memo'],
+    TEXT: ['text', 'memo'],
+    JSONB: ['memo'],
+    UUID: ['text'],
+    INT: ['integer'],
+    INTEGER: ['integer'],
+    BIGINT: ['integer'],
+    SMALLINT: ['integer'],
+    DECIMAL: ['decimal', 'money'],
+    NUMERIC: ['decimal', 'money'],
+    DATE: ['date'],
+    TIMESTAMPTZ: ['datetime'],
+    TIMESTAMP: ['datetime'],
+    BOOLEAN: ['flag'],
   };
   return byType[col.type] ?? [];
 }
@@ -95,7 +106,8 @@ function findFieldSpecs(src) {
     for (; end < text.length && depth > 0; end += 1) {
       const c = text[end];
       if (c === "'" || c === '"') {
-        for (end += 1; end < text.length && text[end] !== c; end += 1) if (text[end] === '\\') end += 1;
+        for (end += 1; end < text.length && text[end] !== c; end += 1)
+          if (text[end] === '\\') end += 1;
       } else if (c === '(') depth += 1;
       else if (c === ')') depth -= 1;
     }
@@ -114,7 +126,10 @@ function findFieldSpecs(src) {
 function checkSpec(spec, tables, report) {
   const { args } = spec;
   if (spec.positional || [args.table, args.name, args.kind].some((v) => typeof v !== 'string')) {
-    return report(spec, 'FieldSpec needs named literal table:, name: and kind: arguments so it can be checked against schema.sql');
+    return report(
+      spec,
+      'FieldSpec needs named literal table:, name: and kind: arguments so it can be checked against schema.sql',
+    );
   }
   const tableName = args.table.replace(/^gabay\./i, '');
   const table = tables.get(tableName.toLowerCase());
@@ -126,21 +141,34 @@ function checkSpec(spec, tables, report) {
 
   const kinds = kindsFor(col);
   if (!kinds.includes(args.kind)) {
-    return report(spec, `${where} is ${typeText}: kind must be ${kinds.length ? kinds.join(' or ') : 'none (no form kind exists)'}, not ${args.kind}`);
+    return report(
+      spec,
+      `${where} is ${typeText}: kind must be ${kinds.length ? kinds.join(' or ') : 'none (no form kind exists)'}, not ${args.kind}`,
+    );
   }
   if (args.readOnly === true) return undefined;
 
   const required = args.required === true;
-  if (!col.nullable && !col.hasDefault && !required) report(spec, `${where} is NOT NULL: the spec must say required: true`);
-  if (col.nullable && required) report(spec, `${where} is nullable: the spec must not say required: true`);
+  if (!col.nullable && !col.hasDefault && !required)
+    report(spec, `${where} is NOT NULL: the spec must say required: true`);
+  if (col.nullable && required)
+    report(spec, `${where} is nullable: the spec must not say required: true`);
   if (col.length !== null && args.maxLength !== col.length) {
-    report(spec, `${where} is ${typeText}(${col.length}): maxLength must be ${col.length}, spec has ${args.maxLength ?? 'none'}`);
+    report(
+      spec,
+      `${where} is ${typeText}(${col.length}): maxLength must be ${col.length}, spec has ${args.maxLength ?? 'none'}`,
+    );
   }
-  if (col.length === null && args.maxLength !== undefined) report(spec, `${where} has no length: remove maxLength: ${args.maxLength}`);
+  if (col.length === null && args.maxLength !== undefined)
+    report(spec, `${where} has no length: remove maxLength: ${args.maxLength}`);
   if (col.scale !== null && args.scale !== col.scale) {
-    report(spec, `${where} is ${typeText}(${col.precision},${col.scale}): scale must be ${col.scale}, spec has ${args.scale ?? 'none'}`);
+    report(
+      spec,
+      `${where} is ${typeText}(${col.precision},${col.scale}): scale must be ${col.scale}, spec has ${args.scale ?? 'none'}`,
+    );
   }
-  if (col.scale === null && args.scale !== undefined) report(spec, `${where} has no scale: remove scale: ${args.scale}`);
+  if (col.scale === null && args.scale !== undefined)
+    report(spec, `${where} has no scale: remove scale: ${args.scale}`);
   return undefined;
 }
 

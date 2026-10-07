@@ -52,7 +52,14 @@ function tree(files) {
 function lint(name, files, extra = {}) {
   const root = tree(files);
   try {
-    const { results } = runLinters({ names: [name], files: null, staged: false, base: null, root, ...extra });
+    const { results } = runLinters({
+      names: [name],
+      files: null,
+      staged: false,
+      base: null,
+      root,
+      ...extra,
+    });
     return results[0].violations;
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

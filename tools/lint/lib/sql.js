@@ -26,7 +26,8 @@ const PLACEHOLDER = /\$\d+/;
 
 const looksLikeSql = (text) => KEYWORD.test(text) || SCHEMA_REF.test(text);
 const looksLikeStatement = (text) =>
-  STATEMENT.test(text) || (SCHEMA_REF.test(text) && /\b(select|insert|update|delete)\b/i.test(text));
+  STATEMENT.test(text) ||
+  (SCHEMA_REF.test(text) && /\b(select|insert|update|delete)\b/i.test(text));
 
 /** A literal's text with its JS escapes of quotes and backslashes undone, so SQL quotes read as quotes. */
 const unescape = (text) => text.replace(/\\(['"`\\])/g, '$1');
@@ -83,9 +84,15 @@ function annotation(src, line, tag) {
 function objectProps(src, topTokens, open) {
   const props = [];
   const push = (from, end) => {
-    if (/^\s*\.\.\./.test(src.slice(from, end))) props.push({ key: '...', valueStart: null, valueEnd: end });
+    if (/^\s*\.\.\./.test(src.slice(from, end)))
+      props.push({ key: '...', valueStart: null, valueEnd: end });
     const head = /^\s*([A-Za-z_$][\w$]*)\s*(:)?/.exec(src.slice(from, end));
-    if (head) props.push({ key: head[1], valueStart: head[2] ? from + head[0].length : null, valueEnd: end });
+    if (head)
+      props.push({
+        key: head[1],
+        valueStart: head[2] ? from + head[0].length : null,
+        valueEnd: end,
+      });
   };
   let depth = 0;
   let from = open + 1;
@@ -147,18 +154,27 @@ function findRunPagedCalls(src) {
   const tokens = scan(src, { lang: 'js' });
   const clean = blank(src, tokens, ['comment']);
   const topTokens = new Map(tokens.filter((t) => t.depth === 0).map((t) => [t.start, t]));
-  const strings = tokens.filter((t) => t.depth === 0 && (t.type === 'string' || t.type === 'template'));
+  const strings = tokens.filter(
+    (t) => t.depth === 0 && (t.type === 'string' || t.type === 'template'),
+  );
   const lineOf = lineMap(src);
   const calls = [];
   for (const m of clean.matchAll(/\brunPaged\s*\(/g)) {
     const inLiteral = strings.some((t) => m.index > t.start && m.index < t.end);
-    const declaration = /\bfunction\s*\*?\s*$/.test(clean.slice(Math.max(0, m.index - 20), m.index));
+    const declaration = /\bfunction\s*\*?\s*$/.test(
+      clean.slice(Math.max(0, m.index - 20), m.index),
+    );
     if (inLiteral || declaration) continue;
     const rest = clean.slice(m.index + m[0].length);
     const brace = /^\s*\{/.exec(rest);
     if (!brace) {
       const line = lineOf(m.index);
-      calls.push({ line, text: '', whereLiteral: false, unreadable: 'the argument is not an object literal' });
+      calls.push({
+        line,
+        text: '',
+        whereLiteral: false,
+        unreadable: 'the argument is not an object literal',
+      });
       continue;
     }
     const props = objectProps(clean, topTokens, m.index + m[0].length + brace[0].length - 1);
