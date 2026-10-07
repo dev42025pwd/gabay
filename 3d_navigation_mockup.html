@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gabay 3D Navigation Mock-up</title>
+<style>
+:root{
+  --page:#EFE6DF; --page-text:#2B211C; --page-muted:#74645A; --page-card:#FFFFFF; --page-line:#E4D5CB;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --page:#17110E; --page-text:#F3E9E2; --page-muted:#B8A99D; --page-card:#241B17; --page-line:#4A3C34; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--page-text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.stage{display:flex;gap:32px;align-items:flex-start;justify-content:center;padding:24px 16px;flex-wrap:wrap}
+.phone-wrap{flex:none}
+
+/* ---------- Phone: Gabay tokens from lib/theme.dart (light + dark) ---------- */
+.phone{
+  --ground:#FBF4EF; --surface:#FFFFFF; --alt:#F4E9E1; --text:#2B211C; --muted:#74645A; --outline:#E4D5CB;
+  --accent:#C1623D; --on-accent:#FFFFFF; --accent-text:#A84A29;
+  --floor:#EDE9E1; --store:#F7E6DA; --store-line:#E4D5CB; --staff:#E9C9C0;
+  --wall-top:#CFC5BC; --wall-a:#A99D93; --wall-b:#948880;
+  --slab-a:#D9BFAE; --slab-b:#C9AD9A;
+  --fur-top:#DCCDB4; --fur-a:#B9A68A; --fur-b:#A59378; --fur-line:#7D6446;
+  --col-top:#BDB8B3; --col-a:#8E8A86; --col-b:#7A7672;
+  --label:#23262B; --halo:#FBF4EF;
+  --route:#37C45F; --route-rim:#1B7F39; --route-text:#1B7F39;
+  --poi:#7451B8; --beacon:#6A3FB0; --walkway:#14737A; --door:#E0A030; --mark:#23262B;
+  --open:#3F6B3D; --open-chip:#E9F1E8; --closed:#A24A2E; --closed-chip:#FBEADD;
+  --maint:#8A5F18; --maint-chip:#FBF1DE; --soon:#5B4C96; --soon-chip:#EFEAFB;
+  --shadow:0 2px 10px rgba(43,33,28,.16);
+  position:relative;width:390px;height:844px;border-radius:38px;border:10px solid #1c1512;overflow:hidden;
+  background:var(--ground);color:var(--text);box-shadow:0 18px 50px rgba(0,0,0,.28);transform-origin:top left;
+  font-size:14px;line-height:1.35;user-select:none;-webkit-user-select:none;
+}
+.phone[data-theme=dark]{
+  --ground:#221A16; --surface:#2E2420; --alt:#3A2E28; --text:#F3E9E2; --muted:#B8A99D; --outline:#4A3C34;
+  --accent:#E08A63; --on-accent:#2B150C; --accent-text:#E08A63;
+  --floor:#2E2621; --store:#3A2D26; --store-line:#4A3C34; --staff:#4A2E28;
+  --wall-top:#6A5B52; --wall-a:#45382F; --wall-b:#3A2F28;
+  --slab-a:#2B211C; --slab-b:#241B17;
+  --fur-top:#6A5A48; --fur-a:#4E4235; --fur-b:#43382C; --fur-line:#B89C78;
+  --col-top:#6C6862; --col-a:#4C4945; --col-b:#403D3A;
+  --label:#EDE6E0; --halo:#221A16;
+  --route:#5CE07F; --route-rim:#1E8C3F; --route-text:#8FE6A6;
+  --poi:#9A7BDB; --beacon:#B79AF0; --walkway:#4FC3CC; --door:#F0B84A; --mark:#EDE6E0;
+  --open:#8FC480; --open-chip:#2E3B2A; --closed:#E08C78; --closed-chip:#4A2E26;
+  --maint:#E8B866; --maint-chip:#46341A; --soon:#B6A8E0; --soon-chip:#352F4A;
+  --shadow:0 2px 12px rgba(0,0,0,.5);
+}
+:where(.phone button){font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.phone svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#map{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#map:active{cursor:grabbing}
+#map text{font:600 12px system-ui,sans-serif;fill:var(--label);paint-order:stroke;stroke:var(--halo);stroke-width:4px;stroke-linejoin:round;text-anchor:middle;pointer-events:none}
+#map text.small{font-size:9px;stroke-width:3px}
+.gl{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.statusbar{position:absolute;top:0;left:0;right:0;height:40px;display:flex;justify-content:space-between;align-items:center;padding:6px 24px 0;font-weight:600;font-size:13px;z-index:30;pointer-events:none}
+.search{position:absolute;top:44px;left:14px;right:14px;height:48px;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);border:1px solid var(--outline);display:flex;align-items:center;gap:10px;padding:0 14px;z-index:25;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;font-size:15px;color:var(--text)}
+.search input::placeholder{color:var(--muted)}
+.search .clear{display:none}
+.search.has-text .clear{display:flex}
+.results{position:absolute;top:98px;left:14px;right:14px;max-height:380px;overflow:auto;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);border:1px solid var(--outline);z-index:24;display:none}
+.results.open{display:block}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px;width:100%;text-align:left;border-bottom:1px solid var(--outline)}
+.row:last-child{border-bottom:0}
+.row[disabled]{opacity:.6}
+.tile{width:44px;height:44px;border-radius:12px;background:var(--alt);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex:none}
+.row .t{flex:1;min-width:0}
+.row .t b{display:block;font-weight:600;font-size:15px}
+.row .t span{color:var(--muted);font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip svg.i{width:14px;height:14px;stroke-width:2.4}
+.chip.open{color:var(--open);background:var(--open-chip)} .chip.closed{color:var(--closed);background:var(--closed-chip)}
+.chip.maintenance{color:var(--maint);background:var(--maint-chip)} .chip.comingSoon{color:var(--soon);background:var(--soon-chip)}
+
+.floor{position:absolute;left:14px;top:112px;z-index:20;display:flex;flex-direction:column;align-items:center;gap:4px}
+.floor .fchip{width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:17px;box-shadow:var(--shadow)}
+.floor span{font-size:10.5px;color:var(--muted);font-weight:600;background:color-mix(in srgb,var(--ground) 80%,transparent);border-radius:6px;padding:0 4px}
+.rail{position:absolute;right:14px;top:112px;z-index:20;display:flex;flex-direction:column;gap:10px}
+.rail .btn,.fab{width:46px;height:46px;border-radius:13px;background:var(--surface);box-shadow:var(--shadow);border:1px solid var(--outline);display:flex;align-items:center;justify-content:center;color:var(--text)}
+.rail .zoom{display:flex;flex-direction:column;border-radius:13px;background:var(--surface);box-shadow:var(--shadow);border:1px solid var(--outline);margin-top:48px}
+.rail .zoom button{width:46px;height:44px;display:flex;align-items:center;justify-content:center}
+.rail .zoom button+button{border-top:1px solid var(--outline)}
+.rail .btn.on{color:var(--accent-text)}
+.rail .btn small{display:block;font-size:10px;font-weight:700;line-height:1}
+.dock{position:absolute;left:0;right:0;bottom:64px;z-index:22;display:flex;flex-direction:column;pointer-events:none}
+.dock>*{pointer-events:auto}
+.fabs{display:flex;justify-content:flex-end;padding:0 14px 12px}
+.fab{color:var(--accent-text)}
+.sheet{background:var(--surface);border-radius:20px 20px 0 0;box-shadow:0 -4px 18px rgba(43,33,28,.14);padding:8px 18px 14px;border:1px solid var(--outline);border-bottom:0}
+.sheet:empty{display:none}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--outline);margin:0 auto 10px}
+.eta{display:flex;align-items:center;gap:10px}
+.eta .big{flex:1;min-width:0;font-size:22px;font-weight:700;letter-spacing:-.2px}
+.eta .big em{font-style:normal;color:var(--route-text)}
+.eta .big span{color:var(--text);font-weight:500}
+.eta .to{display:block;font-size:12.5px;color:var(--muted);font-weight:500;letter-spacing:0}
+.round{width:40px;height:40px;border-radius:50%;background:var(--alt);display:flex;align-items:center;justify-content:center;flex:none;color:var(--text)}
+.ttl{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.ttl .tile{width:48px;height:48px}
+.ttl b{font-size:18px;font-weight:700}
+.ttl small{display:block;color:var(--muted);font-size:12.5px}
+.btns{display:flex;gap:10px;margin-top:12px}
+.pbtn{flex:1;height:48px;border-radius:14px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:15px}
+.sbtn{flex:1;height:48px;border-radius:14px;background:var(--alt);color:var(--text);font-weight:600;font-size:15px;border:1px solid var(--outline)}
+.det{margin-top:12px;border-top:1px solid var(--outline);padding-top:10px;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.det .line{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.det .muted{color:var(--muted)}
+.pillrow{display:flex;gap:8px;flex-wrap:wrap}
+.pill{border-radius:999px;padding:6px 12px;font-weight:600;font-size:13px;background:var(--alt);border:1px solid var(--outline)}
+.pill.sel{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);color:var(--accent-text)}
+.warn{background:var(--closed-chip);color:var(--closed);border-radius:12px;padding:8px 12px;font-size:13px;font-weight:600;margin-top:8px}
+.ok{background:var(--open-chip);color:var(--open);border-radius:12px;padding:8px 12px;font-size:13px;font-weight:600}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--outline);position:relative;flex:none;transition:.15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.15s}
+.sw.on{background:var(--accent)} .sw.on::after{left:21px}
+
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:64px;background:var(--surface);border-top:1px solid var(--outline);display:flex;z-index:40}
+.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:500;color:var(--muted)}
+.tabbar button.on{color:var(--accent-text);font-weight:700}
+.screen{position:absolute;top:0;left:0;right:0;bottom:64px;background:var(--ground);z-index:35;overflow:auto;padding:52px 16px 20px;display:none}
+.screen.on{display:block}
+.screen h2{margin:4px 0 12px;font-size:24px;letter-spacing:-.3px}
+.screen h3{margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--outline);border-radius:14px;overflow:hidden}
+.card .row{cursor:default}
+.seg{display:flex;background:var(--alt);border-radius:12px;padding:3px;border:1px solid var(--outline)}
+.seg button{flex:1;height:36px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--accent-text);box-shadow:0 1px 4px rgba(43,33,28,.18)}
+.who{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.avatar{width:60px;height:60px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center}
+.avatar svg.i{width:30px;height:30px}
+.bar{height:8px;border-radius:4px;background:var(--outline);width:90px;overflow:hidden;flex:none}
+.bar i{display:block;height:100%;background:var(--accent)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+.hint{color:var(--muted);font-size:12.5px;margin:8px 2px}
+
+/* ---------- Page notes ---------- */
+.notes{width:min(460px,100%);padding-top:4px}
+.notes h1{font-size:24px;line-height:1.2;margin:0 0 6px;letter-spacing:-.3px}
+.notes h2{font-size:14px;text-transform:uppercase;letter-spacing:.8px;color:var(--page-muted);margin:26px 0 8px}
+.notes p,.notes li{font-size:14.5px}
+.notes ul{padding-left:20px;margin:6px 0}
+.notes li{margin:5px 0}
+.notes .lede{color:var(--page-muted);margin:0}
+.card2{background:var(--page-card);border:1px solid var(--page-line);border-radius:14px;padding:14px 16px;margin-top:10px}
+.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ctl button{height:38px;padding:0 16px;border-radius:10px;border:1px solid var(--page-line);background:var(--page-card);color:var(--page-text);font:600 14px system-ui;cursor:pointer}
+.ctl button.main{background:#C1623D;color:#fff;border-color:#C1623D}
+.ctl input[type=range]{flex:1;min-width:120px;accent-color:#C1623D}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:1px}
+.tag.rule{background:#FBEADD;color:#A24A2E} .tag.unv{background:#EFEAFB;color:#5B4C96}
+@media (prefers-color-scheme:dark){.tag.rule{background:#4A2E26;color:#E08C78}.tag.unv{background:#352F4A;color:#B6A8E0}}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-nav" viewBox="0 0 24 24"><path d="M12 3l7 17-7-4-7 4z"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><path d="M3.5 5h17v14h-17z"/><path d="M7 10l3 2-3 2M12 15h4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.5 6.5a4 4 0 0 0 4.9 4.9L20 12 12 20a2.1 2.1 0 0 1-3-3l8-8z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="g-books" viewBox="0 0 24 24"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M9 8h6"/></symbol>
+    <symbol id="g-food" viewBox="0 0 24 24"><path d="M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 11h2a2 2 0 0 1 0 4h-2M8 3.5v2M12 3.5v2"/></symbol>
+    <symbol id="g-fashion" viewBox="0 0 24 24"><path d="M12 9V8a2.2 2.2 0 1 0-2.2-2.2"/><path d="M12 9L3.5 16.5a1 1 0 0 0 .6 1.8h15.8a1 1 0 0 0 .6-1.8z"/></symbol>
+    <symbol id="g-restroom" viewBox="0 0 24 24"><circle cx="8" cy="5" r="1.6"/><path d="M8 8.5V15M5.5 21L8 15l2.5 6"/><circle cx="16.5" cy="5" r="1.6"/><path d="M16.5 8.5V21"/></symbol>
+    <symbol id="g-entrance" viewBox="0 0 24 24"><path d="M4 20V4h9v16M13 12h8M18 8l3 4-3 4"/></symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+  <div class="phone-wrap" id="pw">
+    <div class="phone" id="phone" data-theme="light">
+      <div class="statusbar"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <svg id="map" viewBox="0 0 390 844" preserveAspectRatio="none"></svg>
+
+      <div class="search" id="search">
+        <svg class="i"><use href="#i-search"/></svg>
+        <input id="q" autocomplete="off">
+        <button class="clear" id="qclear" data-act="qclear" aria-label="Clear"><svg class="i"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="results" id="results"></div>
+
+      <div class="floor" id="floor"><button class="fchip" aria-label="Floor 1">1</button><span>Penthouse</span></div>
+      <div class="rail" id="rail">
+        <button class="btn on" id="btnView" data-act="view" aria-label="Switch 3D or flat"><svg class="i"><use href="#i-cube"/></svg></button>
+        <div class="zoom"><button data-act="zin" aria-label="Zoom in"><svg class="i"><use href="#i-plus"/></svg></button><button data-act="zout" aria-label="Zoom out"><svg class="i"><use href="#i-minus"/></svg></button></div>
+      </div>
+      <div class="dock" id="dock">
+        <div class="fabs"><button class="fab" data-act="recenter" aria-label="Centre on me"><svg class="i"><use href="#i-nav"/></svg></button></div>
+        <div class="sheet" id="sheet"></div>
+      </div>
+
+      <div class="screen" id="screen"></div>
+      <nav class="tabbar" id="tabbar"></nav>
+    </div>
+  </div>
+
+  <aside class="notes">
+    <h1>Gabay navigation, in 3D</h1>
+    <p class="lede">The screenshot's layout on your penthouse model: search, floor chip, zoom and recentre, an ETA sheet and four tabs. The route is computed live from the real walkway graph in <span class="mono">penthouse.json</span>. This is a mock-up, not Flutter code.</p>
+
+    <h2>Try it</h2>
+    <div class="card2">
+      <div class="ctl">
+        <button class="main" id="btnWalk">▶ Walk the route</button>
+        <button id="btnReset">Reset</button>
+      </div>
+      <div class="ctl" style="margin-top:10px"><input type="range" id="scrub" min="0" max="1000" value="0"><span id="scrubTxt" class="mono"></span></div>
+    </div>
+    <ul>
+      <li>Drag the map to pan. Use + / − and the arrow to zoom and recentre. The cube button flips 3D and flat.</li>
+      <li>Tap a purple pin, a search result or a Places row for the place card, then <b>Go</b>.</li>
+      <li>Tap the sheet's chevron for the full route panel. Turn on <b>Wheelchair route</b> and pick Restroom (west) to see the "no wheelchair route" message.</li>
+      <li><b>Me</b> switches role, Simple/Technical wording and light/dark. <b>Test tools</b> (tester and admin only) turns on beacons, stickers, doors and the walkway graph.</li>
+    </ul>
+
+    <h2>Kept from Gabay, changed from the screenshot</h2>
+    <ul>
+      <li>Warm ground, terracotta accent for buttons, floor chip, dot and active tab (L72).</li>
+      <li>Every label exists in Simple and Technical (L51). The tabs read Places / Map / Test tools / Me, or Locations / Navigation / Debug / Profile.</li>
+      <li>One floor chip. The screenshot's two "1" chips look like a bug, and the penthouse has a single floor.</li>
+      <li>Test tools hides for shoppers, like the admin-only map detail (L70).</li>
+      <li>Routes still have no alternatives here: the penthouse walkway has no loops.</li>
+    </ul>
+
+    <h2>Needs your ruling</h2>
+    <ul>
+      <li><span class="tag rule">L-ROW</span><b>Route colour.</b> L72 makes route, dot and destination one accent. The hybrid uses a green dotted route and a terracotta dot, so the dot no longer matches the route.</li>
+      <li><span class="tag rule">L-ROW</span><b>Purple pins vs purple beacons.</b> Beacons are purple today. With Test tools on, <span class="swatch" style="background:#7451B8"></span>pins and <span class="swatch" style="background:#6A3FB0"></span>beacons are hard to tell apart.</li>
+      <li><span class="tag rule">L-ROW</span><b>Green route vs teal walkway.</b> Both read as green when the walkway overlay is on.</li>
+      <li><span class="tag rule">L-ROW</span><b>New tab bar.</b> Today's tabs are Beacons / Map / Test walks (plus Dashboard and Venues for admins). Where Beacons, Runs, Dashboard and Venues go under "Test tools" is not decided here.</li>
+    </ul>
+
+    <h2>Not verified</h2>
+    <ul>
+      <li><span class="tag unv">RECALLED</span>flutter_map with CrsSimple draws a flat map and has no built-in tilt. A real version would need a perspective transform or a custom painter, and taps would need the inverse of that transform. Not checked against the packages.</li>
+      <li>Pin glyphs, the 1.2 m/s walking speed and the status of each place (Clothing shown as under repair) are made up for the demo.</li>
+      <li>Geometry is from <span class="mono">penthouse.json</span> only. Nothing from the Modernbrands PDF is used (L48).</li>
+    </ul>
+  </aside>
+</div>
+
+<script>
+/* ===== Penthouse data (assets/venue/penthouse.json, trimmed to what the mock-up draws) ===== */
+const ROOMS=[
+ {id:'CONF',name:'Bookstore',cat:'books',pts:[[0.1,0.1],[3.55,0.1],[3.55,3.7],[0.1,3.7]]},
+ {id:'CRT',name:'Restroom (north)',cat:'restroom',pts:[[3.65,0.1],[4.68,0.1],[4.68,2.6],[3.65,2.6]]},
+ {id:'SRV',name:'Staff only',cat:'staff',pts:[[4.83,0.1],[7.84,0.1],[7.84,3.1],[7.4,3.38],[5.97,3.38],[4.83,2.47]]},
+ {id:'OFF3',name:'Dunkin',cat:'food',pts:[[8.1,0.1],[12.25,0.1],[12.25,3.3],[8.1,3.3]]},
+ {id:'CRR',name:'Restroom (east)',cat:'restroom',pts:[[12.4,0.1],[13.6,0.1],[13.6,3.3],[12.4,3.3]]},
+ {id:'PANT',name:'Food kiosk',cat:'food',pts:[[12.0,3.46],[13.6,3.46],[13.6,5.55],[12.0,5.55]]},
+ {id:'OFF1',name:'Office 1',cat:'concourse',pts:[[5.1,2.6855],[5.97,3.38],[10.3,3.38],[10.3,7.8],[5.1,7.8]]},
+ {id:'EAST',name:'East strip',cat:'concourse',pts:[[10.3,3.38],[12.0,3.38],[12.0,7.8],[10.3,7.8]]},
+ {id:'HALL',name:'Hall',cat:'concourse',pts:[[3.6,2.6],[4.83,2.6],[4.83,2.47],[5.1,2.6855],[5.1,5.7],[3.6,5.7]]},
+ {id:'CRL',name:'Restroom (west)',cat:'restroom',pts:[[0.1,3.85],[2.0,3.85],[2.0,5.1],[0.1,5.1]]},
+ {id:'PRNT',name:'Print station',cat:'concourse',pts:[[2.0,3.85],[3.5,3.85],[3.5,5.95],[2.0,5.95]]},
+ {id:'OFF2',name:'Clothing',cat:'fashion',pts:[[1.3,5.95],[4.8,5.95],[4.8,11.0],[0.1,11.0],[0.1,7.8],[1.3,7.8]]}
+];
+const OBS=[ // id, kind, x1, y1, x2, y2
+ ['COL1','column',7.2,1.1,7.9,1.8],['COL2','column',7.3,7.3,7.9,7.6],['SHAFT-W','shaft',0.1,5.2,1.3,7.6],['SHAFT-E','shaft',12.0,5.7,13.6,7.8],
+ ['F1','furniture',1.4,1.2,2.6,2.4],['F2','furniture',3.05,4.0,3.5,5.7],['F3','furniture',4.55,4.25,5.1,5.7],['F4','furniture',6.7,4.6,10.2,6.1],
+ ['F5a','furniture',9.7,3.0,10.3,3.5],['F5b','furniture',9.95,3.5,10.5,4.0],['F5c','furniture',10.2,4.0,10.85,4.4],['F6','furniture',10.25,4.3,10.85,7.55],
+ ['F7','furniture',8.1,0.1,12.1,0.7],['F8','furniture',11.5,0.7,12.1,2.0],['F9','furniture',12.95,3.3,13.55,4.95],['F10','furniture',13.0,4.95,13.5,5.35],
+ ['F11','furniture',1.55,6.25,2.15,9.2],['F12','furniture',4.25,6.9,4.85,9.85],['F13','furniture',0.5,10.45,4.45,11.0],
+ ['F14a','furniture',9.55,3.4,10.1,4.3],['F14b','furniture',8.1,1.85,8.3,2.9]
+];
+const DOORS=[ // id, a, b
+ ['D1',[5.4,7.8],[6.5,7.8]],['D2',[3.9,2.6],[4.6,2.6]],['D3',[3.55,2.95],[3.55,3.65]],['D4',[5.05,2.64],[5.6,3.08]],['D5',[5.1,2.69],[5.1,5.7]],
+ ['D7',[2.0,4.4],[2.0,5.0]],['D8',[4.95,6.05],[4.95,6.8]],['D9',[8.3,3.35],[9.1,3.35]],['D11',[12.0,3.5],[12.0,5.5]],['D12',[12.4,3.4],[13.1,3.4]],
+ ['D13',[10.4,3.34],[12.0,3.34]],['D15',[2.13,5.95],[3.0,5.95]]
+];
+const BEACONS=[['B1',2.5,4.5,-62],['B2',6.3,3.5,-71],['B3',11.5,4.0,-83],['B4',5.5,7.5,-58],['B5',9.5,7.5,-77]];
+const MARKS=[[1,6.0,7.3],[2,7.5,6.5],[3,9.5,6.6],[4,7.0,4.0],[5,4.2,4.5],[6,4.2,3.0],[7,2.5,2.5],[8,1.0,1.0],[9,1.0,4.5],[10,2.5,5.0],[11,3.5,6.5],[12,2.5,9.0],[13,1.0,10.0],[14,4.2,1.5],[15,9.0,2.5],[16,11.0,1.5],[17,12.9,1.5],[18,12.8,4.5],[19,11.2,4.0],[20,11.2,7.0],[21,5.95,7.2],[22,4.25,3.05],[23,4.0,3.45],[24,2.5,4.7],[25,5.5,6.45],[26,8.7,3.9],[27,11.5,4.5]];
+const NODES={A1:[5.95,7.2],A2:[5.7,6.45],A3:[7.5,6.8],A4:[9.6,6.8],A5:[5.7,5.3],A6:[5.7,4.0],A7:[7.5,4.0],A8:[8.7,4.0],H1:[4.3,3.8],H2:[4.2,3.2],C1:[8.7,2.8],C2:[10.0,2.5],C3:[11.2,2.9],'P-D13':[11.2,3.34],E1:[11.4,3.9],E2:[11.45,4.5],G1:[4.0,6.4],G2:[2.6,6.3],'P-D15':[2.57,5.95],G3:[2.55,5.3],G4:[2.55,4.7],'S-D1':[5.95,7.8],'S-D2':[4.25,2.6],'S-D3':[3.55,3.3],'S-D7':[2.0,4.7],'S-D8':[4.95,6.43],'S-D9':[8.7,3.35],'S-D11':[12.0,4.5]};
+const EDGES=[['A1','A2',1.6],['A2','A3',1.7],['A3','A4',1.7],['A2','A5',1.6],['A5','A6',1.6],['A6','A7',1.2],['A7','A8',1.2],['A6','H1',1.5],['H1','H2',1.5],['A8','S-D9',1.2],['S-D9','C1',1.5],['C1','C2',2.0],['C2','C3',2.0],['C3','P-D13',1.7],['P-D13','E1',1.7],['E1','E2',2.0],['A2','S-D8',1.5],['S-D8','G1',0.95],['G1','G2',2.0],['G2','P-D15',0.9],['P-D15','G3',0.9],['G3','G4',0.9],['A1','S-D1',1.6],['H2','S-D2',1.2],['H2','S-D3',1.2],['G4','S-D7',0.9],['E2','S-D11',2.0]];
+const OUTLINE=[[0.1,0.1],[13.6,0.1],[13.6,7.8],[4.8,7.8],[4.8,11.0],[0.1,11.0]];
+const WALLS=[[0.1,0.1,13.6,0.1],[13.6,0.1,13.6,7.8],[13.6,7.8,6.5,7.8],[5.4,7.8,4.8,7.8],[4.8,7.8,4.8,11.0],[4.8,11.0,0.1,11.0],[0.1,11.0,0.1,0.1]];
+const PLACES=[ // anchor = where the pin and label stand, node = walkway node at the door
+ {id:'CONF',name:'Bookstore',sub:'Mini Conference',cat:'books',door:'D3',node:'S-D3',at:[1.6,1.3],label:'Bookstore',status:'open'},
+ {id:'OFF3',name:'Dunkin',sub:'Office 3',cat:'food',door:'D9',node:'S-D9',at:[10.2,1.9],label:'Dunkin',status:'open'},
+ {id:'PANT',name:'Food kiosk',sub:'Mini Pantry',cat:'food',door:'D11',node:'S-D11',at:[12.5,4.55],label:'Food kiosk',status:'open'},
+ {id:'OFF2',name:'Clothing',sub:'Office 2',cat:'fashion',door:'D8',node:'S-D8',at:[3.2,9.4],label:'Clothing',status:'maintenance'},
+ {id:'CRT',name:'Restroom (north)',sub:'CR (top)',cat:'restroom',door:'D2',node:'S-D2',at:[4.15,2.0],label:'Restroom N',status:'open'},
+ {id:'CRL',name:'Restroom (west)',sub:'CR (left)',cat:'restroom',door:'D7',node:'S-D7',at:[0.9,4.9],label:'Restroom W',status:'open'}
+];
+const STATUS={ // [Simple, Technical, icon]
+ open:['Open','Open','i-check'],closed:['Closed','Closed','i-x'],maintenance:['Being repaired','Maintenance','i-wrench'],comingSoon:['Opening soon','Coming soon','i-clock']
+};
+
+/* ===== Named limits ===== */
+const WALK_MPS=1.2, WHEELCHAIR_MIN_WIDTH_M=1.2, START_PROGRESS_M=2.5;
+const SLAB_H=0.22, WALL_H=0.7, WALL_T=0.25, COLUMN_H=2.2, SHAFT_H=1.6, FURNITURE_H=0.5, ROUTE_Z=0.34;
+const BASE_PX_PER_M=21.5, PITCH_Y=0.68, PITCH_Z=0.74, YAW=-20*Math.PI/180;
+const ZOOM_MIN=0.6, ZOOM_MAX=3.2, ZOOM_STEP=1.3, CENTRE_X=192, CENTRE_Y=372, FOLLOW_ZOOM=1.7, TAP_SLOP_PX=4;
+const CONE_SPREAD=28*Math.PI/180, CONE_RADIUS_M=2.0;
+const USER_START=[6.0,7.0], VENUE_CX=6.85, VENUE_CY=5.6;
+const COS=Math.cos(YAW), SIN=Math.sin(YAW);
+
+/* ===== State ===== */
+const state={
+  tab:'map', role:'shopper', words:'simple', theme:'light',
+  ov:{beacons:false,marks:false,walkway:false,doors:false,ids:false},
+  place:null, route:null, arrived:false, expanded:false, wheelchair:false, wcError:null,
+  userPos:USER_START.slice(), heading:null, playing:false,
+  query:'', searchOpen:false, scale:1
+};
+const cam={zoom:1,px:0,py:0,tilt:1};
+
+/* ===== Helpers ===== */
+const $=id=>document.getElementById(id);
+const T=(s,t)=>state.words==='simple'?s:t;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+const placeById=id=>PLACES.find(p=>p.id===id);
+const isTester=()=>state.role!=='shopper';
+const ovOn=k=>isTester()&&state.ov[k];
+
+function P(x,y,z=0){
+  const u=x-VENUE_CX, v=y-VENUE_CY;
+  const ru=u*COS-v*SIN, rv=u*SIN+v*COS;
+  const ky=1-(1-PITCH_Y)*cam.tilt, kz=PITCH_Z*cam.tilt, S=BASE_PX_PER_M*cam.zoom;
+  return [CENTRE_X+cam.px+ru*S, CENTRE_Y+cam.py+rv*S*ky-z*S*kz];
+}
+const pts=(arr,z=0)=>arr.map(p=>P(p[0],p[1],z).map(n=>n.toFixed(1)).join(',')).join(' ');
+const area=a=>a.reduce((s,p,i)=>{const q=a[(i+1)%a.length];return s+p[0]*q[1]-q[0]*p[1]},0)/2;
+const centroid=a=>[a.reduce((s,p)=>s+p[0],0)/a.length,a.reduce((s,p)=>s+p[1],0)/a.length];
+function inPoly(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>pt[1])!==(b[1]>pt[1])&&pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
+const rect=(x1,y1,x2,y2)=>[[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
+const slabRooms=ROOMS.filter(r=>r.cat!=='concourse');
+const onSlab=pt=>slabRooms.some(r=>inPoly(pt,r.pts));
+
+function prism(poly,z0,z1,top,sideA,sideB,topStroke){
+  const A=area(poly); let out='';
+  if(cam.tilt>0.02){
+    for(let i=0;i<poly.length;i++){
+      const a=poly[i], b=poly[(i+1)%poly.length];
+      let nx=b[1]-a[1], ny=-(b[0]-a[0]); if(A<0){nx=-nx;ny=-ny}
+      const nrv=nx*SIN+ny*COS, nru=nx*COS-ny*SIN;
+      if(nrv<=0.001) continue;
+      out+=`<polygon points="${pts([a,b],z0)} ${pts([b,a],z1)}" style="fill:var(${nru<0?sideA:sideB})"/>`;
+    }
+  }
+  return out+`<polygon points="${pts(poly,z1)}" style="fill:var(${top});stroke:${topStroke||'none'};stroke-width:.8"/>`;
+}
+function wallRect(x1,y1,x2,y2,t){
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy), ux=dx/L, uy=dy/L, nx=-uy*t/2, ny=ux*t/2, ex=ux*t/2, ey=uy*t/2;
+  return [[x1-ex+nx,y1-ey+ny],[x2+ex+nx,y2+ey+ny],[x2+ex-nx,y2+ey-ny],[x1-ex-nx,y1-ey-ny]];
+}
+const isFrontWall=w=>{const mx=(w[0]+w[2])/2-VENUE_CX, my=(w[1]+w[3])/2-VENUE_CY;return mx*SIN+my*COS>0};
+
+/* ===== Routing over the walkway graph ===== */
+function graph(wheelchair){
+  const g={};
+  for(const [a,b,w] of EDGES){
+    if(wheelchair&&w<WHEELCHAIR_MIN_WIDTH_M) continue;
+    const d=dist(NODES[a],NODES[b]);
+    (g[a]=g[a]||[]).push([b,d]); (g[b]=g[b]||[]).push([a,d]);
+  }
+  return g;
+}
+function shortest(g,from,to){
+  const d={[from]:0}, prev={}, todo=new Set([from]);
+  while(todo.size){
+    let u=null; for(const n of todo) if(u===null||d[n]<d[u]) u=n;
+    todo.delete(u); if(u===to) break;
+    for(const [v,w] of g[u]||[]) if(d[u]+w<(d[v]??Infinity)){d[v]=d[u]+w;prev[v]=u;todo.add(v)}
+  }
+  if(!(to in d)) return null;
+  const path=[]; for(let n=to;n!==undefined;n=prev[n]) path.unshift(n);
+  return path;
+}
+const nearestNode=pos=>Object.keys(NODES).reduce((b,n)=>dist(NODES[n],pos)<dist(NODES[b],pos)?n:b,'A1');
+function routeTo(place,from,wheelchair){
+  const path=shortest(graph(wheelchair),nearestNode(from),place.node);
+  if(!path) return null;
+  const poly=[from.slice(),...path.map(n=>NODES[n])];
+  const cum=[0]; for(let i=1;i<poly.length;i++) cum.push(cum[i-1]+dist(poly[i-1],poly[i]));
+  return {placeId:place.id,poly,cum,total:cum[cum.length-1],progress:0};
+}
+function pointAt(r,m){
+  m=Math.max(0,Math.min(r.total,m));
+  let i=1; while(i<r.cum.length-1&&r.cum[i]<m) i++;
+  const seg=r.cum[i]-r.cum[i-1]||1, t=(m-r.cum[i-1])/seg, a=r.poly[i-1], b=r.poly[i];
+  return {pos:[lerp(a[0],b[0],t),lerp(a[1],b[1],t)],heading:Math.atan2(b[1]-a[1],b[0]-a[0]),i};
+}
+function remainingPoly(r){
+  const {pos,i}=pointAt(r,r.progress);
+  return [pos,...r.poly.slice(i)];
+}
+function syncUser(){
+  if(!state.route) return;
+  const r=state.route, at=pointAt(r,r.progress);
+  state.userPos=at.pos; state.heading=at.heading;
+  state.arrived=r.progress>=r.total-0.01;
+  if(state.arrived){state.playing=false}
+}
+function startRoute(place,progress=0){
+  state.wcError=null;
+  const r=routeTo(place,state.userPos,state.wheelchair);
+  if(!r){state.route=null;state.wcError=place.name;state.place=place.id;return}
+  r.progress=Math.min(progress,r.total);
+  state.route=r; state.place=place.id; state.arrived=false; state.expanded=false; state.heading=null;
+  syncUser();
+}
+function stopRoute(){state.route=null;state.place=null;state.arrived=false;state.playing=false;state.heading=null;state.wcError=null;state.expanded=false}
+
+const fmtEta=m=>{const s=m/WALK_MPS;return state.words==='simple'?(s<60?'< 1 min':Math.ceil(s/60)+' min'):(s/60).toFixed(1)+' min'};
+const fmtM=m=>Math.max(1,Math.round(m))+' m';
+
+/* ===== Map rendering ===== */
+function renderMap(){
+  const out=[];
+  const S=BASE_PX_PER_M*cam.zoom;
+  // ground shadow
+  out.push(`<filter id="blur"><feGaussianBlur stdDeviation="7"/></filter>`);
+  out.push(`<polygon points="${pts(OUTLINE.map(p=>[p[0]+0.5,p[1]+0.7]))}" fill="#000" opacity=".16" filter="url(#blur)"/>`);
+  // floor
+  out.push(`<polygon points="${pts(OUTLINE)}" style="fill:var(--floor)"/>`);
+  for(const r of ROOMS) if(r.cat==='concourse') out.push(`<polygon points="${pts(r.pts)}" style="fill:none;stroke:var(--outline);stroke-width:1"/>`);
+  // back walls
+  const walls=WALLS.map(w=>({w,rect:wallRect(...w,WALL_T),front:isFrontWall(w)}));
+  for(const x of walls) if(!x.front) out.push(prism(x.rect,0,WALL_H,'--wall-top','--wall-a','--wall-b'));
+  // slabs + obstacles, far to near
+  const items=[];
+  for(const r of slabRooms){
+    const top=r.cat==='staff'?'--staff':'--store';
+    items.push({d:P(...centroid(r.pts))[1],svg:prism(r.pts,0,SLAB_H,top,'--slab-a','--slab-b','var(--store-line)')});
+  }
+  for(const [id,kind,x1,y1,x2,y2] of OBS){
+    const poly=rect(x1,y1,x2,y2), c=centroid(poly), z0=onSlab(c)?SLAB_H:0;
+    const h=kind==='column'?COLUMN_H:kind==='shaft'?SHAFT_H:FURNITURE_H;
+    const f=kind==='furniture';
+    items.push({d:P(c[0],c[1])[1]+1,svg:prism(poly,z0,z0+h,f?'--fur-top':'--col-top',f?'--fur-a':'--col-a',f?'--fur-b':'--col-b',f?'var(--fur-line)':'none')});
+  }
+  items.sort((a,b)=>a.d-b.d); for(const it of items) out.push(it.svg);
+  // entrance threshold (always) + doors (tester overlay)
+  const d1=DOORS[0]; out.push(`<polyline points="${pts([d1[1],d1[2]],0.05)}" style="stroke:var(--accent);stroke-width:5;stroke-linecap:butt;fill:none"/>`);
+  if(ovOn('doors')) for(const [id,a,b] of DOORS.slice(1)) out.push(`<polyline points="${pts([a,b],SLAB_H+.02)}" style="stroke:var(--door);stroke-width:5;fill:none"/>`);
+  if(ovOn('walkway')){
+    for(const [a,b] of EDGES) out.push(`<polyline points="${pts([NODES[a],NODES[b]],SLAB_H+.02)}" style="stroke:var(--walkway);stroke-width:3;fill:none;opacity:.85"/>`);
+    for(const n of Object.values(NODES)){const [x,y]=P(n[0],n[1],SLAB_H+.02);out.push(`<circle cx="${x}" cy="${y}" r="3" style="fill:var(--walkway)"/>`)}
+  }
+  // route
+  if(state.route){
+    const rem=remainingPoly(state.route).map(p=>P(p[0],p[1],ROUTE_Z).map(n=>n.toFixed(1)).join(',')).join(' ');
+    if(rem.indexOf(',')>0){
+      out.push(`<polyline points="${rem}" style="fill:none;stroke:var(--route-rim);stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0 13"/>`);
+      out.push(`<polyline points="${rem}" style="fill:none;stroke:var(--route);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0 13"/>`);
+    }
+  }
+  // front walls
+  for(const x of walls) if(x.front) out.push(prism(x.rect,0,WALL_H,'--wall-top','--wall-a','--wall-b'));
+  // tester overlays that stand up
+  if(ovOn('marks')) for(const [n,x,y] of MARKS){const [sx,sy]=P(x,y,SLAB_H);out.push(`<circle cx="${sx}" cy="${sy}" r="5.5" style="fill:var(--mark);stroke:var(--surface);stroke-width:1.5"/><text class="small" x="${sx}" y="${sy-8}">M${n}</text>`)}
+  if(ovOn('beacons')) for(const [id,x,y] of BEACONS){const [sx,sy]=P(x,y,0.75);out.push(`<g><circle cx="${sx}" cy="${sy}" r="9" style="fill:var(--beacon);stroke:#fff;stroke-width:2"/><circle cx="${sx}" cy="${sy}" r="15" style="fill:none;stroke:var(--beacon);stroke-width:1.5;opacity:.5"/><text class="small" x="${sx}" y="${sy-19}">${id}</text></g>`)}
+  if(ovOn('ids')) for(const r of ROOMS){const [sx,sy]=P(...centroid(r.pts),SLAB_H);out.push(`<text class="small" x="${sx}" y="${sy}">${r.id}</text>`)}
+  // place pins + labels
+  for(const p of PLACES){
+    const [x,y]=P(p.at[0],p.at[1],SLAB_H), top=y-24, dim=p.status!=='open';
+    out.push(`<g data-poi="${p.id}" style="cursor:pointer;${dim?'opacity:.55':''}">
+      <line x1="${x}" y1="${y}" x2="${x}" y2="${top+12}" style="stroke:var(--poi);stroke-width:2"/>
+      <circle cx="${x}" cy="${y}" r="3" style="fill:var(--poi)"/>
+      <circle cx="${x}" cy="${top}" r="14" style="fill:var(--poi);stroke:#fff;stroke-width:2.5"/>
+      <g class="gl" style="color:#fff"><use href="#g-${p.cat}" x="${x-8.5}" y="${top-8.5}" width="17" height="17"/></g>
+      <text x="${x}" y="${y+16}">${p.label}</text></g>`);
+  }
+  { const [x,y]=P(5.95,7.8,0.1); out.push(`<g><circle cx="${x}" cy="${y+22}" r="12" style="fill:var(--accent);stroke:#fff;stroke-width:2.5"/><g class="gl" style="color:var(--on-accent)"><use href="#g-entrance" x="${x-7.5}" y="${y+14.5}" width="15" height="15"/></g><text x="${x}" y="${y+46}">${T('Entrance','Entrance (D1)')}</text></g>`) }
+  // destination pin
+  if(state.route&&!state.arrived){
+    const e=state.route.poly[state.route.poly.length-1], [x,y]=P(e[0],e[1],ROUTE_Z);
+    out.push(`<circle cx="${x}" cy="${y}" r="7" style="fill:#fff;stroke:var(--route);stroke-width:4"/>
+      <path d="M${x} ${y-8} c-3 -8 -15 -11 -15 -25 a15 15 0 0 1 30 0 c0 14 -12 17 -15 25z" style="fill:var(--route);stroke:var(--route-rim);stroke-width:1.5"/>
+      <circle cx="${x}" cy="${y-33}" r="5.5" style="fill:#fff"/>`);
+  }
+  // you-are-here dot + heading cone
+  const [ux,uy]=P(state.userPos[0],state.userPos[1],ROUTE_Z);
+  if(state.heading!==null&&!state.arrived){
+    const a=state.heading, steps=8, cone=[[state.userPos[0],state.userPos[1]]];
+    for(let i=0;i<=steps;i++){const t=a-CONE_SPREAD+i*2*CONE_SPREAD/steps;cone.push([state.userPos[0]+Math.cos(t)*CONE_RADIUS_M,state.userPos[1]+Math.sin(t)*CONE_RADIUS_M])}
+    out.push(`<defs><radialGradient id="cone" gradientUnits="userSpaceOnUse" cx="${ux}" cy="${uy}" r="${CONE_RADIUS_M*S}"><stop offset="0" stop-color="#C1623D" stop-opacity=".55"/><stop offset="1" stop-color="#C1623D" stop-opacity="0"/></radialGradient></defs>
+      <polygon points="${pts(cone,ROUTE_Z)}" fill="url(#cone)"/>`);
+  }
+  out.push(`<ellipse cx="${ux}" cy="${uy+3}" rx="13" ry="6" fill="#000" opacity=".18"/><circle cx="${ux}" cy="${uy}" r="17" style="fill:var(--accent);opacity:.2"/><circle cx="${ux}" cy="${uy}" r="9" style="fill:var(--accent);stroke:#fff;stroke-width:3.5"/>`);
+  $('map').innerHTML=out.join('');
+}
+
+/* ===== Chrome ===== */
+const tabs=()=>[
+  {id:'places',icon:'i-pin',s:'Places',t:'Locations'},
+  {id:'map',icon:'i-map',s:'Map',t:'Navigation'},
+  ...(isTester()?[{id:'debug',icon:'i-term',s:'Test tools',t:'Debug'}]:[]),
+  {id:'me',icon:'i-user',s:'Me',t:'Profile'}
+];
+const ic=(id,cls='i')=>`<svg class="${cls}"><use href="#${id}"/></svg>`;
+const chip=s=>`<span class="chip ${s}">${ic(STATUS[s][2])}${T(STATUS[s][0],STATUS[s][1])}</span>`;
+const catTile=c=>`<div class="tile">${ic('g-'+c)}</div>`;
+const walkLen=p=>{const r=routeTo(p,state.userPos,state.wheelchair);return r?r.total:null};
+const distTxt=p=>{const m=walkLen(p);return m===null?T('No way there','No path'):T('About '+fmtM(m)+' to walk',fmtM(m)+' along the walkway')};
+const placeRow=(p,act)=>`<button class="row" data-act="${act}:${p.id}">${catTile(p.cat)}<div class="t"><b>${p.name}</b><span>${state.words==='simple'?distTxt(p):p.door+' · '+p.sub+' · '+distTxt(p)}</span></div>${chip(p.status)}</button>`;
+
+function renderChrome(){
+  const onMap=state.tab==='map';
+  $('q').placeholder=T('Search a store or place','Search destination doors');
+  for(const id of ['search','floor','rail']) $(id).style.display=onMap?'':'none';
+  $('dock').style.display=onMap?'':'none';
+  $('results').classList.toggle('open',onMap&&state.searchOpen);
+  $('search').classList.toggle('has-text',!!state.query);
+  $('btnView').classList.toggle('on',cam.tilt>0.5);
+  $('tabbar').innerHTML=tabs().map(t=>`<button class="${state.tab===t.id?'on':''}" data-act="tab:${t.id}">${ic(t.icon)}<span>${T(t.s,t.t)}</span></button>`).join('');
+  $('results').innerHTML=resultsHtml();
+  $('sheet').innerHTML=sheetHtml();
+  $('screen').className='screen'+(onMap?'':' on');
+  $('screen').innerHTML=onMap?'':screenHtml();
+  $('phone').dataset.theme=state.theme;
+}
+function resultsHtml(){
+  const q=state.query.trim().toLowerCase();
+  const list=PLACES.filter(p=>!q||(p.name+' '+p.sub+' '+p.door+' '+p.cat).toLowerCase().includes(q));
+  if(!list.length) return `<div class="row"><div class="t"><b>${T('Nothing found','No destination doors match')}</b></div></div>`;
+  return list.map(p=>placeRow(p,'pick')).join('');
+}
+function sheetHtml(){
+  const p=state.place&&placeById(state.place);
+  if(state.wcError){
+    return `<div class="grab"></div><div class="ttl"><div class="tile">${ic('g-restroom')}</div><div><b>${state.wcError}</b></div></div>
+      <div class="warn">${T('There is no wheelchair route to '+state.wcError+'.','No step-free route to '+state.wcError)}</div>
+      <div class="btns"><button class="sbtn" data-act="wheel">${T('Turn off wheelchair route','Step-free off')}</button><button class="sbtn" data-act="stop">${T('Close','Dismiss')}</button></div>`;
+  }
+  if(!p) return '';
+  if(!state.route){
+    return `<div class="grab"></div><div class="ttl"><div class="tile">${ic('g-'+p.cat)}</div><div style="flex:1"><b>${p.name}</b><small>${state.words==='simple'?p.sub:p.door+' ('+p.sub+')'} · ${distTxt(p)}</small></div><button class="round" data-act="stop" aria-label="Close">${ic('i-close')}</button></div>
+      <div class="pillrow">${chip(p.status)}</div>
+      ${p.status!=='open'?`<div class="warn">${T('Not open, so you cannot go here yet.','Not Open: routing disabled')}</div>`:''}
+      <div class="btns"><button class="pbtn" data-act="go:${p.id}" ${p.status!=='open'?'disabled style="opacity:.45"':''}>${T('Go to '+p.name,'Route to '+p.door+' ('+p.name+')')}</button></div>`;
+  }
+  const r=state.route, rem=r.total-r.progress;
+  if(state.arrived){
+    return `<div class="grab"></div><div class="ok">${ic('i-check')} ${T('You have arrived at '+p.name,'Arrived at door '+p.door)}</div>
+      <div class="btns"><button class="sbtn" data-act="stop">${T('Done','End route')}</button></div>`;
+  }
+  const head=`<div class="grab"></div><div class="eta"><div class="big"><span class="to">${T('To '+p.name,'To '+p.door+' ('+p.name+')')}</span><em>${state.words==='simple'?fmtEta(rem):fmtEta(rem)}</em> <span>(${fmtM(rem)})</span></div>
+    <button class="round" data-act="expand" aria-label="Details">${ic(state.expanded?'i-down':'i-up')}</button>
+    <button class="round" data-act="stop" aria-label="${T('Stop','End route')}">${ic('i-close')}</button></div>`;
+  if(!state.expanded) return head;
+  return head+`<div class="det">
+    <div class="line"><span class="muted">${T('Starting from','Route start')}</span><b>${T('Where I am now','The smoothed dot')}</b></div>
+    <div class="line"><span class="muted">${T('About '+fmtM(r.total)+' to walk',fmtM(r.total)+' along the walkway')}</span><span class="pill sel">${T('Shortest ('+fmtM(r.total)+')','best '+fmtM(r.total))}</span></div>
+    <div class="muted">${T('There is no other way to get there.','No alternative passes the penalty rules')}</div>
+    <div class="line"><span>${T('Wheelchair route','Step-free only')}</span><button class="sw ${state.wheelchair?'on':''}" data-act="wheel" aria-label="Wheelchair route"></button></div>
+  </div>
+  <div class="btns"><button class="sbtn" data-act="arrived">${T("I've arrived","I've arrived (manual)")}</button><button class="pbtn" data-act="stop">${T('Stop','End route')}</button></div>`;
+}
+function screenHtml(){
+  if(state.tab==='places') return `<h2>${T('Places','Locations')}</h2><div class="card">${PLACES.map(p=>placeRow(p,'pick')).join('')}</div>
+    <p class="hint">${T('Tap a place to see it on the map.','Destination doors from penthouse.json (L53).')}</p>`;
+  if(state.tab==='me') return `<div class="who"><div class="avatar">${ic('i-user')}</div><div><b style="font-size:18px">${T('Gabay tester','Spike tester')}</b><div class="hint" style="margin:0">${T('Dynamiq penthouse','Dynamiq penthouse · 5 beacons')}</div></div></div>
+    <h3>${T('Who is using this','Role')}</h3><div class="seg">${['shopper','tester','admin'].map(x=>`<button class="${state.role===x?'on':''}" data-act="role:${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div>
+    <h3>${T('Wording','Wording (L51)')}</h3><div class="seg">${['simple','technical'].map(x=>`<button class="${state.words===x?'on':''}" data-act="words:${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div>
+    <h3>${T('Look','Appearance')}</h3><div class="seg">${['light','dark'].map(x=>`<button class="${state.theme===x?'on':''}" data-act="theme:${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div>
+    <h3>${T('Map','Map view')}</h3><div class="seg">${[['1','3D tilted'],['0','Flat']].map(([v,l])=>`<button class="${(cam.tilt>0.5)===(v==='1')?'on':''}" data-act="tilt:${v}">${l}</button>`).join('')}</div>
+    <p class="hint">${state.role==='shopper'?T('Shoppers see no test tools.','Shopper: Debug tab and map detail hidden (L70).'):T('Test tools is now in the tab bar.','Debug tab visible.')}</p>`;
+  if(state.tab==='debug'){
+    const sw=(k,l,sub)=>`<div class="row"><div class="t"><b>${l}</b><span>${sub}</span></div><button class="sw ${state.ov[k]?'on':''}" data-act="ov:${k}" aria-label="${l}"></button></div>`;
+    return `<h2>${T('Test tools','Debug')}</h2><h3>${T('Show on the map','Map layers')}</h3><div class="card">
+      ${sw('beacons',T('Beacons','Beacons'),'B1 – B5')}${sw('marks',T('Floor stickers','Marks'),'M1 – M27')}${sw('doors',T('Doors','Doors'),'D1 – D15')}${sw('walkway',T('Walking paths','Walkway graph'),T('Where routes can go','Nodes and edges'))}${sw('ids',T('Room codes','Room ids'),'CONF, OFF1, …')}</div>
+      <h3>${T('Beacons heard','Beacon RSSI')}</h3><div class="card">${BEACONS.map(b=>`<div class="row"><div class="t"><b>${b[0]}</b><span>x ${b[1]} m, y ${b[2]} m</span></div><span class="muted">${b[3]} dBm</span><div class="bar"><i style="width:${Math.round((b[3]+95)/45*100)}%"></i></div></div>`).join('')}</div>
+      <h3>${T('How we guess where you are','Position methods')}</h3><div class="card">
+      <div class="row"><div class="t"><b><span class="dot" style="background:#C1542E"></span>${T('Nearest beacon','Nearest')}</b></div></div>
+      <div class="row"><div class="t"><b><span class="dot" style="background:#2F6BB0"></span>${T('Average of beacons','Centroid')}</b></div></div>
+      <div class="row"><div class="t"><b><span class="dot" style="background:#2F8F4F"></span>${T('Smoothed guess','Grid HMM')}</b></div></div></div>`;
+  }
+  return '';
+}
+
+/* ===== Events ===== */
+function act(a){
+  const [k,v]=a.split(':');
+  if(k==='tab'){state.tab=v;state.searchOpen=false}
+  else if(k==='pick'){state.tab='map';state.searchOpen=false;state.query='';$('q').value='';state.wcError=null;if(!state.route||state.arrived){state.route=null;state.arrived=false;state.place=v}else{state.place=v;state.route=null;state.playing=false}}
+  else if(k==='go'){startRoute(placeById(v))}
+  else if(k==='stop'){stopRoute()}
+  else if(k==='expand'){state.expanded=!state.expanded}
+  else if(k==='arrived'){if(state.route){state.route.progress=state.route.total;syncUser()}}
+  else if(k==='wheel'){state.wheelchair=!state.wheelchair;const p=state.place&&placeById(state.place);if(p&&(state.route||state.wcError)){const prog=0;startRoute(p,prog);if(state.route)state.expanded=true}}
+  else if(k==='view'){tween(cam.tilt>0.5?0:1)}
+  else if(k==='tilt'){tween(+v)}
+  else if(k==='zin'){cam.zoom=Math.min(ZOOM_MAX,cam.zoom*ZOOM_STEP)}
+  else if(k==='zout'){cam.zoom=Math.max(ZOOM_MIN,cam.zoom/ZOOM_STEP)}
+  else if(k==='recenter'){cam.px=0;cam.py=0;const q=P(state.userPos[0],state.userPos[1]);cam.px=CENTRE_X-q[0];cam.py=CENTRE_Y+20-q[1]}
+  else if(k==='role'){state.role=v;if(v==='shopper'&&state.tab==='debug')state.tab='me'}
+  else if(k==='words'){state.words=v}
+  else if(k==='theme'){state.theme=v}
+  else if(k==='ov'){state.ov[v]=!state.ov[v]}
+  else if(k==='qclear'){state.query='';$('q').value='';state.searchOpen=true}
+  frame();
+}
+function tween(to){
+  const from=cam.tilt, t0=performance.now();
+  (function step(now){const t=Math.min(1,(now-t0)/380);cam.tilt=lerp(from,to,t*t*(3-2*t));frame();if(t<1)requestAnimationFrame(step)})(t0);
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');
+  if(b&&!b.disabled){act(b.dataset.act);return}
+  if(!e.target.closest('#search,#results')&&state.searchOpen){state.searchOpen=false;frame()}
+});
+$('q').addEventListener('focus',()=>{state.searchOpen=true;frame()});
+$('q').addEventListener('input',e=>{state.query=e.target.value;state.searchOpen=true;frame()});
+
+// pan, and tap a pin
+let drag=null;
+const mapEl=$('map');
+mapEl.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,px:cam.px,py:cam.py,moved:false};mapEl.setPointerCapture(e.pointerId)});
+mapEl.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  const dx=(e.clientX-drag.x)/state.scale, dy=(e.clientY-drag.y)/state.scale;
+  if(Math.hypot(dx,dy)>TAP_SLOP_PX) drag.moved=true;
+  if(drag.moved){cam.px=drag.px+dx;cam.py=drag.py+dy;renderMap()}
+});
+mapEl.addEventListener('pointerup',e=>{
+  const d=drag; drag=null; if(!d||d.moved) return;
+  const el=document.elementFromPoint(e.clientX,e.clientY), poi=el&&el.closest('[data-poi]');
+  if(state.searchOpen){state.searchOpen=false;$('q').blur()}
+  if(poi&&!(state.route&&!state.arrived)){state.place=poi.dataset.poi;state.wcError=null;state.expanded=false}
+  else if(poi){state.place=poi.dataset.poi;state.route=null;state.playing=false;state.wcError=null;state.arrived=false}
+  frame();
+});
+
+/* ===== Walk simulation + side controls ===== */
+let last=0;
+function tick(now){
+  if(state.playing&&state.route){
+    const dt=Math.min(0.1,(now-last)/1000), r=state.route;
+    r.progress=Math.min(r.total,r.progress+dt*WALK_MPS*3); // 3x so the demo is watchable
+    syncUser(); frame();
+  }
+  last=now; requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+$('btnWalk').onclick=()=>{
+  if(!state.route) return;
+  if(state.arrived){state.route.progress=0;syncUser()}
+  state.playing=!state.playing; frame();
+};
+$('btnReset').onclick=()=>{
+  state.userPos=USER_START.slice(); state.wheelchair=false; state.playing=false; state.expanded=false; state.tab='map';
+  cam.zoom=1;cam.px=0;cam.py=0;
+  startRoute(placeById('PANT'),START_PROGRESS_M); frame();
+};
+$('scrub').oninput=e=>{
+  if(!state.route) return;
+  state.playing=false; state.route.progress=state.route.total*(+e.target.value/1000); syncUser(); frame();
+};
+function syncSide(){
+  const r=state.route;
+  $('btnWalk').textContent=state.playing?'⏸ Pause':(state.arrived?'↻ Walk again':'▶ Walk the route');
+  $('btnWalk').disabled=!r; $('scrub').disabled=!r;
+  if(r){$('scrub').value=Math.round(r.progress/r.total*1000);$('scrubTxt').textContent=r.progress.toFixed(1)+' / '+r.total.toFixed(1)+' m'}
+  else $('scrubTxt').textContent='no route';
+}
+
+let chromeKey='';
+function frame(){
+  renderMap(); syncSide();
+  const key=JSON.stringify([state.tab,state.role,state.words,state.theme,state.ov,state.place,!!state.route,state.arrived,state.expanded,state.wheelchair,state.wcError,state.query,state.searchOpen,Math.round(cam.tilt*10),state.route?Math.round(state.route.progress*2):0,state.playing?1:0]);
+  if(key!==chromeKey){chromeKey=key;
+    const focused=document.activeElement===$('q');
+    renderChrome(); if(focused&&state.tab==='map') $('q').focus();
+  }
+}
+
+/* ===== Fit the phone to the window ===== */
+function fit(){
+  const full=864, avail=window.innerHeight-48, s=Math.min(1,avail/full);
+  state.scale=s;
+  $('phone').style.transform=`scale(${s})`;
+  $('pw').style.width=(410*s)+'px'; $('pw').style.height=(864*s)+'px';
+}
+addEventListener('resize',fit);
+
+// Optional deep link, e.g. #tab=debug&role=tester&ov=all&theme=dark&words=technical&expanded=1&flat=1&place=OFF2
+function applyHash(){
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('role')) state.role=h.get('role');
+  if(h.get('words')) state.words=h.get('words');
+  if(h.get('theme')) state.theme=h.get('theme');
+  if(h.get('tab')) state.tab=h.get('tab');
+  if(h.get('ov')==='all') for(const k in state.ov) state.ov[k]=true;
+  if(h.get('flat')) cam.tilt=0;
+  if(h.get('place')){startRoute(placeById(h.get('place')),+(h.get('at')||0))}
+  if(h.get('expanded')&&state.route) state.expanded=true;
+  if(h.get('wheelchair')){state.wheelchair=true;startRoute(placeById(h.get('place')||'PANT'))}
+  if(h.get('zoom')) cam.zoom=+h.get('zoom');
+}
+
+fit();
+startRoute(placeById('PANT'),START_PROGRESS_M);
+applyHash();
+frame();
+</script>
+</body>
+</html>

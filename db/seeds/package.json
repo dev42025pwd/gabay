@@ -1,0 +1,18 @@
+{
+  "name": "gabay-test-seed",
+  "private": true,
+  "description": "Gabay's local test seed (plan.html L119, P0-02): two test tenants, their venues from JSON, and six accounts in the Firebase Auth emulator. Local only.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "seed": "firebase emulators:exec --only auth --project demo-gabay --import ./.emulator-data --export-on-exit ./.emulator-data \"node --env-file=../../.env seed.js\"",
+    "seed:db-only": "node --env-file=../../.env seed.js --no-accounts"
+  },
+  "dependencies": {
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "firebase-tools": "15.32.1"
+  }
+}

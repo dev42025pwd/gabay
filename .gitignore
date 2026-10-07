@@ -1,0 +1,37 @@
+# Never in git (plan.html L123; WORKING_AGREEMENT §7)
+/Gabay Demo.apk
+*.apk
+*.aab
+/db/seeds/sources/internal/
+
+# Secrets: the pre-commit secret guard refuses these too (standard §8.1)
+.env
+.env.*
+!.env.example
+
+# Dependencies and local tool state
+node_modules/
+.emulator-data/
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+*.log
+
+# Build output (each Flutter project adds its own .gitignore as well)
+build/
+coverage/
+.dart_tool/
+
+# Editors and OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Claude Code: per-machine files (settings.json and agents/ are committed, standard §8.6)
+.claude/settings.local.json
+.claude/*.lock

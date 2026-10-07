@@ -1,0 +1,11 @@
+{
+  "name": "gabay",
+  "private": true,
+  "description": "Gabay: indoor wayfinding for Philippine malls. Root scripts; see README and CLAUDE.md.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "seed": "npm --prefix db/seeds run seed"
+  }
+}

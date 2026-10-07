@@ -1,0 +1,128 @@
+{
+  "_comment": "MEZZ office (plan.html L69), the second place, built from the one-page MEZZ drawing (1 pt = 19.6953 mm, checked against every dimension string) and approved by the product owner on 2026-09-30 (L49). The drawing is ours and for internal use only, like L48: it is never copied into anything shared, and the underlay PDF is git-ignored. Metres from the building's north-west outer corner; x east, y south. Rooms are inner wall faces. Same schema and optional fields as penthouse.json (see its _comment), plus L69: a door may carry 'name' and 'category' (an off-plan doorway drawn without a room shape: D4 Brew Corner, D5 Restroom). Off-plan rooms (Executive office EXEC, CR, Server room SRV) are doorways only, with no invented shapes. D6 (Server passage) is restricted and not a destination, and has no walkway spur. The Admin Office is the Paper Trail store and the Main Office is the Mezz Mart store; the Hallway, Pantry and vestibule are the concourse. Door positions D2, D3, D4 and D6 are medium or low confidence (leaf widths read from the swing arcs; D6 position uncertain). The ceiling height is UNVERIFIED: model.beaconHeightM 2.7 assumes ceiling-mounted beacons; tape-check on site and use the in-app per-place height setting (it overrides this value on the phone). Beacon positions are layout A (Hallway spine plus rooms), to be refined by the L56-style simulation and by dragging in the app.",
+  "name": "MEZZ office",
+  "extent": { "width": 14.43, "height": 13.39 },
+  "spikeUuid": "87872435-5008-4E48-BD54-A7C561C885C3",
+  "recommendedBeaconSettings": {
+    "major": 1,
+    "txPowerDbm": 4,
+    "advIntervalMs": 100,
+    "note": "Set in MOKO's BeaconX Pro app: iBeacon slot, this UUID, Major 1, Minor = beacon number (B1 = 1 ... B5 = 5). Major 1 is shared with the penthouse (L69), so the place is picked by hand in the app. To give MEZZ its own Major later, change 'major' here AND in assets/venue/index.json, and reprogram the H2s. No code change is needed."
+  },
+  "model": {
+    "rssiAt1mDbm": -55,
+    "pathLossExponent": 3.0,
+    "wallLossDb": 3.0,
+    "obstacleLossDb": 20.0,
+    "obstacleLossDbByKind": { "column": 20.0, "shaft": 20.0, "furniture": 1.0 },
+    "bodyMarginDb": 5.0,
+    "beaconHeightM": 2.7,
+    "phoneHeightM": 1.1,
+    "rssiSigmaDb": 6.0,
+    "heardThresholdDbm": -95,
+    "stepLengthM": 0.7,
+    "gridCellM": 0.5
+  },
+  "rooms": [
+    { "id": "HALL", "name": "Hallway", "place": "Hallway, Pantry, vestibule", "category": "concourse", "walkable": true, "points": [[5.23,1.73],[8.41,1.73],[8.41,3.38],[9.43,3.38],[9.43,7.52],[7.52,7.52],[7.52,9.79],[4.82,9.79],[4.82,8.13],[5.74,8.13],[5.74,4.13],[4.58,4.13],[4.58,2.74],[5.23,2.74]] },
+    { "id": "ADMN", "name": "Paper Trail", "place": "Admin Office", "category": "books", "walkable": true, "points": [[1.85,0.15],[5.10,0.15],[5.10,2.59],[4.43,2.59],[4.43,4.00],[3.94,4.54],[0.15,4.54],[0.15,2.70],[1.85,2.70]] },
+    { "id": "MAIN", "name": "Mezz Mart", "place": "Main Office", "category": "other", "walkable": true, "points": [[9.58,3.42],[14.18,3.42],[14.18,13.24],[9.41,13.24],[9.41,12.74],[8.22,12.74],[8.22,7.69],[9.58,7.69]] }
+  ],
+  "obstacles": [
+    { "id": "F1", "kind": "furniture", "name": "Desk 600x1200", "rect": [1.90,0.15,3.10,0.75] },
+    { "id": "F2", "kind": "furniture", "name": "Desk 600x1400", "rect": [3.10,0.15,4.50,0.75] },
+    { "id": "F3", "kind": "furniture", "name": "Desk 600x1200", "rect": [4.50,0.15,5.10,1.35] },
+    { "id": "F4", "kind": "furniture", "name": "Desk 600x1200", "rect": [4.50,1.35,5.10,2.55] },
+    { "id": "F5", "kind": "furniture", "name": "Desk 600x1200", "rect": [1.20,3.94,2.40,4.54] },
+    { "id": "F6", "kind": "furniture", "name": "Desk 600x1200", "rect": [2.60,3.94,3.80,4.54] },
+    { "id": "F7", "kind": "furniture", "name": "Storage with lock", "rect": [0.15,2.72,0.60,3.62] },
+    { "id": "F8", "kind": "furniture", "name": "Storage with lock", "rect": [0.15,3.62,0.60,4.52] },
+    { "id": "F9", "kind": "furniture", "name": "Bin", "rect": [3.86,3.97,4.16,4.27] },
+    { "id": "F10", "kind": "furniture", "name": "Sofa", "rect": [5.77,4.35,6.76,6.56] },
+    { "id": "F11", "kind": "furniture", "name": "Coffee table (round 0.74)", "rect": [7.26,5.09,8.00,5.83] },
+    { "id": "F12", "kind": "furniture", "name": "Side table (round 0.46)", "rect": [6.11,6.60,6.57,7.06] },
+    { "id": "F13", "kind": "furniture", "name": "Glass board stand", "rect": [8.96,4.62,9.41,6.22] },
+    { "id": "F14", "kind": "furniture", "name": "Pantry table (round 0.80)", "rect": [6.45,2.29,7.25,3.09] },
+    { "id": "F15", "kind": "furniture", "name": "Pantry counter and water dispenser", "rect": [7.89,1.75,8.39,2.95] },
+    { "id": "F16", "kind": "furniture", "name": "Vestibule side table (round 0.46)", "rect": [7.20,8.56,7.52,9.02] },
+    { "id": "F17", "kind": "furniture", "name": "Round symbol 0.30 (plant?)", "rect": [4.92,8.25,5.22,8.55] },
+    { "id": "F18", "kind": "furniture", "name": "Stations 10-12 desks", "rect": [9.68,3.42,14.18,4.02] },
+    { "id": "F19", "kind": "furniture", "name": "Stations 8-9 desks and divider", "rect": [11.17,5.91,14.18,6.60] },
+    { "id": "F20", "kind": "furniture", "name": "Filing cabinet and printer", "rect": [10.72,6.10,11.17,7.00] },
+    { "id": "F21", "kind": "furniture", "name": "Stations 6-7 desks and divider", "rect": [11.17,10.06,14.18,10.76] },
+    { "id": "F22", "kind": "furniture", "name": "Filing cabinet and printer", "rect": [10.72,9.66,11.17,10.56] },
+    { "id": "F23", "kind": "furniture", "name": "Stations 3-5 desks", "rect": [9.98,12.64,14.18,13.24] },
+    { "id": "F24", "kind": "furniture", "name": "Station 1 desk", "rect": [8.25,8.34,8.86,9.85] },
+    { "id": "F25", "kind": "furniture", "name": "Station 2 desk", "rect": [8.25,11.08,8.86,12.58] },
+    { "id": "F26", "kind": "furniture", "name": "Filing cabinet and printer", "rect": [8.25,10.02,8.70,10.92] },
+    { "id": "F27", "kind": "furniture", "name": "Built-in storage and wall pier", "rect": [13.64,7.58,14.18,9.12] }
+  ],
+  "doors": [
+    { "id": "D1", "rooms": ["HALL", "OUTSIDE"], "a": [4.85,9.86], "b": [5.82,9.86], "entrance": true, "destination": true, "confidence": "high" },
+    { "id": "D2", "rooms": ["HALL", "MAIN"], "a": [9.50,6.60], "b": [9.50,7.45], "destination": true, "confidence": "medium" },
+    { "id": "D3", "rooms": ["HALL", "ADMN"], "a": [4.50,3.00], "b": [4.50,3.80], "destination": true, "confidence": "medium" },
+    { "id": "D4", "rooms": ["HALL", "EXEC"], "a": [4.60,4.20], "b": [5.50,4.20], "destination": true, "name": "Brew Corner", "category": "food", "confidence": "medium" },
+    { "id": "D5", "rooms": ["HALL", "CR"], "a": [5.31,1.65], "b": [6.01,1.65], "destination": true, "name": "Restroom", "category": "restroom", "confidence": "high" },
+    { "id": "D6", "rooms": ["HALL", "SRV"], "a": [8.56,3.30], "b": [9.39,3.30], "restricted": true, "confidence": "low" }
+  ],
+  "beacons": [
+    { "id": "B1", "minor": 1, "x": 6.15, "y": 8.98, "where": "Vestibule (ceiling-mounted)" },
+    { "id": "B2", "minor": 2, "x": 7.60, "y": 5.73, "where": "Over the lounge (ceiling-mounted)" },
+    { "id": "B3", "minor": 3, "x": 6.00, "y": 3.13, "where": "Pantry (ceiling-mounted)" },
+    { "id": "B4", "minor": 4, "x": 11.90, "y": 4.93, "where": "Mezz Mart north (ceiling-mounted)" },
+    { "id": "B5", "minor": 5, "x": 11.50, "y": 11.63, "where": "Mezz Mart south (ceiling-mounted)" }
+  ],
+  "marks": [
+    { "id": "M1", "x": 5.34, "y": 9.33, "door": "D1" }, { "id": "M2", "x": 8.95, "y": 7.03, "door": "D2" },
+    { "id": "M3", "x": 5.05, "y": 3.40, "door": "D3" }, { "id": "M4", "x": 5.05, "y": 3.70, "door": "D4" },
+    { "id": "M5", "x": 5.66, "y": 2.18, "door": "D5" },
+    { "id": "M6", "x": 6.40, "y": 9.13 }, { "id": "M7", "x": 7.00, "y": 7.60 }, { "id": "M8", "x": 8.40, "y": 7.08 },
+    { "id": "M9", "x": 8.48, "y": 5.43 }, { "id": "M10", "x": 8.30, "y": 3.73 }, { "id": "M11", "x": 6.60, "y": 3.73 },
+    { "id": "M12", "x": 5.60, "y": 2.33 }, { "id": "M13", "x": 7.60, "y": 3.33 },
+    { "id": "M14", "x": 10.30, "y": 5.03 }, { "id": "M15", "x": 10.00, "y": 11.63 },
+    { "id": "M16", "x": 3.00, "y": 1.73 }, { "id": "M17", "x": 2.20, "y": 3.33 }
+  ],
+  "walkingLoop": ["M1","M6","M7","M8","M2","M9","M10","M13","M12","M5","M11","M3","M4","M1"],
+  "walkway": {
+    "minClearWidthM": 0.9,
+    "wheelchairWidthM": 1.2,
+    "nodes": [
+      { "id": "S-D1", "x": 5.34, "y": 9.86, "door": "D1" },
+      { "id": "E1", "x": 5.60, "y": 9.03 },
+      { "id": "H1", "x": 6.90, "y": 7.60 },
+      { "id": "H2", "x": 8.45, "y": 7.03 },
+      { "id": "S-D2", "x": 9.50, "y": 7.03, "door": "D2" },
+      { "id": "H3", "x": 8.48, "y": 5.43 },
+      { "id": "H4", "x": 8.20, "y": 3.73 },
+      { "id": "J", "x": 5.95, "y": 3.58 },
+      { "id": "L1", "x": 5.15, "y": 3.43 },
+      { "id": "S-D3", "x": 4.50, "y": 3.40, "door": "D3" },
+      { "id": "S-D4", "x": 5.05, "y": 3.98, "door": "D4" },
+      { "id": "P1", "x": 5.70, "y": 2.33 },
+      { "id": "S-D5", "x": 5.66, "y": 1.65, "door": "D5" }
+    ],
+    "edges": [
+      { "a": "S-D1", "b": "E1", "widthM": 2.70 },
+      { "a": "E1", "b": "H1", "widthM": 1.78 },
+      { "a": "H1", "b": "H2", "widthM": 1.30 },
+      { "a": "H2", "b": "S-D2", "widthM": 1.30 },
+      { "a": "H2", "b": "H3", "widthM": 0.96 },
+      { "a": "H3", "b": "H4", "widthM": 0.96 },
+      { "a": "H4", "b": "J", "widthM": 1.26 },
+      { "a": "J", "b": "L1", "widthM": 1.16 },
+      { "a": "L1", "b": "S-D3", "widthM": 1.16 },
+      { "a": "L1", "b": "S-D4", "widthM": 1.16 },
+      { "a": "J", "b": "P1", "widthM": 1.22 },
+      { "a": "P1", "b": "S-D5", "widthM": 1.22 }
+    ]
+  },
+  "underlay": {
+    "asset": "assets/venue/mezz.pdf",
+    "page": 0,
+    "_comment": "Fractions of the page where the building's outer west, east and north edges fall on the MEZZ drawing, computed from the PDF's vectors. The map screen has nudge and scale controls; adjustments are saved on the device.",
+    "leftFrac": 0.200,
+    "rightFrac": 0.815,
+    "topFrac": 0.094,
+    "opacity": 0.35
+  }
+}
