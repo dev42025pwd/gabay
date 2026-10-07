@@ -81,10 +81,11 @@ function createDb(config, logger = createLogger(config.logLevel)) {
    * BEGIN -> fn(tx) -> COMMIT; any throw rolls back and rethrows (§3.9). `tx.query` has the same
    * params rule as `query` and runs on the transaction's own connection.
    *
-   * Only failures raised by the database layer's own calls (pool.connect, BEGIN, COMMIT, ROLLBACK,
-   * tx.query) are tagged `dbUnavailable` and make the connection count as lost. An error thrown by
-   * the caller's fn itself (an ECONNRESET from some other service) is passed through untouched, and the
-   * healthy connection goes back to the pool (S2 re-review N1).
+   * Only failures raised by the database layer's own calls (pool.connect, BEGIN, COMMIT, tx.query)
+   * are tagged `dbUnavailable` and make the connection count as lost. A failed ROLLBACK is logged and
+   * also marks the connection lost, but it is not tagged (the original error is the one rethrown). An
+   * error thrown by the caller's fn itself (an ECONNRESET from some other service) is passed through
+   * untouched, and the healthy connection goes back to the pool (S2 re-review N1).
    */
   async function withTransaction(fn) {
     const client = await tagUnavailable(() => pool.connect());

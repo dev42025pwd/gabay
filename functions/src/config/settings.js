@@ -77,10 +77,10 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
         ? Number(tenantId)
         : tenantId;
     if (Number.isSafeInteger(n) && n > 0) return n;
-    logger.warn(
-      { tenantId: String(tenantId).slice(0, 40) },
-      'not a tenant id, using platform values',
-    );
+    // Describe the bad value without converting it: String() throws for Object.create(null) or an
+    // object whose toString throws, and this function sits outside any try (S2 final nit).
+    const described = typeof tenantId === 'string' ? tenantId.slice(0, 40) : typeof tenantId;
+    logger.warn({ tenantId: described }, 'not a tenant id, using platform values');
     return null;
   }
 

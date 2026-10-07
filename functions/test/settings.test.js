@@ -149,15 +149,30 @@ test('settings: a garbage tenant id never throws, falls back to the platform val
   const db = fakeDb([row(null, 'routing.stairsSaveM', '200'), row(5, 'routing.stairsSaveM', '90')]);
   const logger = fakeLogger();
   const s = createSettings(db.query, logger);
-  for (const bad of ['abc', '5; DROP TABLE x', '1.5', 1.5, -3, 0, '', NaN, {}, [5], true]) {
-    assert.equal(await s.getSetting('routing.stairsSaveM', bad), 200, `getSetting(${String(bad)})`);
-    assert.doesNotThrow(() => s.invalidate(bad));
+  // Includes values that cannot be turned into a string (S2 final nit): describing the bad id in the
+  // warning must never throw either.
+  const noPrototype = Object.create(null);
+  const hostile = {
+    toString() {
+      throw new Error('toString exploded');
+    },
+  };
+  const bads = ['abc', '5; DROP TABLE x', '1.5', 1.5, -3, 0, '', NaN, {}, [5], true];
+  bads.push(noPrototype, hostile, Symbol('tenant'), 5n, () => 5);
+  for (const [i, bad] of bads.entries()) {
+    assert.equal(await s.getSetting('routing.stairsSaveM', bad), 200, `getSetting #${i}`);
+    assert.doesNotThrow(() => s.invalidate(bad), `invalidate #${i}`);
+    assert.deepEqual(
+      await s.getPublicFlags(bad),
+      { 'analytics.routeTraces': false, 'liveStatus.overlay': false },
+      `getPublicFlags #${i}`,
+    );
   }
   assert.deepEqual(await s.getPublicFlags('abc'), {
     'analytics.routeTraces': false,
     'liveStatus.overlay': false,
   });
-  assert.ok(logger.calls.warn.length >= 11, 'each garbage id is logged');
+  assert.ok(logger.calls.warn.length >= bads.length * 3, 'each garbage id is logged');
   // The platform query, never a tenant query, ran for them: the bound value is null.
   assert.ok(db.state.calls.every((p) => p[0] === null));
 });
