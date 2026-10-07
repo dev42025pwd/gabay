@@ -12,7 +12,7 @@ node tools/lint/run.js migrations-immutable --staged               # the index a
 node tools/lint/run.js migrations-immutable --base origin/main     # REF...HEAD (CI)
 ```
 
-The runner never passes silently. `--base` or `--root` without a value exits 2. A whole-repo run fails (rule `repo-layout`) if `db/schema.sql`, `app/lib` or `functions/src` is missing (`--allow-partial` turns that off for a partial tree, as the tests use). Every linter prints how many files it scanned.
+The runner never passes silently. `--base` or `--root` without a value exits 2. A whole-repo run fails (rule `repo-layout`) if `db/schema.sql`, `app/lib` or `functions/src` is missing (`--allow-partial`, valid only together with `--root`, turns that off for a tree you chose on purpose, as the tests use). Every linter prints how many files it scanned.
 
 | Rule | Catches | Source |
 |---|---|---|
@@ -41,10 +41,10 @@ const all = await query('SELECT TenantId FROM gabay.Venue', []);
 
 ## Accepted limits (what a text linter cannot see: these are review-pass items)
 
-- `sql-interpolation`: SQL built with `Array.join`, `String.concat`, `util.format` or a helper function is not seen; a template that is the branch of a ternary inside a `where:` value is found only if it reads as SQL by itself.
-- `tenant-predicate`: it is a text check, so `TenantId = $1 OR 1 = 1` passes; a table name that is interpolated (`gabay.${t}`) is not resolved; a `runPaged` whose `from` is not a literal is not checked; a subquery without a predicate inside a statement that has one elsewhere passes.
+- `sql-interpolation`: SQL built with `Array.join`, `String.concat`, `util.format` or a helper function is not seen. A template that is the branch of a ternary inside a `where:` value is found only if it reads as SQL by itself. A parenthesised literal joined to a variable (`("SELECT " + x)`) and a table name split into its own literal (`"gabay." + t`) are not seen. A `${}` wrapped in single quotes is treated as SQL (a false positive costs a quote change, a false negative is an injection); the message says so.
+- `tenant-predicate`: it is a text check. `TenantId = $1 OR 1 = 1` and `TenantId = $1 OR <other column> = $2` pass. A subquery (`EXISTS (...)`) or a CTE that binds the tenant elsewhere satisfies a statement whose main query does not. A table name that is interpolated (`gabay.${t}`) is not resolved. `runPaged` is read only at a direct call with an object literal: a destructured alias (`const { runPaged: page } = ...`) or `const p = runPaged` is not seen. A `runPaged` call whose `from` or `where` is not a string literal, that has a `...` spread, or whose argument is not an object literal FAILS (it cannot be checked; mark it with `// tenant-scope: <reason>` if it is a platform query).
 - `position-privacy`: the indirect path (a view model reads the position from a service and hands it to another service that talks to the network) is not seen.
-- `colour-literals`: `Color(<decimal integer>)`, a colour built from a `const int`, `HSLColor` and the other legacy `ThemeData` colours are not caught.
+- `colour-literals`: `Color(<decimal integer>)`, a colour built from a `const int`, `HSLColor` and the other legacy `ThemeData` colours are not caught. Only `Colors`, `CupertinoColors` and a prefixed `m.Colors` are the framework classes; a field or class that merely ends in `Colors` (`tokens.levelColors`, `MyColors`) is not flagged.
 - `no-bare-textfield`: a class that `extends TextFormField` is not caught.
 
 ## Skipped everywhere

@@ -11,7 +11,7 @@ Run the passes in order. Report each finding as `file:line`, the rule it breaks,
 - Routes guarded in order: role → permission → tenant scope → validation (§9 item 3).
 - Every tenant-scoped query carries its tenant predicate from the request context, never from the token's user object (rule 2).
 - No value from a request is interpolated into SQL; sort keys, filters and lookup names go through an allow-list (rule 3).
-- Read every new `// sql-identifiers:` and `// tenant-scope:` annotation in the diff: the linters accept any stated reason, so the reviewer judges it (L128). The linters' documented limits (SQL joined with `.join`, `concat` or `util.format`; lower-case SQL without `gabay.`) are read by hand.
+- Read every new `// sql-identifiers:` and `// tenant-scope:` annotation in the diff: the linters accept any stated reason, so the reviewer judges it (L128). The linters' documented limits are read by hand: see "Accepted limits" in `tools/lint/README.md`.
 - Firebase ID token verified before anything else; permissions read from the database (E-08).
 - No secret, key or real password in the diff; `.env` never staged.
 - Positions: nothing leaves the phone outside opted-in analytics (invariant 4); no background location or BLE (invariant 5). Follow any position value a ViewModel hands to a service: the linter checks only who imports positioning and same-file network use (L128).

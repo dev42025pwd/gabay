@@ -34,9 +34,9 @@ function checkManifest(file, text, found) {
     }
   }
   for (const m of text.matchAll(/<service\b[^>]*>/g)) {
-    const type = /android:foregroundServiceType\s*=\s*"([^"]*)"/.exec(m[0]);
+    const type = /android:foregroundServiceType\s*=\s*(["'])(.*?)\1/.exec(m[0]); // either quote style
     if (!type || REMOVED.test(m[0])) continue;
-    const bad = type[1].split('|').map((t) => t.trim()).filter((t) => BANNED_SERVICE_TYPES.includes(t));
+    const bad = type[2].split('|').map((t) => t.trim()).filter((t) => BANNED_SERVICE_TYPES.includes(t));
     if (bad.length) {
       const at = m.index + type.index;
       found.push(violation(file, lineOf(at), NAME, `foregroundServiceType "${bad.join('|')}": no location or connected-device foreground service (Blueprint Foreground rule)`));

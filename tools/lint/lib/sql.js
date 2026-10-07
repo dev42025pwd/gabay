@@ -49,7 +49,14 @@ function findSql(src) {
         QUOTED_INTERPOLATION.test(text) ||
         PLACEHOLDER.test(text));
     if (!looksLikeSql(text) && !fragment) continue;
+    // True when the quote-wrapped ${} is the ONLY reason this reads as SQL (so the message can say why).
+    const quotedOnly =
+      fragment &&
+      !looksLikeSql(text) &&
+      !SQL_KEY.test(src.slice(Math.max(0, t.start - 60), t.start)) &&
+      !PLACEHOLDER.test(text);
     found.push({
+      quotedOnly,
       type: t.type,
       text,
       line: lineOf(t.start),
@@ -76,6 +83,7 @@ function annotation(src, line, tag) {
 function objectProps(src, topTokens, open) {
   const props = [];
   const push = (from, end) => {
+    if (/^\s*\.\.\./.test(src.slice(from, end))) props.push({ key: '...', valueStart: null, valueEnd: end });
     const head = /^\s*([A-Za-z_$][\w$]*)\s*(:)?/.exec(src.slice(from, end));
     if (head) props.push({ key: head[1], valueStart: head[2] ? from + head[0].length : null, valueEnd: end });
   };
@@ -129,9 +137,11 @@ function literalValue(src, strings, start, end) {
 
 /**
  * Every runPaged({ ... }) call (not its declaration), as the statement it will run:
- * SELECT <select> FROM <from> <join> WHERE <where>. `complete` is false when the where value is
- * missing or is not a literal (so a tenant predicate cannot be seen).
- * @returns {Array<{ line: number, text: string, whereLiteral: boolean }>}
+ * SELECT <select> FROM <from> <join> WHERE <where>.
+ * `unreadable` is a reason string when the call cannot be read as a statement: the argument is not
+ * an object literal, the object has a ... spread, or `from` is missing or not a literal. (A `where`
+ * that is not a literal is reported through `whereLiteral`, and only matters on a tenant table.)
+ * @returns {Array<{ line: number, text: string, whereLiteral: boolean, unreadable: string|null }>}
  */
 function findRunPagedCalls(src) {
   const tokens = scan(src, { lang: 'js' });
@@ -140,11 +150,18 @@ function findRunPagedCalls(src) {
   const strings = tokens.filter((t) => t.depth === 0 && (t.type === 'string' || t.type === 'template'));
   const lineOf = lineMap(src);
   const calls = [];
-  for (const m of clean.matchAll(/\brunPaged\s*\(\s*\{/g)) {
+  for (const m of clean.matchAll(/\brunPaged\s*\(/g)) {
     const inLiteral = strings.some((t) => m.index > t.start && m.index < t.end);
     const declaration = /\bfunction\s*\*?\s*$/.test(clean.slice(Math.max(0, m.index - 20), m.index));
     if (inLiteral || declaration) continue;
-    const props = objectProps(clean, topTokens, m.index + m[0].length - 1);
+    const rest = clean.slice(m.index + m[0].length);
+    const brace = /^\s*\{/.exec(rest);
+    if (!brace) {
+      const line = lineOf(m.index);
+      calls.push({ line, text: '', whereLiteral: false, unreadable: 'the argument is not an object literal' });
+      continue;
+    }
+    const props = objectProps(clean, topTokens, m.index + m[0].length + brace[0].length - 1);
     const value = (...keys) => {
       const p = props.find((x) => keys.includes(x.key) && x.valueStart !== null);
       return p ? literalValue(clean, strings, p.valueStart, p.valueEnd) : null;
@@ -158,7 +175,12 @@ function findRunPagedCalls(src) {
       join ? join.text : '',
       where ? `WHERE ${where.text}` : '',
     ].join(' ');
-    calls.push({ line: lineOf(m.index), text, whereLiteral: !!where && where.literal });
+    const unreadable = props.some((p) => p.key === '...')
+      ? 'the object has a ... spread'
+      : !from || !from.literal
+        ? 'from is missing or is not a string literal'
+        : null;
+    calls.push({ line: lineOf(m.index), text, whereLiteral: !!where && where.literal, unreadable });
   }
   return calls;
 }

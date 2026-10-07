@@ -9,7 +9,8 @@
 //   node tools/lint/run.js --staged             migrations-immutable: the index against HEAD
 //   node tools/lint/run.js --base origin/main   migrations-immutable: REF...HEAD (CI)
 //   node tools/lint/run.js --root <dir>         lint another tree (the tests do)
-//   node tools/lint/run.js --allow-partial      do not require db/schema.sql, app/lib and functions/src
+//   node tools/lint/run.js --root <dir> --allow-partial   do not require db/schema.sql, app/lib, functions/src
+//                                               (only valid together with --root)
 //
 // A whole-repo run (no --files) fails if db/schema.sql, app/lib or functions/src is missing: a
 // linter with nothing to look at must never look like a pass. Each linter prints how many files it
@@ -51,6 +52,7 @@ function parseArgs(argv) {
     if (v === undefined || v === '' || v.startsWith('--')) throw new Error(`${flag} needs a value`);
     return v;
   };
+  let rootGiven = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--files') {
@@ -63,10 +65,13 @@ function parseArgs(argv) {
       i += 1;
     } else if (a === '--root') {
       opts.root = path.resolve(valueAfter(i, a));
+      rootGiven = true;
       i += 1;
     } else if (a.startsWith('--')) throw new Error(`unknown option ${a}`);
     else opts.names.push(a);
   }
+  // The escape hatch is for a tree you chose on purpose: on the real repo it would hide a missing path.
+  if (opts.allowPartial && !rootGiven) throw new Error('--allow-partial only works together with --root');
   const known = LINTERS.map((l) => l.name);
   const unknown = opts.names.filter((n) => !known.includes(n));
   if (unknown.length) throw new Error(`unknown linter ${unknown.join(', ')} (known: ${known.join(', ')})`);

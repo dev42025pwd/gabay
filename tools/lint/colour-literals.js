@@ -18,7 +18,8 @@ const DART_IN_LIB = /^app\/lib\/.+\.dart$/;
 const PATTERNS = [
   [/\bColor\s*\(\s*0[xX]/g, 'Color(0x...)'],
   [/\bColor\s*\.\s*from\w*\s*\(/g, 'Color.from...('],
-  [/\b\w*Colors\s*\.\s*\w+/g, 'Colors.<name>'],
+  // Colors, CupertinoColors, m.Colors; not a field that merely ends in Colors (tokens.levelColors).
+  [/(?<![\w$])(?:\w+\.)?(?:Cupertino)?Colors\s*\.\s*\w+/g, 'Colors.<name>'],
   [/\bprimaryColor\b/g, 'primaryColor'],
 ];
 

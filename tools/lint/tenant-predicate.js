@@ -112,13 +112,26 @@ function run(ctx) {
     const src = ctx.read(file);
     const sites = [
       ...findSql(src).filter((s) => s.statement).map((s) => ({ line: s.line, text: s.text, what: 'SQL' })),
-      ...findRunPagedCalls(src).map((c) => ({ line: c.line, text: c.text, what: 'runPaged call', literal: c.whereLiteral })),
+      ...findRunPagedCalls(src).map((c) => ({ line: c.line, text: c.text, what: 'runPaged call', literal: c.whereLiteral, unreadable: c.unreadable })),
     ];
     for (const site of sites) {
-      const bad = check(site.text, scoped);
+      const bad = site.unreadable ? true : check(site.text, scoped);
       if (!bad) continue;
       const note = annotation(src, site.line, TAG);
       if (note && note.reason) continue;
+      if (site.unreadable) {
+        found.push(
+          violation(
+            file,
+            site.line,
+            NAME,
+            note
+              ? `// ${TAG}: needs a reason after the colon (rule 2)`
+              : `runPaged call cannot be checked: ${site.unreadable}; from and where must be string literals at the call site so the tenant predicate can be checked (rule 2), or mark a platform query with // ${TAG}: <reason>`,
+          ),
+        );
+        continue;
+      }
       const [problem, names] = bad;
       const hint = site.literal === false ? ' (where must be a string literal at the call site so the predicate can be checked)' : '';
       found.push(

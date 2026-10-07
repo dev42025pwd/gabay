@@ -67,7 +67,8 @@ test('position-privacy (I5): the network set covers http, web sockets, firebase_
   for (const net of network) {
     const dart = `import '../../../core/positioning/p.dart';\n${net}\n`;
     const found = lint('position-privacy', { [SHOPPER]: dart });
-    assert.equal(found.length, 1, net);
+    // The network import is always line 2 (for dart:io, the import line, not the HttpClient line).
+    assert.deepEqual(at(found), [`${SHOPPER}:2:position-privacy`], net);
     assert.match(found[0].message, /position never leaves the phone/, net);
   }
 });

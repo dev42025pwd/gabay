@@ -14,6 +14,8 @@ const { scan } = require('./lib/scan');
 const NAME = 'sql-interpolation';
 const TAG = 'sql-identifiers';
 const IN_API = /^functions\/src\/.+\.js$/;
+const QUOTED_SHAPE =
+  'a ${} wrapped in single quotes is treated as SQL; bind it as $n, or if this is not SQL use double quotes';
 const QUOTES = new Set(['"', "'", '`']);
 
 /** True when `+` joins this literal to something that is not another literal. */
@@ -39,7 +41,9 @@ function run(ctx) {
     const byStart = new Map(scan(src, { lang: 'js' }).map((t) => [t.start, t]));
     for (const sql of findSql(src)) {
       const shape = sql.hasInterpolation
-        ? 'a ${...} inside SQL text'
+        ? sql.quotedOnly
+          ? QUOTED_SHAPE
+          : 'a ${...} inside SQL text'
         : joinedToVariable(src, sql, byStart)
           ? 'SQL text joined to a variable with +'
           : null;
@@ -53,7 +57,9 @@ function run(ctx) {
           NAME,
           note
             ? `// ${TAG}: needs a reason after the colon (rule 3)`
-            : `${shape}: bind values as $1..$n parameters; identifiers only from an allow-list map, marked with // ${TAG}: <reason> (rule 3)`,
+            : shape === QUOTED_SHAPE
+              ? `${QUOTED_SHAPE} (rule 3); an identifier from an allow-list map is marked with // ${TAG}: <reason>`
+              : `${shape}: bind values as $1..$n parameters; identifiers only from an allow-list map, marked with // ${TAG}: <reason> (rule 3)`,
         ),
       );
     }
