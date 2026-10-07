@@ -1,0 +1,13 @@
+# Flutter's built-in localisation (ARB). Wording lives ONLY in lib/l10n/*.arb;
+# this file configures `flutter gen-l10n`, which `flutter pub get`, `flutter
+# test` and `flutter build` also run because pubspec.yaml has `generate: true`.
+#
+# English only until P0-14: the Tagalog app_tl.arb is added after the product
+# owner's review (L109); it is never machine-translated.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+# Generated Dart is committed beside the ARB files and excluded from analysis.
+# A missing key in a non-template locale is an error, never a silent fallback.
+nullable-getter: false

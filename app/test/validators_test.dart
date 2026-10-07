@@ -1,29 +1,37 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gabay/l10n/app_localizations.dart';
 import 'package:gabay/shared/utils/validators.dart';
 
-void main() {
-  group('Validators.required', () {
-    final validate = Validators.required('Venue name');
+import 'support/shell_harness.dart';
 
+void main() {
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
+
+  group('Validators.required', () {
     test('names the field in the message', () {
-      expect(validate(null), 'Venue name is required.');
-      expect(validate(''), 'Venue name is required.');
-      expect(validate('   '), 'Venue name is required.');
+      final validate = Validators.required(l10n, 'Venue name');
+      final expected = l10n.validatorRequired('Venue name');
+      expect(expected, contains('Venue name'));
+      expect(validate(null), expected);
+      expect(validate(''), expected);
+      expect(validate('   '), expected);
     });
 
     test('accepts any non-blank value', () {
-      expect(validate('Aurora'), isNull);
+      expect(Validators.required(l10n, 'Venue name')('Aurora'), isNull);
     });
   });
 
   group('Validators.maxLength', () {
-    final validate = Validators.maxLength('Code', 3);
-
     test('fails past the limit, naming the field and the limit', () {
-      expect(validate('abcd'), 'Code must be at most 3 characters.');
+      final message = Validators.maxLength(l10n, 'Code', 3)('abcd');
+      expect(message, l10n.validatorTooLong('Code', 3));
+      expect(message, allOf(contains('Code'), contains('3')));
     });
 
     test('accepts the limit, empty and null', () {
+      final validate = Validators.maxLength(l10n, 'Code', 3);
       expect(validate('abc'), isNull);
       expect(validate(''), isNull);
       expect(validate(null), isNull);
@@ -31,14 +39,17 @@ void main() {
   });
 
   group('Validators.combine', () {
-    final validate = Validators.combine([
-      Validators.required('Code'),
-      Validators.maxLength('Code', 3),
-    ]);
+    late FieldValidator validate;
+    setUp(() {
+      validate = Validators.combine([
+        Validators.required(l10n, 'Code'),
+        Validators.maxLength(l10n, 'Code', 3),
+      ]);
+    });
 
     test('returns the first failing message, in order', () {
-      expect(validate(''), 'Code is required.');
-      expect(validate('abcd'), 'Code must be at most 3 characters.');
+      expect(validate(''), l10n.validatorRequired('Code'));
+      expect(validate('abcd'), l10n.validatorTooLong('Code', 3));
     });
 
     test('returns null when every validator passes', () {

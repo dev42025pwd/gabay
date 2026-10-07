@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gabay/core/config/surface_info.dart';
-import 'package:gabay/core/copy/app_copy.dart';
+import 'package:gabay/l10n/app_localizations.dart';
 import 'package:gabay/shared/components/messaging/message_notifier.dart';
 import 'package:gabay/shared/components/messaging/message_overlay.dart';
 
 import 'support/shell_harness.dart';
 
 void main() {
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
+
   for (final surface in [SurfaceInfo.mobile, SurfaceInfo.admin]) {
     group('${surface.surface.name} shell', () {
       testWidgets('renders the app name, the surface and the version', (
@@ -17,13 +20,13 @@ void main() {
         await tester.pumpWidget(shellApp(surface));
         await tester.pumpAndSettle();
 
-        expect(find.text(AppCopy.appName), findsWidgets);
-        expect(find.text(surface.displayName), findsOneWidget);
+        expect(find.text(l10n.appName), findsWidgets);
+        expect(find.text(surface.displayName(l10n)), findsOneWidget);
         expect(
-          find.text('${AppCopy.versionLabel}: ${surface.version.version}'),
+          find.text(l10n.versionLine(surface.version.version)),
           findsOneWidget,
         );
-        expect(find.text(AppCopy.skeletonStatus), findsOneWidget);
+        expect(find.text(l10n.skeletonStatus), findsOneWidget);
       });
 
       testWidgets('navigates to /about and back', (tester) async {
@@ -31,18 +34,18 @@ void main() {
         await tester.pumpWidget(shellApp(surface));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text(AppCopy.aboutAction));
+        await tester.tap(find.text(l10n.aboutAction));
         await tester.pumpAndSettle();
-        expect(find.text(AppCopy.aboutTitle), findsOneWidget);
-        expect(find.text(AppCopy.whatsNewTitle), findsOneWidget);
+        expect(find.text(l10n.aboutTitle), findsOneWidget);
+        expect(find.text(l10n.whatsNewTitle), findsOneWidget);
         expect(
-          find.text('• ${surface.changelog.first.bullets.first}'),
+          find.text('• ${surface.changelog.first.bullets(l10n).first}'),
           findsOneWidget,
         );
 
-        await tester.tap(find.byTooltip(AppCopy.backAction));
+        await tester.tap(find.byTooltip(l10n.backAction));
         await tester.pumpAndSettle();
-        expect(find.text(AppCopy.aboutAction), findsOneWidget);
+        expect(find.text(l10n.aboutAction), findsOneWidget);
       });
 
       testWidgets('nothing overflows at text size x1.4 on a small phone', (
@@ -55,7 +58,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
 
-        await tester.tap(find.text(AppCopy.aboutAction));
+        await tester.tap(find.text(l10n.aboutAction));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });
@@ -68,36 +71,39 @@ void main() {
         await tester.pumpWidget(shellApp(surface));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text(AppCopy.showErrorAction));
+        await tester.tap(find.text(l10n.showErrorAction));
         await tester.pump();
-        expect(find.textContaining(AppCopy.sampleError), findsOneWidget);
+        expect(find.textContaining(l10n.sampleError), findsOneWidget);
         // The dismiss control has a screen-reader name.
-        expect(find.bySemanticsLabel(AppCopy.dismissAction), findsOneWidget);
+        expect(
+          find.bySemanticsLabel(l10n.messageDismissAction),
+          findsOneWidget,
+        );
 
         // A newer message replaces the older one.
-        await tester.tap(find.text(AppCopy.showSuccessAction));
+        await tester.tap(find.text(l10n.showSuccessAction));
         await tester.pump();
-        expect(find.textContaining(AppCopy.sampleError), findsNothing);
-        expect(find.textContaining(AppCopy.sampleSuccess), findsOneWidget);
+        expect(find.textContaining(l10n.sampleError), findsNothing);
+        expect(find.textContaining(l10n.sampleSuccess), findsOneWidget);
 
         // A screen reader dismisses it through its semantics action.
-        tester.semantics.tap(find.semantics.byLabel(AppCopy.dismissAction));
+        tester.semantics.tap(find.semantics.byLabel(l10n.messageDismissAction));
         await tester.pump();
-        expect(find.textContaining(AppCopy.sampleSuccess), findsNothing);
+        expect(find.textContaining(l10n.sampleSuccess), findsNothing);
 
         // A finger dismisses it with a tap on the close icon.
-        await tester.tap(find.text(AppCopy.showErrorAction));
+        await tester.tap(find.text(l10n.showErrorAction));
         await tester.pump();
         await tester.tap(find.byIcon(Icons.close));
         await tester.pump();
-        expect(find.textContaining(AppCopy.sampleError), findsNothing);
+        expect(find.textContaining(l10n.sampleError), findsNothing);
 
         // And auto-dismiss on a timer.
-        await tester.tap(find.text(AppCopy.showErrorAction));
+        await tester.tap(find.text(l10n.showErrorAction));
         await tester.pump();
-        expect(find.textContaining(AppCopy.sampleError), findsOneWidget);
+        expect(find.textContaining(l10n.sampleError), findsOneWidget);
         await tester.pump(kErrorMessageDuration + const Duration(seconds: 1));
-        expect(find.textContaining(AppCopy.sampleError), findsNothing);
+        expect(find.textContaining(l10n.sampleError), findsNothing);
         semantics.dispose();
       });
 

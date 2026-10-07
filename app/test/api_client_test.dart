@@ -42,11 +42,13 @@ ApiClient _client(
   String? token,
   String? tenant,
   VoidCallback? onUnauthenticated,
+  List<String> signInPaths = kDefaultSignInPaths,
 }) {
   return ApiClient(
       baseUrl: 'http://api.test.invalid',
       adapter: adapter,
       debugLogging: debugLogging,
+      signInPaths: signInPaths,
     )
     ..tokenProvider = (() => token)
     ..tenantIdProvider = (() => tenant)
@@ -150,27 +152,59 @@ void main() {
       expect(completed, isFalse);
     });
 
-    test('skips sign-in paths: the caller sees the real 401', () async {
-      var calls = 0;
-      final client = _client(
-        FakeAdapter(status: 401),
-        onUnauthenticated: () => calls++,
+    test('no path is a sign-in path by default (Firebase Auth does not call our API)', () {
+      expect(kDefaultSignInPaths, isEmpty);
+      expect(
+        ApiClient(baseUrl: 'http://api.test.invalid').signInPaths,
+        isEmpty,
       );
-
-      for (final path in kDefaultSignInPaths) {
-        await expectLater(
-          client.post<Object?>(path),
-          throwsA(
-            isA<DioException>().having(
-              (e) => e.response?.statusCode,
-              'status',
-              401,
-            ),
-          ),
-        );
-      }
-      expect(calls, 0);
     });
+
+    test(
+      'with the default list, a 401 on any path calls onUnauthenticated',
+      () async {
+        var calls = 0;
+        final allCalled = Completer<void>();
+        final client = _client(
+          FakeAdapter(status: 401),
+          onUnauthenticated: () {
+            if (++calls == 3) allCalled.complete();
+          },
+        );
+        for (final path in ['/auth/login', '/auth/verify', '/venues']) {
+          unawaited(client.get<Object?>(path).then((_) {}, onError: (_) {}));
+        }
+        // Waits for the third signal itself, not for a guessed delay.
+        await allCalled.future.timeout(const Duration(seconds: 5));
+        expect(calls, 3);
+      },
+    );
+
+    test(
+      'skips a path listed in signInPaths: the caller sees the real 401',
+      () async {
+        var calls = 0;
+        final client = _client(
+          FakeAdapter(status: 401),
+          onUnauthenticated: () => calls++,
+          signInPaths: const ['/auth/login', '/auth/verify'],
+        );
+
+        for (final path in ['/auth/login', '/auth/verify']) {
+          await expectLater(
+            client.post<Object?>(path),
+            throwsA(
+              isA<DioException>().having(
+                (e) => e.response?.statusCode,
+                'status',
+                401,
+              ),
+            ),
+          );
+        }
+        expect(calls, 0);
+      },
+    );
 
     test('forwards other errors untouched', () async {
       var calls = 0;

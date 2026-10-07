@@ -1,12 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gabay/core/config/app_version.dart';
 import 'package:gabay/core/config/changelog.dart';
+import 'package:gabay/l10n/app_localizations.dart';
+
+import 'support/shell_harness.dart';
 
 // The "Current" marker of the what's-new list must match the running version
 // constant exactly (standard 4.8). With no --dart-define the running version
 // is the committed fallback, which the pre-commit hook stamps together with
 // the top changelog entry.
 void main() {
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
+
   final hasDefine = const String.fromEnvironment('APP_VERSION').isNotEmpty;
 
   group('versions and changelogs', () {
@@ -16,7 +22,7 @@ void main() {
         for (final entry in log) {
           expect(entry.version, matches(RegExp(r'^\d+\.\d+\.\d+$')));
           expect(entry.date, matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
-          expect(entry.bullets, isNotEmpty);
+          expect(entry.bullets(l10n), isNotEmpty);
         }
       }
     });

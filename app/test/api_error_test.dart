@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gabay/core/copy/app_copy.dart';
 import 'package:gabay/core/network/api_error.dart';
+import 'package:gabay/l10n/app_localizations.dart';
+
+import 'support/shell_harness.dart';
 
 DioException _dio({
   int? status,
@@ -25,98 +27,94 @@ DioException _dio({
 }
 
 void main() {
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
+
+  String format(Object error) => formatApiError(error, l10n);
+
   group('formatApiError', () {
     test('uses the backend { error } body first, even with a status code', () {
       expect(
-        formatApiError(
-          _dio(status: 409, body: {'error': 'Name already used.'}),
-        ),
+        format(_dio(status: 409, body: {'error': 'Name already used.'})),
         'Name already used.',
       );
     });
 
     test('falls back to friendly copy for the status code', () {
-      expect(formatApiError(_dio(status: 400)), AppCopy.errorBadRequest);
-      expect(formatApiError(_dio(status: 401)), AppCopy.errorUnauthenticated);
-      expect(formatApiError(_dio(status: 403)), AppCopy.errorForbidden);
-      expect(formatApiError(_dio(status: 404)), AppCopy.errorNotFound);
-      expect(formatApiError(_dio(status: 409)), AppCopy.errorConflict);
-      expect(formatApiError(_dio(status: 413)), AppCopy.errorTooLarge);
-      expect(formatApiError(_dio(status: 422)), AppCopy.errorInvalid);
-      expect(formatApiError(_dio(status: 429)), AppCopy.errorTooManyRequests);
-      expect(formatApiError(_dio(status: 500)), AppCopy.errorServer);
-      expect(formatApiError(_dio(status: 502)), AppCopy.errorServer);
-      expect(formatApiError(_dio(status: 503)), AppCopy.errorUnavailable);
-      expect(formatApiError(_dio(status: 418)), AppCopy.errorGeneric);
+      expect(format(_dio(status: 400)), l10n.errorBadRequest);
+      expect(format(_dio(status: 401)), l10n.errorUnauthenticated);
+      expect(format(_dio(status: 403)), l10n.errorForbidden);
+      expect(format(_dio(status: 404)), l10n.errorNotFound);
+      expect(format(_dio(status: 409)), l10n.errorConflict);
+      expect(format(_dio(status: 413)), l10n.errorTooLarge);
+      expect(format(_dio(status: 422)), l10n.errorInvalid);
+      expect(format(_dio(status: 429)), l10n.errorTooManyRequests);
+      expect(format(_dio(status: 500)), l10n.errorServer);
+      expect(format(_dio(status: 502)), l10n.errorServer);
+      expect(format(_dio(status: 503)), l10n.errorUnavailable);
+      expect(format(_dio(status: 418)), l10n.errorGeneric);
     });
 
     test('ignores a body that has no usable { error } string', () {
       expect(
-        formatApiError(_dio(status: 404, body: {'error': ''})),
-        AppCopy.errorNotFound,
+        format(_dio(status: 404, body: {'error': ''})),
+        l10n.errorNotFound,
       );
       expect(
-        formatApiError(_dio(status: 404, body: {'error': 42})),
-        AppCopy.errorNotFound,
+        format(_dio(status: 404, body: {'error': 42})),
+        l10n.errorNotFound,
       );
       expect(
-        formatApiError(_dio(status: 404, body: '<html>Not Found</html>')),
-        AppCopy.errorNotFound,
+        format(_dio(status: 404, body: '<html>Not Found</html>')),
+        l10n.errorNotFound,
       );
     });
 
     test('with no response, goes by the Dio exception type', () {
       expect(
-        formatApiError(_dio(type: DioExceptionType.connectionTimeout)),
-        AppCopy.errorTimeout,
+        format(_dio(type: DioExceptionType.connectionTimeout)),
+        l10n.errorTimeout,
       );
       expect(
-        formatApiError(_dio(type: DioExceptionType.receiveTimeout)),
-        AppCopy.errorTimeout,
+        format(_dio(type: DioExceptionType.receiveTimeout)),
+        l10n.errorTimeout,
       );
       expect(
-        formatApiError(_dio(type: DioExceptionType.connectionError)),
-        AppCopy.errorNoConnection,
+        format(_dio(type: DioExceptionType.connectionError)),
+        l10n.errorNoConnection,
       );
-      expect(
-        formatApiError(_dio(type: DioExceptionType.cancel)),
-        AppCopy.errorCancelled,
-      );
-      expect(
-        formatApiError(_dio(type: DioExceptionType.unknown)),
-        AppCopy.errorGeneric,
-      );
+      expect(format(_dio(type: DioExceptionType.cancel)), l10n.errorCancelled);
+      expect(format(_dio(type: DioExceptionType.unknown)), l10n.errorGeneric);
     });
 
     test('goes by exception type for non-Dio errors and never echoes them', () {
-      expect(formatApiError(TimeoutException('x')), AppCopy.errorTimeout);
-      expect(
-        formatApiError(const FormatException('bad')),
-        AppCopy.errorUnexpectedReply,
-      );
-      final text = formatApiError(StateError('secret internal detail'));
-      expect(text, AppCopy.errorGeneric);
+      expect(format(TimeoutException('x')), l10n.errorTimeout);
+      expect(format(const FormatException('bad')), l10n.errorUnexpectedReply);
+      final text = format(StateError('secret internal detail'));
+      expect(text, l10n.errorGeneric);
       expect(text, isNot(contains('secret')));
     });
 
     test('a backend message that looks like a raw exception is replaced', () {
       expect(
-        formatApiError(
+        format(
           _dio(status: 500, body: {'error': 'DioException [bad response]'}),
         ),
-        AppCopy.errorGeneric,
+        l10n.errorGeneric,
       );
     });
   });
 
   group('sanitizeErrorText', () {
+    String sanitize(String text) => sanitizeErrorText(text, l10n);
+
     test('passes plain sentences, collapsing whitespace', () {
-      expect(sanitizeErrorText('  Name   is\n taken. '), 'Name is taken.');
+      expect(sanitize('  Name   is\n taken. '), 'Name is taken.');
     });
 
     test('keeps a normal sentence that mentions the word exception', () {
       expect(
-        sanitizeErrorText('Make an exception request to the mall.'),
+        sanitize('Make an exception request to the mall.'),
         'Make an exception request to the mall.',
       );
     });
@@ -133,13 +131,13 @@ void main() {
         '',
         '   ',
       ]) {
-        expect(sanitizeErrorText(raw), AppCopy.errorGeneric, reason: raw);
+        expect(sanitize(raw), l10n.errorGeneric, reason: raw);
       }
     });
 
     test('caps the length with an ellipsis', () {
       final long = 'a' * 1000;
-      final cleaned = sanitizeErrorText(long);
+      final cleaned = sanitize(long);
       expect(cleaned.length, kMaxErrorTextLength);
       expect(cleaned.endsWith('…'), isTrue);
     });

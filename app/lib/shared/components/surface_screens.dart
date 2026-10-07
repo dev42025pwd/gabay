@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/app_version.dart';
 import '../../core/config/changelog.dart';
 import '../../core/config/surface_provider.dart';
-import '../../core/copy/app_copy.dart';
 import '../../core/theme/gabay_tokens.dart';
+import '../../l10n/app_localizations.dart';
 import 'messaging/messaging_context.dart';
 
 /// Widest the placeholder content grows (tablet and browser windows).
@@ -23,16 +23,17 @@ class SurfaceHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final surface = ref.watch(surfaceProvider);
+    final l10n = AppLocalizations.of(context);
     final tokens = GabayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppCopy.appName)),
+      appBar: AppBar(title: Text(l10n.appName)),
       body: _PlaceholderBody(
         children: [
-          Text(AppCopy.appName, style: textTheme.displaySmall),
+          Text(l10n.appName, style: textTheme.displaySmall),
           const SizedBox(height: 4),
-          Text(surface.displayName, style: textTheme.titleLarge),
+          Text(surface.displayName(l10n), style: textTheme.titleLarge),
           const SizedBox(height: 16),
           _VersionLines(version: surface.version),
           const SizedBox(height: 16),
@@ -50,7 +51,7 @@ class SurfaceHomeScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      AppCopy.skeletonStatus,
+                      l10n.skeletonStatus,
                       style: TextStyle(color: tokens.onInfoContainer),
                     ),
                   ),
@@ -65,15 +66,15 @@ class SurfaceHomeScreen extends ConsumerWidget {
             children: [
               FilledButton(
                 onPressed: () => context.go(SurfaceAboutScreen.path),
-                child: const Text(AppCopy.aboutAction),
+                child: Text(l10n.aboutAction),
               ),
               OutlinedButton(
-                onPressed: () => context.showSuccess(AppCopy.sampleSuccess),
-                child: const Text(AppCopy.showSuccessAction),
+                onPressed: () => context.showSuccess(l10n.sampleSuccess),
+                child: Text(l10n.showSuccessAction),
               ),
               OutlinedButton(
-                onPressed: () => context.showError(AppCopy.sampleError),
-                child: const Text(AppCopy.showErrorAction),
+                onPressed: () => context.showError(l10n.sampleError),
+                child: Text(l10n.showErrorAction),
               ),
             ],
           ),
@@ -92,25 +93,26 @@ class SurfaceAboutScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final surface = ref.watch(surfaceProvider);
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          tooltip: AppCopy.backAction,
+          tooltip: l10n.backAction,
           icon: const Icon(Icons.arrow_back),
           // go(), not pop(): the address bar stays honest (standard 4.6).
           onPressed: () => context.go(SurfaceHomeScreen.path),
         ),
-        title: const Text(AppCopy.aboutTitle),
+        title: Text(l10n.aboutTitle),
       ),
       body: _PlaceholderBody(
         children: [
-          Text(surface.displayName, style: textTheme.titleLarge),
+          Text(surface.displayName(l10n), style: textTheme.titleLarge),
           const SizedBox(height: 12),
           _VersionLines(version: surface.version),
           const SizedBox(height: 24),
-          Text(AppCopy.whatsNewTitle, style: textTheme.titleMedium),
+          Text(l10n.whatsNewTitle, style: textTheme.titleMedium),
           const SizedBox(height: 8),
           for (final entry in surface.changelog) _ChangelogTile(entry: entry),
         ],
@@ -143,14 +145,15 @@ class _VersionLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final style = Theme.of(context).textTheme.bodyMedium;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('${AppCopy.versionLabel}: ${version.version}', style: style),
-        Text('${AppCopy.buildLabel}: ${version.buildNumber}', style: style),
-        Text('${AppCopy.commitLabel}: ${version.gitCommit}', style: style),
-        Text('${AppCopy.builtLabel}: ${version.buildTime}', style: style),
+        Text(l10n.versionLine(version.version), style: style),
+        Text(l10n.buildLine(version.buildNumber), style: style),
+        Text(l10n.commitLine(version.gitCommit), style: style),
+        Text(l10n.builtLine(version.buildTime), style: style),
       ],
     );
   }
@@ -163,6 +166,7 @@ class _ChangelogTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -173,7 +177,7 @@ class _ChangelogTile extends StatelessWidget {
             '${entry.version}  ·  ${entry.date}',
             style: textTheme.labelLarge,
           ),
-          for (final bullet in entry.bullets)
+          for (final bullet in entry.bullets(l10n))
             Text('• $bullet', style: textTheme.bodyMedium),
         ],
       ),

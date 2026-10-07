@@ -1,11 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gabay/core/copy/app_copy.dart';
+import 'package:gabay/l10n/app_localizations.dart';
 import 'package:gabay/shared/components/messaging/app_message.dart';
 import 'package:gabay/shared/components/messaging/message_notifier.dart';
 
+import 'support/shell_harness.dart';
+
 void main() {
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
+
   ProviderContainer make() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -25,24 +30,25 @@ void main() {
               statusCode: 403,
             ),
           ),
+          l10n,
         );
     final message = container.read(messageProvider)!;
     expect(message.kind, AppMessageKind.error);
-    expect(message.text, AppCopy.errorForbidden);
+    expect(message.text, l10n.errorForbidden);
   });
 
   test('showError with a raw-looking string is sanitised, never shown raw', () {
     final container = make();
     container
         .read(messageProvider.notifier)
-        .showError('SocketException: Failed host lookup');
-    expect(container.read(messageProvider)!.text, AppCopy.errorGeneric);
+        .showError('SocketException: Failed host lookup', l10n);
+    expect(container.read(messageProvider)!.text, l10n.errorGeneric);
   });
 
   test('a newer message gets a higher id and replaces the older one', () {
     final container = make();
     final notifier = container.read(messageProvider.notifier)
-      ..showError('first');
+      ..showError('first', l10n);
     final first = container.read(messageProvider)!;
     notifier.showSuccess('second');
     final second = container.read(messageProvider)!;
@@ -55,7 +61,7 @@ void main() {
     final notifier = container.read(messageProvider.notifier)
       ..showSuccess('first');
     await tester.pump(const Duration(seconds: 3));
-    notifier.showError('second');
+    notifier.showError('second', l10n);
     // The success message's own timer (5 s) fires here if it was not cancelled.
     await tester.pump(const Duration(seconds: 3));
     expect(container.read(messageProvider)?.text, 'second');

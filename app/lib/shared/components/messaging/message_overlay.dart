@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/copy/app_copy.dart';
 import '../../../core/theme/gabay_tokens.dart';
+import '../../../l10n/app_localizations.dart';
 import 'app_message.dart';
 import 'message_notifier.dart';
 
@@ -69,6 +69,7 @@ class _MessageBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final tokens = GabayTokens.of(context);
+    final l10n = AppLocalizations.of(context);
     final isError = message.kind == AppMessageKind.error;
     final background = isError
         ? scheme.errorContainer
@@ -77,7 +78,9 @@ class _MessageBanner extends StatelessWidget {
         ? scheme.onErrorContainer
         : tokens.onSuccessContainer;
     final icon = isError ? Icons.error_outline : Icons.check_circle_outline;
-    final prefix = isError ? AppCopy.errorPrefix : AppCopy.successPrefix;
+    final prefix = isError
+        ? l10n.messageErrorPrefix
+        : l10n.messageSuccessPrefix;
 
     // No Tooltip here: this banner sits above the Navigator, so it has no
     // Overlay ancestor. The dismiss button is named through Semantics.
@@ -125,7 +128,7 @@ class _MessageBanner extends StatelessWidget {
             ),
             Semantics(
               button: true,
-              label: AppCopy.dismissAction,
+              label: l10n.messageDismissAction,
               excludeSemantics: true,
               onTap: onDismiss,
               child: IconButton(

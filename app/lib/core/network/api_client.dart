@@ -5,9 +5,11 @@ import 'package:flutter/foundation.dart';
 /// plan/PH1-rails.md DC-3: named for what Gabay's tenants are.
 const String kTenantHeader = 'X-Tenant-Id';
 
-/// Default sign-in paths the 401 handler must not intercept (A.11): the
-/// sign-in screen has to see the real error. Phase 2 sets the real paths.
-const List<String> kDefaultSignInPaths = ['/auth/login', '/auth/verify'];
+/// Default sign-in paths the 401 handler must not intercept (A.11): empty.
+/// Firebase Auth signs users in without calling our API (Blueprint 2.4), so
+/// no API path is a sign-in path and every 401 means an expired session. A
+/// path that ever is one is passed to the constructor's [signInPaths].
+const List<String> kDefaultSignInPaths = <String>[];
 
 const Duration kConnectTimeout = Duration(seconds: 10);
 const Duration kReceiveTimeout = Duration(seconds: 30);

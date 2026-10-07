@@ -1,4 +1,4 @@
-import '../copy/app_copy.dart';
+import '../../l10n/app_localizations.dart';
 import 'app_version.dart';
 import 'changelog.dart';
 
@@ -9,26 +9,28 @@ enum AppSurface { mobile, admin }
 class SurfaceInfo {
   const SurfaceInfo({
     required this.surface,
-    required this.displayName,
     required this.version,
     required this.changelog,
   });
 
   final AppSurface surface;
-  final String displayName;
   final AppVersion version;
   final List<ChangelogEntry> changelog;
 
+  /// The surface's name as shown to people, from ARB.
+  String displayName(AppLocalizations l10n) => switch (surface) {
+    AppSurface.mobile => l10n.surfaceMobileName,
+    AppSurface.admin => l10n.surfaceAdminName,
+  };
+
   static const SurfaceInfo mobile = SurfaceInfo(
     surface: AppSurface.mobile,
-    displayName: AppCopy.mobileSurfaceName,
     version: AppVersion.mobile,
     changelog: mobileChangelog,
   );
 
   static const SurfaceInfo admin = SurfaceInfo(
     surface: AppSurface.admin,
-    displayName: AppCopy.adminSurfaceName,
     version: AppVersion.admin,
     changelog: adminChangelog,
   );

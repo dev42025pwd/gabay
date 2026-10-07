@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
+import '../../../l10n/app_localizations.dart';
 import 'app_message.dart';
 
 /// How long a success message stays.
@@ -25,11 +26,12 @@ class MessageNotifier extends Notifier<AppMessage?> {
 
   /// Shows [error] as an error message. Strings pass through
   /// [sanitizeErrorText] (the safety net: no call site can leak raw exception
-  /// text); anything else goes through [formatApiError].
-  void showError(Object error) {
+  /// text); anything else goes through [formatApiError]. [l10n] supplies the
+  /// friendly copy; `context.showError` passes it.
+  void showError(Object error, AppLocalizations l10n) {
     final text = error is String
-        ? sanitizeErrorText(error)
-        : formatApiError(error);
+        ? sanitizeErrorText(error, l10n)
+        : formatApiError(error, l10n);
     _show(AppMessageKind.error, text, kErrorMessageDuration);
   }
 

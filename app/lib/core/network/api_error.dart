@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-import '../copy/app_copy.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Longest message that may reach the screen.
 const int kMaxErrorTextLength = 300;
@@ -11,43 +11,44 @@ const int kMaxErrorTextLength = 300;
 ///
 /// Order: the backend's `{ "error": "..." }` body, then friendly copy for the
 /// HTTP status code, then copy for the exception type. Raw exception text
-/// (`$e`) never reaches the UI.
-String formatApiError(Object error) {
+/// (`$e`) never reaches the UI. The friendly copy comes from ARB through the
+/// [l10n] the caller passes in (a service-free function, no BuildContext).
+String formatApiError(Object error, AppLocalizations l10n) {
   if (error is DioException) {
     final fromBody = _backendMessage(error.response?.data);
-    if (fromBody != null) return sanitizeErrorText(fromBody);
+    if (fromBody != null) return sanitizeErrorText(fromBody, l10n);
 
     final status = error.response?.statusCode;
-    if (status != null) return _copyForStatus(status);
+    if (status != null) return _copyForStatus(status, l10n);
 
     return switch (error.type) {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.sendTimeout ||
       DioExceptionType.receiveTimeout ||
-      DioExceptionType.transformTimeout => AppCopy.errorTimeout,
-      DioExceptionType.connectionError => AppCopy.errorNoConnection,
-      DioExceptionType.cancel => AppCopy.errorCancelled,
-      DioExceptionType.badCertificate => AppCopy.errorNoConnection,
-      DioExceptionType.badResponse => AppCopy.errorUnexpectedReply,
-      DioExceptionType.unknown => AppCopy.errorGeneric,
+      DioExceptionType.transformTimeout => l10n.errorTimeout,
+      DioExceptionType.connectionError => l10n.errorNoConnection,
+      DioExceptionType.cancel => l10n.errorCancelled,
+      DioExceptionType.badCertificate => l10n.errorNoConnection,
+      DioExceptionType.badResponse => l10n.errorUnexpectedReply,
+      DioExceptionType.unknown => l10n.errorGeneric,
     };
   }
   return switch (error) {
-    TimeoutException() => AppCopy.errorTimeout,
-    FormatException() => AppCopy.errorUnexpectedReply,
-    _ => AppCopy.errorGeneric,
+    TimeoutException() => l10n.errorTimeout,
+    FormatException() => l10n.errorUnexpectedReply,
+    _ => l10n.errorGeneric,
   };
 }
 
 /// Safety net inside the central `showError`: if text that looks like a raw
 /// exception or a stack trace is about to be shown, replace it with generic
 /// copy; otherwise collapse whitespace and cap the length.
-String sanitizeErrorText(String text) {
+String sanitizeErrorText(String text, AppLocalizations l10n) {
   final collapsed = text.replaceAll(RegExp(r'\s+'), ' ').trim();
   if (collapsed.isEmpty ||
       _looksRaw.hasMatch(text) ||
       _looksLikeHtml.hasMatch(text)) {
-    return AppCopy.errorGeneric;
+    return l10n.errorGeneric;
   }
   if (collapsed.length <= kMaxErrorTextLength) return collapsed;
   return '${collapsed.substring(0, kMaxErrorTextLength - 1)}…';
@@ -70,16 +71,16 @@ String? _backendMessage(Object? data) {
   return null;
 }
 
-String _copyForStatus(int status) => switch (status) {
-  400 => AppCopy.errorBadRequest,
-  401 => AppCopy.errorUnauthenticated,
-  403 => AppCopy.errorForbidden,
-  404 => AppCopy.errorNotFound,
-  409 => AppCopy.errorConflict,
-  413 => AppCopy.errorTooLarge,
-  422 => AppCopy.errorInvalid,
-  429 => AppCopy.errorTooManyRequests,
-  503 => AppCopy.errorUnavailable,
-  >= 500 => AppCopy.errorServer,
-  _ => AppCopy.errorGeneric,
+String _copyForStatus(int status, AppLocalizations l10n) => switch (status) {
+  400 => l10n.errorBadRequest,
+  401 => l10n.errorUnauthenticated,
+  403 => l10n.errorForbidden,
+  404 => l10n.errorNotFound,
+  409 => l10n.errorConflict,
+  413 => l10n.errorTooLarge,
+  422 => l10n.errorInvalid,
+  429 => l10n.errorTooManyRequests,
+  503 => l10n.errorUnavailable,
+  >= 500 => l10n.errorServer,
+  _ => l10n.errorGeneric,
 };
