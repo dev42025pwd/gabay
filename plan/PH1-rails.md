@@ -52,7 +52,8 @@ Each slice ends with its evidence pasted into the slice report (outputs with exi
 - Evidence: fresh PowerShell in Gabay → v22.23.3, outside → v24.13.0; `fnm exec --using=22 -- npm.cmd run seed` → exit 0, six venues, six accounts.
 - Limit: a terminal that leaves Gabay keeps 22 until closed; hooks and `verify` call Node through fnm, so they always get 22.
 
-### S1 — Repository foundation
+### S1 — Repository foundation — DONE 2026-10-07
+- Evidence: `git init -b main`; 52 files committed as `d3a6c48`; `git ls-files` holds no APK, `sources/internal/`, `.env`, emulator data or `node_modules`; no `.env` secret value in any committed file (scanned); no remote. The seed skips the penthouse with a note when `sources/internal/` is absent (both paths exit 0) and the full seed still exits 0. The root `package.json` gains each script in the slice that builds it (only `seed` exists now), so no script points at a missing file.
 - `git init` (branch `main`); `.gitignore` (APK, `db/seeds/sources/internal/`, `node_modules/`, `.env` but not `.env.example`, `.emulator-data/`, build outputs); `.gitattributes` (LF line endings for scripts and hooks, so they run in CI).
 - Root `package.json` with the scripts above. README: the one-time `git config core.hooksPath .githooks` line (it is already in the README; it is kept).
 - The seed skips the penthouse with a clear message when `sources/internal/` is absent (a clean clone).
