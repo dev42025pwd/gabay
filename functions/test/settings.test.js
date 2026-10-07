@@ -122,3 +122,42 @@ test('settings: the query runs against the real gabay.GlobalSetting columns (rea
     await db.close();
   }
 });
+
+// Regression: S2 re-review N2. A tenant id given as a string ("5", as the X-Tenant-Id header will
+// deliver it in Phase 2) silently dropped the tenant's overrides and split the cache key.
+test('settings: a tenant id given as a string "5" is the same tenant as 5 (values and cache)', async () => {
+  const db = fakeDb([row(null, 'routing.stairsSaveM', '200'), row(5, 'routing.stairsSaveM', '90')]);
+  const s = createSettings(db.query, fakeLogger());
+  assert.equal(await s.getSetting('routing.stairsSaveM', 5), 90);
+  assert.equal(
+    await s.getSetting('routing.stairsSaveM', '5'),
+    90,
+    'the string finds the overrides',
+  );
+  assert.equal(await s.getSetting('routing.stairsSaveM', ' 5 '), 90, 'surrounding spaces are fine');
+  assert.equal(db.state.calls.length, 1, 'one cache entry, not one per spelling');
+  assert.deepEqual(db.state.calls[0], [5], 'a number is what is bound');
+  assert.deepEqual((await s.getPublicFlags('5'))['liveStatus.overlay'], false);
+  assert.equal(db.state.calls.length, 1);
+  // invalidate takes either spelling.
+  db.state.rows = [row(5, 'routing.stairsSaveM', '55')];
+  s.invalidate('5');
+  assert.equal(await s.getSetting('routing.stairsSaveM', 5), 55);
+});
+
+test('settings: a garbage tenant id never throws, falls back to the platform values and warns', async () => {
+  const db = fakeDb([row(null, 'routing.stairsSaveM', '200'), row(5, 'routing.stairsSaveM', '90')]);
+  const logger = fakeLogger();
+  const s = createSettings(db.query, logger);
+  for (const bad of ['abc', '5; DROP TABLE x', '1.5', 1.5, -3, 0, '', NaN, {}, [5], true]) {
+    assert.equal(await s.getSetting('routing.stairsSaveM', bad), 200, `getSetting(${String(bad)})`);
+    assert.doesNotThrow(() => s.invalidate(bad));
+  }
+  assert.deepEqual(await s.getPublicFlags('abc'), {
+    'analytics.routeTraces': false,
+    'liveStatus.overlay': false,
+  });
+  assert.ok(logger.calls.warn.length >= 11, 'each garbage id is logged');
+  // The platform query, never a tenant query, ran for them: the bound value is null.
+  assert.ok(db.state.calls.every((p) => p[0] === null));
+});

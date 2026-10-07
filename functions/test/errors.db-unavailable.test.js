@@ -102,13 +102,21 @@ test('db unavailable: the server ending our session (57P01) is 503', async () =>
   }
 });
 
-test('db unavailable: a tagged failure is 503; the same errno from a non-database caller is not', async () => {
+test('db unavailable: a tagged failure is 503; the same errno from a non-database caller is not (also inside a transaction)', async () => {
   const tagged = Object.assign(new Error('connect ECONNREFUSED'), {
     code: 'ECONNREFUSED',
     dbUnavailable: true,
   });
   const other = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+  // Regression (S2 re-review N1): the same errno thrown by the caller's own code INSIDE a transaction,
+  // for example a future Cloud Storage call, is not the database's fault either.
+  const db = singleConnectionDb();
   const s = await mount((app) => {
+    app.get('/in-tx', async () => {
+      await db.withTransaction(async () => {
+        throw other;
+      });
+    });
     app.get('/tagged', () => {
       throw tagged;
     });
@@ -125,7 +133,19 @@ test('db unavailable: a tagged failure is 503; the same errno from a non-databas
       'a failure outside the database layer is not blamed on the database',
     );
     assert.deepEqual(r.body, { error: 'Internal server error' });
+
+    const inTx = await get(`${s.url}/in-tx`);
+    assert.equal(inTx.status, 500, 'not 503: the database was fine');
+    assert.deepEqual(inTx.body, { error: 'Internal server error' });
+    assert.equal(other.dbUnavailable, undefined, 'the error thrown by the caller is not tagged');
+    assert.equal(
+      db.pool.totalCount,
+      1,
+      'the healthy connection went back to the pool, not destroyed',
+    );
+    assert.equal(db.pool.idleCount, 1);
   } finally {
     await s.close();
+    await db.close();
   }
 });

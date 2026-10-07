@@ -71,3 +71,41 @@ test('real connection failures through query() and withTransaction() are tagged;
     await db.close();
   }
 });
+
+// Regression: S2 re-review N1. withTransaction tagged (and destroyed the connection for) ANY
+// connection-like error, including one thrown by the caller's own fn. Only errors raised by the
+// database layer's own calls (connect, BEGIN, COMMIT, ROLLBACK, tx.query) may be tagged.
+test('withTransaction: an errno thrown by fn is not tagged and the connection is kept', async () => {
+  const db = singleConnectionDb();
+  try {
+    const mine = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+    await assert.rejects(
+      () =>
+        db.withTransaction(async (tx) => {
+          await tx.query('SELECT 1', []);
+          throw mine;
+        }),
+      (err) => err === mine && err.dbUnavailable === undefined,
+    );
+    assert.equal(db.pool.totalCount, 1, 'the healthy connection is released, not destroyed');
+    assert.equal(db.pool.idleCount, 1);
+    assert.equal((await db.query('SELECT 1 AS one', [])).rows[0].one, 1);
+  } finally {
+    await db.close();
+  }
+});
+
+test('withTransaction: a connection lost inside tx.query is tagged and the connection is destroyed', async () => {
+  const db = singleConnectionDb();
+  try {
+    await assert.rejects(
+      () =>
+        db.withTransaction((tx) => tx.query('SELECT pg_terminate_backend(pg_backend_pid())', [])),
+      (err) => err.code === '57P01' && err.dbUnavailable === true,
+    );
+    assert.equal(db.pool.totalCount, 0, 'the lost connection was destroyed');
+    assert.equal((await db.query('SELECT 1 AS one', [])).rows[0].one, 1, 'the pool recovers');
+  } finally {
+    await db.close();
+  }
+});

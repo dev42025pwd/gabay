@@ -63,6 +63,27 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
   /** cache key (tenant id or 'platform') -> { at, values: Map(key -> parsed) } */
   const cache = new Map();
 
+  /**
+   * One tenant-id form for the whole resolver: null (the platform) or a positive integer number.
+   * A string such as "5" (the X-Tenant-Id header arrives as text, Phase 2) is the same tenant as 5;
+   * without this its overrides were dropped and the cache split. Anything else is not a tenant id:
+   * it is logged and read as the platform, because the resolver never throws (S2 re-review N2).
+   * Idempotent, so every entry point can call it.
+   */
+  function normaliseTenantId(tenantId) {
+    if (tenantId === null || tenantId === undefined) return null;
+    const n =
+      typeof tenantId === 'string' && /^\d{1,9}$/.test(tenantId.trim())
+        ? Number(tenantId)
+        : tenantId;
+    if (Number.isSafeInteger(n) && n > 0) return n;
+    logger.warn(
+      { tenantId: String(tenantId).slice(0, 40) },
+      'not a tenant id, using platform values',
+    );
+    return null;
+  }
+
   async function load(tenantId) {
     // tenantId comes from the request context (rule 2). A NULL id matches no tenant row.
     const result = await query(
@@ -84,11 +105,12 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
     return values;
   }
 
-  async function valuesFor(tenantId) {
+  async function valuesFor(tenantInput) {
+    const tenantId = normaliseTenantId(tenantInput);
     const id = tenantId ?? 'platform';
     const hit = cache.get(id);
     if (hit && now() - hit.at < CACHE_TTL_MS) return hit.values;
-    const values = await load(tenantId ?? null);
+    const values = await load(tenantId);
     cache.set(id, { at: now(), values });
     return values;
   }
@@ -97,10 +119,10 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
    * One setting for a tenant (or the platform when tenantId is null). Never throws:
    * a database error, or an unknown key, returns the default (undefined for an unknown key).
    */
-  async function getSetting(key, tenantId = null) {
+  async function getSetting(key, tenantInput = null) {
     const fallback = DEFAULTS[key];
     try {
-      const values = await valuesFor(tenantId);
+      const values = await valuesFor(normaliseTenantId(tenantInput));
       return values.has(key) ? values.get(key) : fallback;
     } catch (err) {
       logger.warn({ err, key }, 'setting lookup failed, using the default');
@@ -109,7 +131,8 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
   }
 
   /** The PUBLIC_FLAGS for a tenant (or the platform), for non-admin clients. Never throws. */
-  async function getPublicFlags(tenantId = null) {
+  async function getPublicFlags(tenantInput = null) {
+    const tenantId = normaliseTenantId(tenantInput);
     const out = {};
     for (const key of PUBLIC_FLAGS) out[key] = await getSetting(key, tenantId);
     return out;
@@ -129,9 +152,13 @@ function createSettings(query, logger = createLogger(), now = Date.now) {
   }
 
   /** Call after any write to GlobalSetting so the next read sees it (a tenant id, or none for all). */
-  function invalidate(tenantId) {
-    if (tenantId === undefined) cache.clear();
-    else cache.delete(tenantId ?? 'platform');
+  function invalidate(tenantInput) {
+    if (tenantInput === undefined) return cache.clear();
+    if (tenantInput === null) return cache.delete('platform');
+    const tenantId = normaliseTenantId(tenantInput);
+    // Not a tenant id: we cannot tell which entry the caller meant, so drop them all (never stale).
+    if (tenantId === null) return cache.clear();
+    return cache.delete(tenantId);
   }
 
   return { getSetting, getPublicFlags, getPublicConfig, invalidate };

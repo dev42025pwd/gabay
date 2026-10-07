@@ -22,7 +22,8 @@ test('index.js: requiring it with no PG* env neither exits, throws, nor reads th
     if (process.env.PGHOST !== undefined) problems.push('the config was read at load (.env was loaded)');
     if (problems.length) { console.error(problems.join('; ')); process.exit(3); }
     console.log('inert');
-    // Nothing may keep the process alive: a pool opened at load would.
+    // The PGHOST check above is what proves the config was not read: getConfig() is the only thing
+    // that loads .env, and a pool is only ever created from that config.
   `;
   const run = spawnSync(process.execPath, ['-e', script], {
     // A scrubbed environment: no PG*, no NODE_ENV=test (which would turn a config exit into a throw).
