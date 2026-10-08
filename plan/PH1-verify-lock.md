@@ -1,6 +1,6 @@
 # Plan: one verify at a time on this machine (the verify lock)
 
-> **Version**: 1.0 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-08 (the interview; to be recorded as plan.html L140 once PR #2, L139, is merged) | **Spec**: none (tooling for Phase 1's rails, as `plan/PH1-rails.md`, L123) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
+> **Version**: 1.1 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-08 (plan.html L140); 1.1 adds the review fixes and names the two changed test files (L140) | **Spec**: none (tooling for Phase 1's rails, as `plan/PH1-rails.md`, L123) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
 
 ## Why
 
@@ -36,6 +36,18 @@ Part 2 (each coder in its own `git worktree` with its own database `gabay_wt_<na
 - The lock is released after a green run, a red run and a termination signal.
 - A bad limit value (`abc`, `0`, `-5`, `1.5`) stops with exit 2 and a message, as `GABAY_VERIFY_CHECK_TIMEOUT_MS` does.
 - `CI=true`: no lock file is created.
+
+## Review fixes (1.1; dod-reviewer's review of `e9836a7`, the product owner's rulings)
+
+1. **A stale lock that cannot be deleted** (antivirus, the indexer or an editor holding it open; another user's file in a sticky `/tmp`) must not make a waiting run spin: print one line naming the error, then wait as for a live lock (the busy line, the pause, the limit, exit 2). Test: a lock held open without delete sharing (Windows) or in a read-only folder (POSIX) gives exit 2 at the limit.
+2. **Safety:** clearing a dead lock cannot remove a lock another run has just taken (claim it, then check); a closed terminal (SIGHUP) releases the lock; a waiting run reads the lock before trying to create it (no temp file every poll, less litter after a hard kill); the lock record carries a `version` field, so a working copy on other code (Part 2) never misreads a newer lock.
+3. **Wording and docs:** the time-out message does not tell the reader to end a process number that may now belong to another program; README says the lock follows the TEMP folder (`os.tmpdir()`); clearing an unreadable lock is listed as a DESIGN CHOICE (VL-5; the alternative: refuse and name the file).
+4. **A test of a true simultaneous start:** several runs released at once never hold the lock together.
+
+## Existing tests that change (rule C1)
+
+- `tools/test/verify.test.js`: its helpers move to the new `tools/test/verify-scratch.js` (shared with the lock tests); child runs get `CI=''` and their own lock file, so they never touch the machine's lock and the lock tests also run on GitHub. No assertion changes.
+- `tools/test/s5-review.test.js`: its copy list gains `tools/lib/verify-lock.js` (`verify.js` now requires it), and its child verify gets its own lock file, so a nested verify never waits on the outer run's lock. No assertion changes.
 
 ## Companion files (CLAUDE.md's sync table)
 
