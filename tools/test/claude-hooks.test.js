@@ -133,6 +133,24 @@ test('stop-verify: a FAILED run on this code lets the session stop, with a "veri
   });
 });
 
+// plan/PH1-verify-logs.md 1.1 item 4: a failed run leaves the whole output of each failing check in .verify/logs/,
+// and the notice says so (only when the folder holds a log: a failure with no output, such as code that changed
+// during the run, has nothing to point to).
+test('stop-verify: the "verify FAILED" notice says where the full output of the failing checks is, when there are logs', () => {
+  withRepo((dir) => {
+    recordVerify(dir, { result: 'red', failed: ['eslint'], ran: 2 });
+    const bare = hook(dir, 'stop-verify', {}).json.systemMessage;
+    assert.doesNotMatch(bare, /\.verify\/logs/, 'no logs, nothing to point to');
+    write(dir, '.verify/logs/eslint.log', 'the whole output\n');
+    const r = hook(dir, 'stop-verify', {});
+    assert.equal(r.json.decision, undefined, 'still not a block');
+    assert.equal(
+      r.json.systemMessage,
+      'verify FAILED on the current code: 2 of 15 checks ran; failed: eslint; the full output of each failing check is in .verify/logs/',
+    );
+  });
+});
+
 test('stop-verify: a partial run (--only) never counts as a verify', () => {
   withRepo((dir) => {
     recordVerify(dir, { partial: true });

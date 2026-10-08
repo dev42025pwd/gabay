@@ -15,6 +15,7 @@ const VERIFY_FILES = [
   'tools/fingerprint.js',
   'tools/lib/proc.js',
   'tools/lib/verify-lock.js',
+  'tools/lib/verify-logs.js',
   'tools/health-probe.js',
 ];
 
