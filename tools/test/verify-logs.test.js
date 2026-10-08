@@ -373,7 +373,16 @@ test('an output past the cap is saved with its start and its end and the "cut" l
     const startAt = log.search(/FIRST-LINE\r?\n/);
     assert.ok(startAt >= 0 && startAt < 300, "the start is kept (after npm's banner)");
     assert.match(log, /LAST-LINE\s*$/, 'the end is kept');
-    assert.match(log, /cut [\d]+ characters/, 'the cut line says how much');
+    assert.equal(log.match(/cut \d+ characters/g).length, 1, 'cut once, not twice (review I1)');
+    // The cut line's count is TRUE: what was kept plus what was cut is everything the check printed. (The
+    // banner npm prints is everything before FIRST-LINE; the child wrote the rest.)
+    const counts =
+      /cut (\d+) characters here: .*only its first (\d+) and last (\d+) characters/.exec(log);
+    const [cut, head, tail] = counts.slice(1).map(Number);
+    const childChars = 'FIRST-LINE\n'.length + 70000 * 100 + '# tests 1\nLAST-LINE\n'.length;
+    assert.equal(head, OUTPUT_CAP_CHARS / 2);
+    assert.equal(tail, OUTPUT_CAP_CHARS / 2);
+    assert.equal(cut + head + tail, startAt + childChars, 'kept + cut = all it printed');
     assert.ok(log.length <= OUTPUT_CAP_CHARS + 500, `${log.length} characters`);
     assert.ok(log.length > OUTPUT_CAP_CHARS - 500, 'the cap is used, not a smaller slice');
     assert.ok(r.out.length < 10_000, 'the console still shows only the tail');
@@ -417,6 +426,26 @@ test('logsDir is .verify/logs under the root; resetLogs creates it, or empties i
   }
 });
 
+// Review I1: runCommand has already cut an over-long output (once, with the true count). Cutting that text again
+// replaced the count with the size of the first cut line ("cut 154 characters" for a 300 MB failure).
+test('writeLog saves text as it is: an already-cut output keeps its one cut line and its true count', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gabay-logs-'));
+  try {
+    const cutOnce = boundedOutput(); // the cap runCommand uses
+    cutOnce.add('x'.repeat(12_000_000));
+    const text = cutOnce.text();
+    assert.match(text, new RegExp(`cut ${12_000_000 - OUTPUT_CAP_CHARS} characters`));
+    assert.ok(
+      text.length > OUTPUT_CAP_CHARS,
+      'the cap plus the cut line: a few characters over the cap',
+    );
+    const saved = writeLog(root, 'eslint', text);
+    assert.equal(fs.readFileSync(path.join(root, saved.file), 'utf8'), text);
+  } finally {
+    clean(root);
+  }
+});
+
 test('writeLog saves the text, reports the repo-relative path and line count; a failure is returned, not thrown', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gabay-logs-'));
   try {
@@ -452,6 +481,122 @@ test('the logs are outside the fingerprint', () => {
     fs.writeFileSync(path.join(dir, '.verify', 'logs', 'eslint.log'), 'x');
     assert.equal(fingerprint(dir), before);
     assert.ok(!codeFiles(dir).some((f) => f.startsWith('.verify/')));
+  } finally {
+    clean(dir);
+  }
+});
+
+// ---- review fixes (plan 1.1) ----------------------------------------------------------------------------------
+
+/**
+ * Holds `file` open so that it cannot be deleted (Windows: FileShare None) until the returned function is called,
+ * or for `holdSeconds` (it lets go by itself).
+ * POSIX lets an open file be unlinked, so there is nothing to hold there: the caller skips.
+ */
+async function holdOpen(file, holdSeconds = 120) {
+  const child = spawn(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-Command',
+      `$f = [System.IO.File]::Open('${file}', 'Open', 'Read', 'None'); Write-Output 'held'; Start-Sleep -Milliseconds ${holdSeconds * 1000}; $f.Close()`,
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'] },
+  );
+  await new Promise((resolve, reject) => {
+    child.stdout.once('data', resolve);
+    child.once('exit', () => reject(new Error('powershell ended before it held the file')));
+  });
+  return () => child.kill();
+}
+
+// Review I2: one log held open (an indexer, a viewer) stopped the whole reset, and all the old logs stayed.
+test('one locked log does not stop the reset: the others are removed and the held one is named in one line', async (t) => {
+  if (process.platform !== 'win32') {
+    t.skip('POSIX removes a file that is open; only Windows refuses (FileShare None)');
+    return;
+  }
+  const dir = scratch();
+  const logs = path.join(dir, '.verify', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  for (const name of ['a-eslint.log', 'b-prettier.log', 'c-seed.log']) {
+    fs.writeFileSync(path.join(logs, name), `old ${name}`);
+  }
+  const release = await holdOpen(path.join(logs, 'b-prettier.log'));
+  try {
+    const direct = resetLogs(dir);
+    assert.match(direct.error, /b-prettier\.log/, 'the held log is named');
+    assert.doesNotMatch(direct.error, /a-eslint|c-seed/, 'the removed ones are not');
+    assert.deepEqual(logNames(dir), ['b-prettier.log'], 'the others are gone');
+
+    fs.writeFileSync(path.join(logs, 'a-eslint.log'), 'old again');
+    const r = verify(dir, ['--only', 'node-version']);
+    assert.equal(r.status, 0, 'the run goes on: ' + r.out + r.err);
+    const line = r.out.split('\n').filter((l) => /^verify: could not empty/.test(l));
+    assert.equal(line.length, 1, 'one line');
+    assert.match(line[0], /b-prettier\.log/);
+    assert.deepEqual(logNames(dir), ['b-prettier.log']);
+  } finally {
+    release();
+    await sleep(500); // the handle is released when powershell is gone
+    clean(dir);
+  }
+});
+
+test('a log that is held only for a moment is removed after a short retry', async (t) => {
+  if (process.platform !== 'win32') {
+    t.skip('POSIX removes a file that is open; only Windows refuses (FileShare None)');
+    return;
+  }
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gabay-logs-'));
+  const file = path.join(root, '.verify', 'logs', 'brief.log');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, 'old');
+  const release = await holdOpen(file, 0.2); // lets go by itself after 0.2 s: within the retries
+  try {
+    const result = resetLogs(root);
+    assert.deepEqual(result, {}, 'removed after the retry');
+    assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
+  } finally {
+    release();
+    await sleep(500);
+    clean(root);
+  }
+});
+
+// Review 3: node-check and structural-linters gave no sign that a time-out was why they failed.
+test('node-check says TIMED OUT, on the console and in its log, when a file check is cut off', () => {
+  const dir = scratch();
+  try {
+    // 1 ms: no process can start and finish a `node --check` in that time, so every file times out.
+    const r = verify(dir, ['--only', 'node-check'], {
+      env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: '1' },
+    });
+    assert.equal(r.status, 1, r.out + r.err);
+    assert.match(r.out, /^FAIL node-check\s.*\.verify\/logs\/node-check\.log/m);
+    assert.match(r.out, /TIMED OUT after 0\.001 s/);
+    assert.match(fs.readFileSync(logFile(dir, 'node-check'), 'utf8'), /TIMED OUT after 0\.001 s/);
+  } finally {
+    clean(dir);
+  }
+});
+
+test('structural-linters stops at the check time-out and says TIMED OUT, on the console and in its log', () => {
+  const dir = scratch({
+    'tools/lint/run.js':
+      "console.log('ok   repo-layout');\nconsole.log('linter output before the hang');\nsetTimeout(() => {}, 120000);\n",
+  });
+  try {
+    const r = verify(dir, ['--only', 'structural-linters'], {
+      env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: '5000' },
+      timeout: 90_000,
+    });
+    assert.equal(r.status, 1, `ended in time? ${r.out}${r.err}`);
+    assert.match(r.out, /^FAIL structural-linters\s.*\.verify\/logs\/structural-linters\.log/m);
+    assert.match(r.out, /TIMED OUT after 5 s/);
+    const log = fs.readFileSync(logFile(dir, 'structural-linters'), 'utf8');
+    assert.match(log, /linter output before the hang/);
+    assert.match(log, /TIMED OUT after 5 s/);
   } finally {
     clean(dir);
   }

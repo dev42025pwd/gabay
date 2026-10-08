@@ -263,14 +263,15 @@ function testsRan(output) {
  * `node --test "<glob>"` exits 0 when the glob matches nothing, which would pass a check that
  * checked nothing.
  */
+const timedOutNote = (timeoutMs) =>
+  `\nTIMED OUT after ${timeoutMs / 1000} s; the process tree was stopped.`;
+
 const command =
   (commandLine, { cwd = ROOT, timeoutMs: ownTimeoutMs = TIMEOUT_MS.default, tests = false } = {}) =>
   async () => {
     const timeoutMs = Math.min(ownTimeoutMs, checkTimeoutCapMs);
     const r = await runCommand(commandLine, { cwd, timeoutMs });
-    let note = r.timedOut
-      ? `\nTIMED OUT after ${timeoutMs / 1000} s; the process tree was stopped.`
-      : '';
+    let note = r.timedOut ? timedOutNote(timeoutMs) : '';
     let ok = r.code === 0 && !r.timedOut;
     if (ok && tests && !(testsRan(r.output) > 0)) {
       ok = false;
@@ -326,15 +327,20 @@ function nodeVersion() {
       };
 }
 
-/** node --check on one file (no shell). */
+/** One `node --check` may run this long; GABAY_VERIFY_CHECK_TIMEOUT_MS caps it like every check. */
+const NODE_CHECK_TIMEOUT_MS = 60_000;
+
+/** node --check on one file (no shell). A file whose check was cut off says so in its output. */
 function checkSyntax(file) {
+  const timeoutMs = Math.min(NODE_CHECK_TIMEOUT_MS, checkTimeoutCapMs);
   return new Promise((resolve) => {
     execFile(
       process.execPath,
       ['--check', file],
-      { cwd: ROOT, timeout: 60_000, windowsHide: true },
+      { cwd: ROOT, timeout: timeoutMs, windowsHide: true },
       (err, stdout, stderr) => {
-        resolve({ ok: !err, output: `${stdout}${stderr}` });
+        const note = err?.killed ? timedOutNote(timeoutMs) : '';
+        resolve({ ok: !err, output: `${stdout}${stderr}${note}` });
       },
     );
   });
@@ -372,15 +378,17 @@ async function nodeCheck() {
 }
 
 async function structuralLinters() {
-  const r = await runCommand(`${NODE} tools/lint/run.js`, { cwd: ROOT });
+  const timeoutMs = Math.min(TIMEOUT_MS.default, checkTimeoutCapMs);
+  const r = await runCommand(`${NODE} tools/lint/run.js`, { cwd: ROOT, timeoutMs });
   // The runner prints "ok   repo-layout" only when db/schema.sql, app/lib and functions/src exist:
   // without it a pass could mean "there was nothing to look at".
   const layoutSeen = /^ok\s+repo-layout/m.test(r.output);
-  const note = layoutSeen
-    ? ''
-    : '\nThe "ok   repo-layout" line is missing: the run did not check the whole repo.';
+  let note = r.timedOut ? timedOutNote(timeoutMs) : '';
+  if (!layoutSeen && !r.timedOut) {
+    note += '\nThe "ok   repo-layout" line is missing: the run did not check the whole repo.';
+  }
   return {
-    ok: r.code === 0 && layoutSeen,
+    ok: r.code === 0 && layoutSeen && !r.timedOut,
     output: tail(r.output, TAIL_LINES) + note,
     full: r.output + note,
   };

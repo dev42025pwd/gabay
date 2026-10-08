@@ -9,15 +9,30 @@
 //   a result for exactly this code, and it FAILED  -> allow, with a "verify FAILED" notice that says how
 //                                                      many checks ran and which failed (a failed run must
 //                                                      not trap the session: an agent can still stop to
-//                                                      ask a question)
+//                                                      ask a question); when .verify/logs/ holds logs, it adds
+//                                                      that the full output of each failing check is there
 //   a result for exactly this code, and it is green -> allow, silently
 //
 // stop_hook_active does NOT release the block (ruling L129 b): only a run on the current code does.
 // The fingerprint comes from tools/fingerprint.js, the module `npm run verify` writes it with.
 'use strict';
 
+const fs = require('node:fs');
 const { ROOT, readEvent, block, notice } = require('./lib');
 const { fingerprint, readStateDetailed } = require(`${ROOT}/tools/fingerprint.js`);
+
+/**
+ * True when .verify/logs/ holds a log: a failed run leaves the whole output of each failing check there
+ * (tools/lib/verify-logs.js), so the notice can point to it. A failure with no output (code that changed
+ * during the run) leaves none, and then there is nothing to point to.
+ */
+function hasLogs() {
+  try {
+    return fs.readdirSync(`${ROOT}/.verify/logs`).some((name) => name.endsWith('.log'));
+  } catch {
+    return false;
+  }
+}
 
 async function main() {
   await readEvent(); // the event is not needed, but stdin must be drained
@@ -61,7 +76,8 @@ async function main() {
         ? ''
         : `${ran}${state.totalChecks ? ` of ${state.totalChecks}` : ''} checks ran; `;
     const failed = state.failed.join(', ') || '(no check names recorded)';
-    notice(`verify FAILED on the current code: ${progress}failed: ${failed}`);
+    const logs = hasLogs() ? '; the full output of each failing check is in .verify/logs/' : '';
+    notice(`verify FAILED on the current code: ${progress}failed: ${failed}${logs}`);
   }
 }
 
