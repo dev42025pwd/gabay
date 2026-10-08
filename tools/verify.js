@@ -29,9 +29,17 @@
 // GABAY_VERIFY_CHECK_TIMEOUT_MS (CI only) caps every check's own timeout, so a hung check fails with its
 // output before the CI job's timeout cancels the run.
 //
+// ONE RUN AT A TIME (plan/PH1-verify-lock.md): every run, a partial one too, takes a lock for the whole machine
+// (tools/lib/verify-lock.js) before its first check, because all runs share gabay_dev and the emulator ports. A
+// second run prints who holds it and waits; after GABAY_VERIFY_LOCK_WAIT_MS (default 15 minutes) it stops with
+// exit 2, and records nothing. GABAY_VERIFY_OWNER names the run in the lock (for example "api-coder"). The lock
+// is released on every way out of this process: the end, a failed check, Ctrl-C and SIGTERM. --list and CI
+// (CI=true: a fresh runner, one job) take no lock.
+//
 // TEST SEAMS (used by tools/test, not for normal use): GABAY_VERIFY_EMULATOR_TIMEOUT_MS shortens the
 // emulator check's timeout; GABAY_VERIFY_TEST_INTERRUPT_MS makes the run call its Ctrl-C cleanup after
-// that many milliseconds, because a real Ctrl-C cannot be sent from a script on Windows.
+// that many milliseconds, because a real Ctrl-C cannot be sent from a script on Windows;
+// GABAY_VERIFY_LOCK_FILE and GABAY_VERIFY_LOCK_REPORT_MS move the lock and shorten its reminder.
 'use strict';
 
 const fs = require('node:fs');
@@ -47,6 +55,13 @@ const {
   sweepPorts,
   ownerText,
 } = require('./lib/proc');
+const {
+  lockFilePath,
+  readWaitLimit,
+  readReportInterval,
+  acquireLock,
+  releaseLock,
+} = require('./lib/verify-lock');
 
 const NODE = `"${process.execPath}"`;
 const WINDOWS = process.platform === 'win32';
@@ -410,6 +425,13 @@ const CHECKS = [
 
 const pad = (name) => name.padEnd(20);
 
+/** The verify lock this process holds, or null (GitHub's runners and a run that has not got it yet hold none). */
+let heldLock = null;
+function releaseHeldLock() {
+  releaseLock(heldLock);
+  heldLock = null;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--list')) {
@@ -421,8 +443,10 @@ async function main() {
     console.log(CHECKS.map((c) => c.name).join('\n'));
     return 0;
   }
+  let lockWaitMs;
   try {
     checkTimeoutCapMs = readCheckTimeoutCap();
+    lockWaitMs = readWaitLimit();
   } catch (err) {
     console.error(err.message);
     return 2;
@@ -441,6 +465,7 @@ async function main() {
     console.error(`\n${signal}: stopping every command and server verify started...`);
     killAll();
     sweepPorts([...startedPorts]); // only servers this run started; a foreign listener is never touched
+    releaseHeldLock();
     process.exit(130);
   };
   process.on('SIGINT', () => stop('SIGINT'));
@@ -453,7 +478,26 @@ async function main() {
     ).unref();
   }
   process.on('SIGTERM', () => stop('SIGTERM'));
-  process.on('exit', killAll);
+  process.on('exit', () => {
+    killAll();
+    releaseHeldLock(); // the backstop for every other way out (an error, a plain exit)
+  });
+
+  // After the signal handlers, so a Ctrl-C while waiting stops cleanly; before anything else that touches the
+  // database or the ports. CI has a fresh runner and one job: no lock there.
+  if (process.env.CI !== 'true') {
+    const got = await acquireLock({
+      file: lockFilePath(),
+      root: ROOT,
+      waitMs: lockWaitMs,
+      reportMs: readReportInterval(),
+    });
+    if (got.timedOut) {
+      console.error(got.message);
+      return 2; // not a verify run: nothing is recorded
+    }
+    heldLock = got.handle;
+  }
 
   const started = Date.now();
   const printAtStart = fingerprint();

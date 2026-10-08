@@ -59,6 +59,7 @@ If something was not run, say so. If a step was skipped, say so. A partial resul
 | Hook | Runs | Blocks |
 |---|---|---|
 | `.githooks/pre-commit` | every commit | a staged `.env` (except `.example`); a duplicate changelog entry; a failing linter for the changed files. Raises the patch version of each surface the commit touches (L129; minor and major by hand) and stamps the top changelog entry's version and date. |
+| `npm run verify` (`tools/lib/verify-lock.js`) | every run, a partial one too (not `--list`, not CI) | a second run at the same time on this machine: it waits for the first (a lock file in the system temp folder; it names the holder, gives up with exit 2 after `GABAY_VERIFY_LOCK_WAIT_MS`, default 15 minutes), because all runs share `gabay_dev` and the emulator ports. Name your run with `GABAY_VERIFY_OWNER` |
 | `.githooks/pre-push` | every push | the push, when `npm run verify` fails; when code files have uncommitted or untracked changes (verify checks the working tree, so it must equal what is pushed); when a pushed ref, peeled to its commit, is not the checked-out commit (deletions pass; S5 review) |
 | GitHub Actions | every push and PR; the e2e suite on a schedule | the merge, when the lint fails; uploads the server log on failure |
 | `.claude/settings.json` Stop hook | when the main session finishes (L129; coders hand back to it) | finishing until `npm run verify` has run on the current code; a failed run lets the session stop with a "verify FAILED" notice to the product owner, so an agent can still stop to ask a question |

@@ -11,6 +11,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { REAL, FIXTURES, scratchRepo, git, write, read, headFile, remove } = require('./scratch');
 const stamp = require('../hooks/stamp');
 const { checkChangelogDart } = require('../hooks/changelog-guard');
+const { VERIFY_FILES, childEnv } = require('./verify-scratch');
 
 const VERSION = 'app/lib/core/config/app_version.dart';
 const CHANGELOG = 'app/lib/core/config/changelog.dart';
@@ -252,7 +253,7 @@ const listenOn = (port) =>
 
 test('verify (I4): an interrupt never kills a foreign process listening on an emulator port', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gabay-verify-'));
-  for (const rel of ['tools/verify.js', 'tools/fingerprint.js', 'tools/lib/proc.js']) {
+  for (const rel of VERIFY_FILES.filter((f) => f !== 'tools/health-probe.js')) {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     fs.copyFileSync(path.join(REAL, rel), path.join(dir, rel));
   }
@@ -290,7 +291,10 @@ test('verify (I4): an interrupt never kills a foreign process listening on an em
       {
         cwd: dir,
         encoding: 'utf8',
-        env: { ...process.env, GABAY_VERIFY_TEST_INTERRUPT_MS: '1500' },
+        env: childEnv({
+          GABAY_VERIFY_TEST_INTERRUPT_MS: '1500',
+          GABAY_VERIFY_LOCK_FILE: path.join(dir, 'test-verify.lock'),
+        }),
       },
     );
     assert.equal(r.status, 130, r.stdout + r.stderr);
