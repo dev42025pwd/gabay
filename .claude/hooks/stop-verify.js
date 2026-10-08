@@ -2,6 +2,7 @@
 // the CURRENT code. Registered under `Stop`, never `SubagentStop`: coders hand back to the main session,
 // which runs verify.
 //
+//   the record is there but corrupt -> block, saying so (not "has not been run")
 //   no verify result, a partial run, or a fingerprint that differs from the code now -> block
 //   the fingerprint cannot be computed (git failed)  -> block, naming the error (fail closed)
 //   a result for exactly this code, and it FAILED  -> allow, with a "verify FAILED" notice that says how
@@ -15,11 +16,17 @@
 'use strict';
 
 const { ROOT, readEvent, block, notice } = require('./lib');
-const { fingerprint, readState } = require(`${ROOT}/tools/fingerprint.js`);
+const { fingerprint, readStateDetailed } = require(`${ROOT}/tools/fingerprint.js`);
 
 async function main() {
   await readEvent(); // the event is not needed, but stdin must be drained
-  const state = readState(ROOT);
+  const { state, corrupt, error } = readStateDetailed(ROOT);
+  if (corrupt) {
+    block(
+      `The verify record .verify/last-run.json is corrupt (${String(error).split('\n')[0]}). Run npm run verify again and paste its output.`,
+    );
+    return;
+  }
   let now;
   try {
     now = fingerprint(ROOT);

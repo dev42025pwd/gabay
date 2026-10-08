@@ -73,18 +73,64 @@ function fingerprint(root = ROOT) {
 /** Where `npm run verify` records its last run (gitignored). */
 const stateFile = (root = ROOT) => path.join(root, '.verify', 'last-run.json');
 
-/** The last verify run, or null when there is none or it is unreadable. */
-function readState(root = ROOT) {
+/**
+ * The last verify run and how it was read: { state, corrupt, error }. A missing record is { state: null,
+ * corrupt: false }; one that does not parse (an interrupted or interleaved write, an edit) is { state: null,
+ * corrupt: true, error } so a caller can say "corrupt" instead of "not run".
+ */
+function readStateDetailed(root = ROOT) {
+  let text;
   try {
-    return JSON.parse(fs.readFileSync(stateFile(root), 'utf8'));
+    text = fs.readFileSync(stateFile(root), 'utf8');
   } catch {
-    return null;
+    return { state: null, corrupt: false, error: null };
+  }
+  try {
+    return { state: JSON.parse(text), corrupt: false, error: null };
+  } catch (err) {
+    return { state: null, corrupt: true, error: err.message };
   }
 }
 
-function writeState(state, root = ROOT) {
-  fs.mkdirSync(path.dirname(stateFile(root)), { recursive: true });
-  fs.writeFileSync(stateFile(root), `${JSON.stringify(state, null, 2)}\n`);
+/** The last verify run, or null when there is none or it is unreadable. */
+function readState(root = ROOT) {
+  return readStateDetailed(root).state;
 }
 
-module.exports = { ROOT, isCode, codeFiles, fingerprint, stateFile, readState, writeState };
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * Records a verify run. Written to a temp file in the same folder, then renamed over the record: the rename
+ * is atomic, so a reader (the Stop hook) or a second verify finishing at the same moment never sees half a
+ * file (two runs once interleaved their in-place writes and left a corrupt record). On Windows a rename can
+ * fail for a moment while another process is replacing the file, so it is retried briefly.
+ */
+function writeState(state, root = ROOT) {
+  const file = stateFile(root);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  fs.writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`);
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      fs.renameSync(temp, file);
+      return;
+    } catch (err) {
+      if (attempt >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) {
+        fs.rmSync(temp, { force: true });
+        throw err;
+      }
+      sleep(25 * attempt);
+    }
+  }
+}
+
+module.exports = {
+  ROOT,
+  isCode,
+  codeFiles,
+  fingerprint,
+  stateFile,
+  readState,
+  readStateDetailed,
+  writeState,
+};

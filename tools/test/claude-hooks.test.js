@@ -335,3 +335,14 @@ test('settings.json: valid JSON, the three hooks wired as ruled, Stop for the ma
     assert.ok(fs.existsSync(path.join(REAL, c.split('/.claude/')[1].replace(/^/, '.claude/'))), c);
   }
 });
+
+test('stop-verify: a corrupt verify record blocks and says it is corrupt, not that verify has not been run (S7 round 2)', () => {
+  withRepo((dir) => {
+    write(dir, '.verify/last-run.json', '{"fingerprint": "x"}\n.3"\n}');
+    const r = hook(dir, 'stop-verify', { hook_event_name: 'Stop' });
+    assert.equal(r.json.decision, 'block');
+    assert.match(r.json.reason, /\.verify\/last-run\.json is corrupt/);
+    assert.match(r.json.reason, /Run npm run verify/);
+    assert.doesNotMatch(r.json.reason, /has not been run/);
+  });
+});

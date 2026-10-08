@@ -7,7 +7,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { fingerprint, isCode, codeFiles, readState, writeState } = require('../fingerprint');
+const {
+  fingerprint,
+  isCode,
+  codeFiles,
+  readState,
+  readStateDetailed,
+  writeState,
+} = require('../fingerprint');
 
 /** A git repository with one commit of the given files. */
 function repo(files) {
@@ -155,4 +162,85 @@ test('speed: the fingerprint of the real repository takes well under a second (t
   fingerprint();
   const ms = Number(process.hrtime.bigint() - start) / 1e6;
   assert.ok(ms < 1000, `${ms.toFixed(0)} ms`);
+});
+
+// ---- S7 round 2: two verify runs finishing together corrupted .verify/last-run.json (in-place write) ----------
+
+test('writeState never writes the record in place: a temp file in .verify, then a rename over it (atomic)', () => {
+  const dir = repo(BASE);
+  const file = path.join(dir, '.verify', 'last-run.json');
+  const realWrite = fs.writeFileSync;
+  const realRename = fs.renameSync;
+  const writes = [];
+  const renames = [];
+  fs.writeFileSync = (target, ...rest) => (writes.push(String(target)), realWrite(target, ...rest));
+  fs.renameSync = (from, to) => (renames.push([String(from), String(to)]), realRename(from, to));
+  try {
+    writeState({ fingerprint: 'abc', result: 'green', failed: [] }, dir);
+  } finally {
+    fs.writeFileSync = realWrite;
+    fs.renameSync = realRename;
+  }
+  try {
+    assert.ok(!writes.includes(file), 'the final path is never opened for writing');
+    assert.equal(renames.length, 1);
+    assert.equal(renames[0][1], file);
+    assert.equal(
+      path.dirname(renames[0][0]),
+      path.dirname(file),
+      'same folder, so the rename is atomic',
+    );
+    assert.deepEqual(
+      fs.readdirSync(path.join(dir, '.verify')),
+      ['last-run.json'],
+      'no temp file left',
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('two writers finishing together leave one whole record and no temp files', () => {
+  const dir = repo(BASE);
+  try {
+    const script = `
+      const { writeState } = require(${JSON.stringify(path.join(__dirname, '..', 'fingerprint.js'))});
+      const pad = 'x'.repeat(400000);
+      for (let i = 0; i < 25; i += 1) writeState({ fingerprint: process.argv[1], result: 'green', failed: [], pad }, ${JSON.stringify(dir)});
+    `;
+    const { spawn } = require('node:child_process');
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const run = (tag) =>
+      new Promise((resolve) => {
+        const child = spawn(process.execPath, ['-e', script, tag], { env, stdio: 'ignore' });
+        child.on('exit', resolve);
+      });
+    return Promise.all([run('A'), run('B')]).then((codes) => {
+      assert.deepEqual(codes, [0, 0], 'neither writer failed');
+      const state = readState(dir);
+      assert.ok(state && ['A', 'B'].includes(state.fingerprint), 'one writer won, whole');
+      assert.deepEqual(fs.readdirSync(path.join(dir, '.verify')), ['last-run.json']);
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+  } catch (err) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw err;
+  }
+});
+
+test('readStateDetailed tells a missing record from a corrupt one, and names the corruption', () => {
+  const dir = repo(BASE);
+  try {
+    assert.deepEqual(readStateDetailed(dir), { state: null, corrupt: false, error: null });
+    fs.mkdirSync(path.join(dir, '.verify'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.verify', 'last-run.json'), '{"a": 1}\n.3"\n}');
+    const d = readStateDetailed(dir);
+    assert.equal(d.state, null);
+    assert.equal(d.corrupt, true);
+    assert.match(d.error, /JSON|Unexpected/i);
+    assert.equal(readState(dir), null, 'readState keeps its meaning: no usable state');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
