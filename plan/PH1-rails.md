@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.6 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.7 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -117,6 +117,7 @@ Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error tex
 - Check: each hook shown blocking a bad sample and passing a good one.
 
 ### S6 — CLAUDE.md under a page, the sync table and REVIEW.md
+- L131: the product owner's Evidence Standard stays in CLAUDE.md verbatim (about 95 lines, over one page); every product agent preloads the rulings skill (`skills:`).
 - CLAUDE.md rewritten to under a page (§8.4): commands, the verification block, absolute rules with their enforcers, the companion-file sync table (§8.5), the traps agents have actually hit here, and the "Rules every product agent carries" section, kept.
 - The settled product rulings now in CLAUDE.md move to a project skill, `.claude/skills/gabay-product-rulings/`, which loads when work touches the shopper app (§8.4: "CLAUDE.md points; skills carry"). *Alternative:* a document CLAUDE.md links to; passed over because agents do not load it unless told.
 - REVIEW.md: drop the passes CI now enforces.

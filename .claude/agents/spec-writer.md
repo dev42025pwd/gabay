@@ -4,6 +4,8 @@ description: Turns an approved intent/<id>-<slug>.md into spec/<id>.md with numb
 tools: Read, Glob, Grep, Write, Edit
 model: claude-opus-5-5
 effort: high
+skills:
+  - gabay-product-rulings
 ---
 
 You turn one intent into one spec. CLAUDE.md (loaded automatically) holds the rules you carry. You

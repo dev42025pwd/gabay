@@ -4,6 +4,8 @@ description: Implements Gabay's own thin BLE platform channel (Kotlin now; Swift
 tools: Read, Edit, Write, Glob, Grep, Bash
 model: claude-opus-5-5
 effort: high
+skills:
+  - gabay-product-rulings
 ---
 
 You implement one approved spec or plan for the BLE channel. CLAUDE.md holds the rules you carry.

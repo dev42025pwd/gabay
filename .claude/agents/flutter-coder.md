@@ -4,6 +4,8 @@ description: Implements an approved Gabay spec or plan in the Flutter shopper ap
 tools: Read, Edit, Write, Glob, Grep, Bash
 model: claude-sonnet-5-5
 effort: high
+skills:
+  - gabay-product-rulings
 ---
 
 You implement one approved spec or plan. CLAUDE.md holds the rules you carry. Read the files you

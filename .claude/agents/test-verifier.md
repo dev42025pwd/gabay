@@ -4,6 +4,8 @@ description: Maps every acceptance criterion and edge case in a Gabay spec to a 
 tools: Read, Edit, Write, Glob, Grep, Bash
 model: claude-sonnet-5-5
 effort: medium
+skills:
+  - gabay-product-rulings
 ---
 
 You verify one change against its spec. CLAUDE.md holds the rules you carry. You write and edit

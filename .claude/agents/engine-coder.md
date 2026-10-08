@@ -4,6 +4,8 @@ description: Implements an approved Gabay spec or plan for the venue package (SQ
 tools: Read, Edit, Write, Glob, Grep, Bash
 model: claude-sonnet-5-5
 effort: xhigh
+skills:
+  - gabay-product-rulings
 ---
 
 You implement one approved spec or plan for the engine. CLAUDE.md holds the rules you carry.

@@ -1,25 +1,24 @@
 # Gabay — REVIEW.md
 
-> **Version**: 1.0 | **Date**: 2026-10-07 | **Status**: in force (standard §8.6; plan.html L121) | **Audience**: dod-reviewer and any reviewer of a Gabay change | **Scope**: the passes a change goes through before the product owner signs its PR
+> **Version**: 1.1 | **Date**: 2026-10-08 | **Status**: in force (standard §8.6; plan.html L121; trimmed in Phase 1 S6, L131) | **Audience**: dod-reviewer and any reviewer of a Gabay change | **Scope**: the passes a change goes through before the product owner signs its PR
 
-Run the passes in order. Report each finding as `file:line`, the rule it breaks, and what fails because of it. A pass with nothing found says "none found" and what was checked. Never fix code here: report.
+Run the passes in order. Skip what the hooks and `npm run verify` already enforce (standard §8.6): rules 2, 3, 4, 6 and 7 (the structural linters, `tools/lint/README.md`), staged `.env` files (the pre-commit secret guard), the changelog stamp and duplicates (pre-commit), and the schema-to-form drift. Review only what those cannot judge. Report each finding as `file:line`, the rule it breaks, and what fails because of it. A pass with nothing found says "none found" and what was checked. Never fix code here: report.
 
 ## 0. Verification (always first)
 - Run `npm run verify` in a fresh context and paste its full output with the exit code. Anything other than `ALL GREEN` stops the review: report the failure.
 
 ## 1. Security pass
 - Routes guarded in order: role → permission → tenant scope → validation (§9 item 3).
-- Every tenant-scoped query carries its tenant predicate from the request context, never from the token's user object (rule 2).
-- No value from a request is interpolated into SQL; sort keys, filters and lookup names go through an allow-list (rule 3).
+- Rules 2 and 3 are linted; review only what the linters cannot see: where a bound tenant parameter's value comes from (the request context, never the token's user object), and that sort keys, filters and lookup names pass through an allow-list map.
 - Read every new `// sql-identifiers:` and `// tenant-scope:` annotation in the diff: the linters accept any stated reason, so the reviewer judges it (L128). The linters' documented limits are read by hand: see "Accepted limits" in `tools/lint/README.md`.
 - Firebase ID token verified before anything else; permissions read from the database (E-08).
-- No secret, key or real password in the diff; `.env` never staged.
+- No secret, key or real password anywhere in the diff (the pre-commit guard refuses only `.env*` files).
 - Positions: nothing leaves the phone outside opted-in analytics (invariant 4); no background location or BLE (invariant 5). Follow any position value a ViewModel hands to a service: the linter checks only who imports positioning and same-file network use (L128).
 
 ## 2. Compliance pass (the standard and Gabay's rules)
-- Rules 1–7 of `CLAUDE.md`: money as `decimal.js` and `DECIMAL(18,4)`; tenant predicate; no interpolation; migrations never edited and `schema.sql` updated with drops; no hardcoded option list; colours only in the theme tokens; forms as `FieldSpec`s.
+- Rules 1 and 5 of `CLAUDE.md`, which no linter enforces: money as `decimal.js` and `DECIMAL(18,4)`, never a float; no hardcoded option list a client could extend. For rule 4, that the migration and `schema.sql` say the same thing (the linters check only that committed migrations are untouched and every table has its drop).
 - Every `docs/product/FEATURE_PIPELINE.md` §5 item met or waived in one line: the standard's 15 and G1–G4.
-- Seeds, permission and menu rows, manuals, smoke guide, changelog and the companion-file sync table updated (§9 items 2, 4, 10, 11, 12).
+- Every row of the companion-file sync table in `CLAUDE.md` evaluated: seeds, permission and menu rows, manuals, smoke guide and the changelog's wording updated, or one line why not (§9 items 2, 4, 10, 11, 12).
 - New enumerable sets as tables or commented constants (§9 item 14).
 - Decisions: behaviour that differs from the PRD or Blueprint has its `plan.html` row (G4).
 

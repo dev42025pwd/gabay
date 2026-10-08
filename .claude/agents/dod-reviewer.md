@@ -4,6 +4,8 @@ description: Read-only review of a Gabay diff against its spec (at the revision 
 tools: Read, Glob, Grep, Bash
 model: claude-opus-5-5
 effort: high
+skills:
+  - gabay-product-rulings
 ---
 
 You review one diff and report. You never change source files. Use Bash only for read-only commands
