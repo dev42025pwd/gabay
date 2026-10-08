@@ -2,7 +2,11 @@
 
 > **Version**: 1.1 | **Date**: 2026-10-08 | **Status**: in force (standard §8.6; plan.html L121; trimmed in Phase 1 S6, L131) | **Audience**: dod-reviewer and any reviewer of a Gabay change | **Scope**: the passes a change goes through before the product owner signs its PR
 
-Run the passes in order. Skip what the hooks and `npm run verify` already enforce (standard §8.6): rules 2, 3, 4, 6 and 7 (the structural linters, `tools/lint/README.md`), staged `.env` files (the pre-commit secret guard), the changelog stamp and duplicates (pre-commit), and the schema-to-form drift. Review only what those cannot judge. Report each finding as `file:line`, the rule it breaks, and what fails because of it. A pass with nothing found says "none found" and what was checked. Never fix code here: report.
+Run the passes in order. Skip what `npm run verify` already enforces (standard §8.6; step 0 runs it): rules 2, 3, 4, 6 and 7 as far as the structural linters reach (`tools/lint/README.md`; their "Accepted limits" are reviewed by hand), and the schema-to-form drift. Until CI exists (S7), the secret guard and the changelog duplicate guard run only in the local pre-commit hook, which `--no-verify` skips: check both by hand (no staged `.env*`; no repeated changelog entry).
+
+**Skip entirely:** generated files (`app/lib/l10n/app_localizations*.dart`, `build/`, `.dart_tool/`, `node_modules/`, lockfiles unless a pin moved).
+
+**Severity.** *Critical*: a rule 1–7 breach, a security or privacy hole, data loss, or a check that cannot fail. *Important*: wrong behaviour, a missed spec criterion or edge case, an unenforced requirement, or a gap a later change will hit. *Nit*: wording, naming, style, a missing comment. **Nit cap: at most 10 nits per review, the most useful first; the rest are dropped, not listed.** Report each finding as `file:line`, the rule it breaks, and what fails because of it. A pass with nothing found says "none found" and what was checked. Never fix code here: report.
 
 ## 0. Verification (always first)
 - Run `npm run verify` in a fresh context and paste its full output with the exit code. Anything other than `ALL GREEN` stops the review: report the failure.
@@ -16,6 +20,7 @@ Run the passes in order. Skip what the hooks and `npm run verify` already enforc
 - Positions: nothing leaves the phone outside opted-in analytics (invariant 4); no background location or BLE (invariant 5). Follow any position value a ViewModel hands to a service: the linter checks only who imports positioning and same-file network use (L128).
 
 ## 2. Compliance pass (the standard and Gabay's rules)
+- The linters' accepted limits (`tools/lint/README.md`): colours built from an integer or `HSLColor`, a class extending `TextFormField`, SQL assembled by `join`/`concat`/helpers, a tenant bound only in a subquery.
 - Rules 1 and 5 of `CLAUDE.md`, which no linter enforces: money as `decimal.js` and `DECIMAL(18,4)`, never a float; no hardcoded option list a client could extend. For rule 4, that the migration and `schema.sql` say the same thing (the linters check only that committed migrations are untouched and every table has its drop).
 - Every `docs/product/FEATURE_PIPELINE.md` §5 item met or waived in one line: the standard's 15 and G1–G4.
 - Every row of the companion-file sync table in `CLAUDE.md` evaluated: seeds, permission and menu rows, manuals, smoke guide and the changelog's wording updated, or one line why not (§9 items 2, 4, 10, 11, 12).

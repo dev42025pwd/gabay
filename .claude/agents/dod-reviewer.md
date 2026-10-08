@@ -1,6 +1,6 @@
 ---
 name: dod-reviewer
-description: Read-only review of a Gabay diff against its spec (at the revision the plan cites): the FEATURE_PIPELINE §5 definition of done (§9 and G1–G4), REVIEW.md, rules 1–7, stated scale targets and overengineering. An AI self-check, never a human sign-off. Makes no changes.
+description: "Read-only review of a Gabay diff against its spec (at the revision the plan cites): the FEATURE_PIPELINE §5 definition of done (§9 and G1–G4), REVIEW.md, rules 1–7, stated scale targets and overengineering. An AI self-check, never a human sign-off. Makes no changes."
 tools: Read, Glob, Grep, Bash
 model: claude-opus-5-5
 effort: high

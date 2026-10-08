@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.7 | **Date**: 2026-10-07 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.7 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -124,7 +124,7 @@ Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error tex
 
 ### S7 — GitHub repository and CI
 - **Stops for you:** you sign the GitHub CLI in as `dev42025pwd`. I then create `dev42025pwd/gabay` (private) and push `main`.
-- `.github/workflows/lint.yml` (every push and PR): verify's fast part (linters, ESLint, `flutter analyze`, tests that need no database).
+- `.github/workflows/lint.yml` (every push and PR): verify's fast part (linters, ESLint, `flutter analyze`, tests that need no database), plus the secret guard and the changelog duplicate guard, which until then run only in the local pre-commit hook (S6 review; REVIEW.md checks them by hand meanwhile).
 - `e2e.yml` (nightly and on demand): a PostgreSQL service from `schema.sql`, the seed with the Auth emulator, the API tests, the server log uploaded on failure; its cost stated in a header comment.
 - `build.yml` (after lint passes): builds the admin web and a debug APK, stamping `APP_VERSION`, `BUILD_NUMBER`, `GIT_COMMIT` and `BUILD_TIME`. Artifacts only: no store upload, no Firebase deploy.
 - Branch protection on `main`: lint must pass before merge.

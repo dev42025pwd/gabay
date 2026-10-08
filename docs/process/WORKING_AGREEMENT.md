@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.6 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.7 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -10,7 +10,7 @@ The product owner set these rules so they never have to be repeated. When the pr
 - **Purely internal choices** (names, a helper's shape) inside an approved spec and plan are listed as **DESIGN CHOICES** in the plan or PR, each with an alternative, for the product owner to approve or overrule.
 - **How to ask:** with AskUserQuestion, the recommended option first and marked, each option with its evidence and tradeoff. Research first and show what was found; tag anything unchecked **RECALLED**, and check it before it carries weight (CLAUDE.md evidence standard).
 - **Where documents, references or rulings disagree,** stop and ask, quoting both.
-- **Record every ruling** as a `plan.html` decision-log row (append-only, with a version bump and a changelog row), and update the PRD, Blueprint, pipeline, schema, CLAUDE.md and this file as the ruling touches them, in the same turn. No document is edited before the product owner's go-ahead.
+- **Record every ruling** as a `plan.html` decision-log row (append-only, with a version bump and a changelog row), and update the PRD, Blueprint, pipeline, schema, CLAUDE.md, this file and, for a product ruling, the `gabay-product-rulings` skill (`.claude/skills/`; every product agent preloads it, L131) as the ruling touches them, in the same turn. No document is edited before the product owner's go-ahead.
 - **Deploys and outward actions** (creating a repository, pushing, publishing a store build, deploying to Firebase) happen only on the product owner's call (L109).
 
 ## 2. Approvals (L121)

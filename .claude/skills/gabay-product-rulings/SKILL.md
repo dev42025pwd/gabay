@@ -1,6 +1,6 @@
 ---
 name: gabay-product-rulings
-description: Gabay's settled product rulings (plan.html L83–L123), moved from CLAUDE.md in Phase 1 S6. The Gabay Demo app as the main reference for the user-facing app, and what the product does differently: routing, step-free and store shortcuts, the live dot, voice and wording, checks and arrival, QR removal, plan import, devices, sign-in, analytics and forecasts, guided walk, test venues, app ID and theme. Use before specifying, planning, building, testing or reviewing anything in the shopper app or the admin page, any map, routing, positioning, voice, wording, analytics or seed behaviour, or whenever a gap or conflict with the demo app appears.
+description: "Use before specifying, planning, building, testing or reviewing anything in the shopper app or the admin page, any map, routing, positioning, voice, wording, analytics or seed behaviour, or whenever a gap or conflict with the Gabay Demo app appears. Holds Gabay's settled product rulings (plan.html L83-L124): the Gabay Demo app as the main reference for the user-facing app and what the product does differently (routing, step-free and store shortcuts, the live dot, voice and wording, checks and arrival, QR removal, plan import, devices, sign-in, analytics and forecasts, guided walk, test venues, app ID, theme, Node 22)."
 ---
 
 # Gabay product rulings

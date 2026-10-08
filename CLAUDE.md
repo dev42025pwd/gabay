@@ -1,17 +1,17 @@
 # CLAUDE.md
 
-Gabay: indoor wayfinding for Philippine malls (a Flutter shopper app, a Flutter Web admin page, one Express API as a Cloud Function, PostgreSQL). Phase 1 (rails) is under way on `plan/PH1-rails.md`; no product feature exists yet. Local first (L109): everything runs on this machine until the product owner calls a deploy.
+Gabay: indoor wayfinding for Philippine malls (a Flutter shopper app, a Flutter Web admin page, one Express API as a Cloud Function, PostgreSQL). Phase 1 (rails) is under way on `plan/PH1-rails.md`; no product feature exists yet. Local first (L109): everything runs on this machine until the product owner calls a deploy. Replies to the product owner: plain language, recommendation first, evidence pasted (WORKING_AGREEMENT §1, §4).
 
-## Commands (Node 22 via fnm; in Git Bash: `fnm exec --using=22 -- npm.cmd run <script>`)
+## Commands (Node 22: in Git Bash `"$LOCALAPPDATA/Microsoft/WinGet/Links/fnm.exe" exec --using=22 -- npm.cmd run <script>`)
 - `npm run verify`: every check (linters and their tests, ESLint, Prettier, API and tool tests, `db/schema.sql` twice, the seed, the Functions emulator health, `flutter analyze`, `flutter test`). Healthy output ends `ALL GREEN`; the exit code is the number of failures. Run it before reporting any task complete and paste the output. If a test fails, fix the code, not the test.
-- Parts: `npm run lint:structural`, `lint:test`, `tools:test`, `api:test`, `api:lint`, `test:schema-forms`, `setup-db`, `migrate`, `seed`. In `app/`: `flutter analyze`, `flutter test`; screenshots with `flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<dir>`.
+- Parts: `npm run lint:structural`, `lint:test`, `tools:test`, `api:test`, `api:lint`, `test:schema-forms`, `setup-db`, `migrate`, `seed`. In `app/`: `flutter analyze`, `flutter test`; screenshots with `flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<dir>`. Do not invent commands; add new ones here.
 - Local database: PostgreSQL 18.6, `localhost:5432`, database `gabay_dev`; the password is in the local `.env` (never committed). The Auth emulator project is `demo-gabay`.
-- Once per clone: `git config core.hooksPath .githooks`. Hooks: pre-commit (secret guard, changelog duplicate guard, linters on the staged content, version stamp), pre-push (`npm run verify`, checked-out commit, clean tree), Claude Stop hooks (no finishing until verify has run on the current code; no finishing when screens changed without a changelog entry unless the final message has a line `Changelog waived: <reason>`). README has the details.
+- Once per clone: `git config core.hooksPath .githooks`. The hooks (pre-commit, post-commit, pre-push, and the Claude Code Stop, SessionStart and after-Dart-edit hooks) are listed in README and `WORKING_AGREEMENT.md` §6.
 
 ## Stack and the seven rules
-Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through one `ApiClient`, go_router with `usePathUrlStrategy()`; Node 22 + Express in one Cloud Function (`maxInstances = 1`, Singapore); PostgreSQL via `pg` with raw parameterized SQL, no ORM; Firebase Auth with roles in the database. Gabay's deviations from the standard's §1 stack are EXCEPTIONS E-02 to E-17 (L98, L115). Never Firestore or the Realtime Database; never React, Vue, Angular, Python, PHP, MySQL, MongoDB, an ORM, float money or `moment`. Pins: Blueprint Part 1 only.
+Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through one `ApiClient`, go_router with `usePathUrlStrategy()`; Node 22 + Express in one Cloud Function (`maxInstances = 1`, Singapore); PostgreSQL via `pg` with raw parameterized SQL, no ORM; Firebase Auth with roles in the database. Never Firestore or the Realtime Database; never React, Vue, Angular, Python or PHP backends, MySQL, MongoDB, an ORM, float money or `moment`. Pins: Blueprint Part 1 only. Any deviation from the standard's §1 needs written lead sign-off (the product owner, under Raphael Mendoza's delegation, L115) and an `EXCEPTIONS.md` entry with an expiry date; Gabay's are E-02 to E-17 (E-11 withdrawn).
 1. Money is `decimal.js` and `DECIMAL(18,4)`; never a float. *(review)*
-2. Every tenant-scoped query binds its tenant from the request context. *(`tenant-predicate`)*
+2. Every tenant-scoped query binds its tenant from the request context (`req.tenantCompanyID`), never from the token's user object. *(`tenant-predicate` checks the binding; review checks the source)*
 3. Never interpolate a request value into SQL; allow-list maps for sort keys, filters and lookups. *(`sql-interpolation`)*
 4. A committed migration is never edited: new zero-padded migration plus `schema.sql`, every `CREATE TABLE` with its `DROP TABLE`. *(`migrations-immutable`, `schema-drops`)*
 5. No hardcoded option list a client could extend: a table, a maintenance screen, `/api/lookups/:name`. *(review)*
@@ -19,32 +19,32 @@ Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through
 7. Forms are schema projections: one `FieldSpec` per field, never a bare `TextField`. *(`no-bare-textfield`, `schema-forms`)*
 
 ## Where things are
-- How we work: `docs/process/WORKING_AGREEMENT.md` (ask, never assume; approvals; evidence; tests; hooks; models). Read it before any work. Process rulings are recorded there in the same turn.
-- Definition of done: `docs/product/FEATURE_PIPELINE.md` §5. Review passes: `REVIEW.md`. Decisions: `plan.html` (append-only log). Product: `docs/product/GABAY_PRD.md`, `GABAY_MASTER_BLUEPRINT.md`, `db/schema.sql`. Exceptions: `docs/process/EXCEPTIONS.md`.
-- **Product rulings** (the Gabay Demo app as the main reference, L83–L123): the project skill `gabay-product-rulings`. Load it before any spec, plan, build, test or review touching the shopper app, the admin page, maps, routing, positioning, voice, wording, analytics or seeds. A gap it does not settle: stop and ask.
-- The standard: `Engineering Standards.html`, a single-page viewer; read the raw file (Markdown inside `<script type="text/plain" id="src-...">`; grep `^#{1,3} `). Its `prd`, `blueprint` and `pipeline` blocks are RetailPOS examples, not Gabay requirements.
+- Required reading before any work: `docs/process/WORKING_AGREEMENT.md` (how we work; process rulings are recorded there in the same turn) and, for the area you touch, `docs/product/GABAY_MASTER_BLUEPRINT.md` (Part 1 constraints and known traps, Part 3 schema, Part 4 modules).
+- Definition of done: `docs/product/FEATURE_PIPELINE.md` §5. Review passes: `REVIEW.md`. Decisions: `plan.html` (append-only log). Product: `docs/product/GABAY_PRD.md`, `db/schema.sql`. Exceptions: `docs/process/EXCEPTIONS.md`.
+- **Product rulings** (the Gabay Demo app as the main reference, L83–L124): the project skill `gabay-product-rulings`. Load it before any spec, plan, build, test or review touching the shopper app, the admin page, maps, routing, positioning, voice, wording, analytics or seeds. A gap it does not settle: stop and ask.
+- The standard: `Engineering Standards.html`, a single-page viewer; read the raw file (Markdown inside `<script type="text/plain" id="src-...">`; grep `^#{1,3} ` or `id="src-`). Its `prd`, `blueprint` and `pipeline` blocks are RetailPOS examples, not Gabay requirements.
 
 ## Companion-file sync table (§8.5): evaluate every row before marking work done; update in the same turn, or say in one line why not
 | When this changes | Also update |
 |---|---|
-| `db/schema.sql` | a new migration in `db/migrations/`; the seeds; Blueprint Part 3; the affected `FieldSpec`s |
-| An API route | its tests; permission and menu rows in the seed; Blueprint §3; the E2E manual in `docs/testing/` |
-| A screen or its wording | `app_en.arb` (Tagalog with P0-14); a changelog entry (`changelog.dart` + ARB bullet); screenshots; the E2E manual and `Smoke_Test_Guide.md` |
+| `db/schema.sql` | a new migration in `db/migrations/`; the seeds; Blueprint Part 3; `db/SCHEMA_READING_GUIDE.md`; the affected `FieldSpec`s |
+| An API route | its tests; the e2e suite (from P0); permission and menu rows in the seed; Blueprint Part 4 (and Part 1's API conventions if they move); `docs/testing/E2E_Test_Cases_Manual.md` |
+| A screen or its wording | `app/lib/l10n/app_en.arb` (Tagalog with P0-14); a changelog entry (`app/lib/core/config/changelog.dart` + ARB bullet); screenshots; `docs/testing/E2E_Frontend_Test_Cases_Manual.md` and `Smoke_Test_Guide.md` |
 | A dependency | its Blueprint Part 1 pin; an EXCEPTIONS entry if §1 does not name it |
-| A setting, limit or option list | the `GlobalSetting` or lookup seed; the Blueprint |
-| A command or check | this file's Commands; README; `tools/verify.js` if it is a check |
-| An owner ruling | a `plan.html` row (version bump, changelog row); every document it touches; this file or the skill; the modules page |
+| A setting, limit or option list | the `GlobalSetting` or lookup seed; `.env.example` if it is an env value; the Blueprint |
+| A command or check | this file's Commands; README; `INSTALL.md` if setup changes; `tools/verify.js` if it is a check |
+| An owner ruling | a `plan.html` row (version bump, changelog row); every document it touches; this file, or the `gabay-product-rulings` skill for a product ruling; the modules page (https://claude.ai/artifact/QFDHQAvkiDL93hM76Kb9mt) |
 | A pipeline entry's state | `FEATURE_PIPELINE.md` (DONE marker, §6) |
 | A deploy or an incident | `docs/ops/DEPLOYMENT_RUNBOOK.md` / `docs/ops/INCIDENTS.md` |
 
 ## Things agents get wrong here
-- `npm` under fnm in Git Bash: use `npm.cmd`; the default Node is 24, so run through `fnm exec --using=22`.
+- `fnm` is not on an agent's PATH in Git Bash: call `"$LOCALAPPDATA/Microsoft/WinGet/Links/fnm.exe"`; use `npm.cmd`, not `npm`; the default Node is 24.
 - The git index is shared by parallel agents: commit with `git commit -- <paths>` (a new file needs `git add <path>` first), never a bare `git commit -a`.
 - A hook file loses its executable bit on a pathspec commit (`core.fileMode` is false): `git update-index --chmod=+x <file>`.
 - `plan.html` is edited by other sessions too: re-read its version and next L-row before editing; check `<tr>`/`<li>` balance after.
 - `npm run seed:db-only` (in `db/seeds`) deletes the test accounts; restore them with the full `npm run seed`.
 - Never print or commit `.env` values. Never copy code from `demo_app` or `gabay_spike` (L34); the penthouse data stays out of git (L48, L123).
-- Model IDs and library APIs come from a doc check this session, never from memory (L121, L122).
+- The Blueprint's `<known_traps>` (Part 1) list the domain traps (global lookups `TenantId = $t OR TenantId IS NULL`, frozen rows, and more): read them before database or engine work.
 
 ## Evidence Standard (the product owner's text, kept verbatim; L131)
 
@@ -80,14 +80,18 @@ doc, or a flagged assumption, treat it as unsupported and say so rather
 than presenting it as settled.
 
 ## Rules every product agent carries (L61, L64; keep this section)
-- **Phase gate:** agents are dormant until the line below exists. Phase 1 declared 2026-10-07 (L122). The declaration approves no work: each task needs the product owner's approved plan, and every repository, push or deploy waits for their call.
-- **Models (L62, L122):** Sonnet 5.5 for well-defined coding; Opus 5.5 or Fable 5.1, by weight, for analysis and decisions; every important scenario goes to the product owner first.
+- **Phase gate:** agents are dormant until the product owner's declaration is recorded here as a line `Phase 1 declared <date> (L-row)`. If that line is absent, stop and ask.
+
+  Phase 1 declared 2026-10-07 (L122)
+
+  The declaration wakes the agents and approves no work: each Phase 1 task, the rails included, needs the product owner's approved plan, and every repository, push or deploy waits for their call.
+- **Models (L62, L122; WORKING_AGREEMENT §8):** Sonnet 5.5 for well-defined coding; Opus 5.5 or Fable 5.1, by weight, for analysis and decisions. Every important scenario goes to the product owner first, including any move to Opus or Fable. Model IDs and library APIs come from a doc check, never from memory (L121).
 - **Pipeline:** intent → spec (spec-writer) → plan (main session; the product owner approves; it cites the spec revision) → diff (coders) → tests (test-verifier) → review (dod-reviewer) → the product owner's sign-off. Files are named by pipeline ID: `intent/<id>-<slug>.md`, `spec/<id>.md`, `plan/<id>.md`.
 - **Evidence:** paste command output; never write "should work". Tag an unchecked library, framework or API claim RECALLED; verify a load-bearing one (doc fetch or source check) or stop and ask.
 - **Scope:** build only what the spec and plan say; anything else under `## Suggestions`. Spec and plan disagree: stop and ask, quoting both. The spec moved past the revision the plan cites: stop and ask.
 - **Edge cases:** every one in the spec gets a test or a one-line reason why not.
-- **Ambiguity:** never guess. Subagents return `## Questions for the user`, each tagged `[<agent-name>]`, with 2–3 options and the recommended one first; the main session asks the product owner.
-- **Code quality:** clean, readable, one responsibility per file, scalable to the spec's stated targets (cite them); extract on the second use, except what the standard or Blueprint mandates (C2).
-- **Dependencies:** versions from the Blueprint Part 1 pins, never from another repo; a new one needs a pin and, outside §1, an EXCEPTIONS entry (C8). Limits are named constants, env values or settings.
+- **Ambiguity:** never guess. Subagents cannot ask the product owner: they stop and return `## Questions for the user`, each tagged `[<agent-name>]`, with 2–3 options and the recommended one first; the main session asks and resumes them.
+- **Code quality:** clean, readable, maintainable, clear names, one responsibility per file, scalable to the spec's stated targets (cite them); extract on the second use, except what the standard or Blueprint mandates (C2).
+- **Dependencies:** versions from the Blueprint Part 1 pins, never from another repo (gabay_spike included); a new one needs a pin and, outside §1, an EXCEPTIONS entry (C8). Limits are named constants, env values or settings (C8).
 - **Tests:** an existing test changes only when `plan/<id>.md` names it and the spec change behind it (C1); list every changed test with a one-line reason.
 - **Done:** every §9 item met or waived in one line. dod-reviewer's check is an AI self-check; the product owner signs off.
