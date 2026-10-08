@@ -2,7 +2,7 @@
 // `npm run verify` stores it with its result; the Claude Stop hook recomputes it to learn whether
 // the code changed since the last verify (L129). Both use this one module, so they cannot disagree.
 //
-// Code = app/, functions/, db/, tools/, .githooks/, .claude/hooks/, root package.json, firebase.json
+// Code = app/, functions/, db/, tools/, .githooks/, .github/, .claude/hooks/, root package.json, firebase.json
 // and .claude/settings.json; from `git ls-files --cached --others --exclude-standard`, so ignored
 // output (build/, node_modules/, .dart_tool/, .verify/) never counts and an untracked new file does.
 // Documents (*.md, docs/, plan.html, ...) are outside the set: a docs-only edit changes nothing.
@@ -16,7 +16,15 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const CODE_PREFIXES = ['app/', 'functions/', 'db/', 'tools/', '.githooks/', '.claude/hooks/'];
+const CODE_PREFIXES = [
+  'app/',
+  'functions/',
+  'db/',
+  'tools/',
+  '.githooks/',
+  '.claude/hooks/',
+  '.github/',
+];
 const CODE_FILES = new Set([
   'package.json',
   'firebase.json',

@@ -1,0 +1,117 @@
+# e2e: the database half of `npm run verify`, against a real PostgreSQL 18 service, every night and on
+# demand (L133, plan S7): the schema twice (it must be re-runnable), the test seed with the Firebase Auth
+# emulator, the API's tests, the database tools' tests, and the Functions emulator answering /api/health.
+#
+# NO repository secrets. The .env is written during the job from throwaway values: the database password is
+# derived from the run id (the service container is only reachable on the runner), and every SEED_PW_* is
+# random per run and masked in the log. Nothing is echoed.
+#
+# Java: not installed on purpose. firebase-tools 15.32.1 checks for Java 21 or newer only when an emulator
+# that runs on Java is started (controller.js: targets.some(requiresJava); commandUtils.js:
+# MIN_SUPPORTED_JAVA_MAJOR_VERSION = 21), and those are Firestore, Realtime Database and Storage
+# (downloadableEmulators.js: binary "java"). Auth and Functions, the only emulators Gabay starts, run on Node.
+# If Gabay ever starts one of the Java emulators, add actions/setup-java with Temurin 21 before the seed.
+#
+# COST (GitHub Free private repository: 2,000 Actions minutes a month; usage is blocked, not billed,
+# when exhausted; docs.github.com, fetched 2026-10-08): about 6 minutes a run (checkout and npm ci of three
+# packages including firebase-tools about 2, schema and seed about 1, emulator health about 1, tests about
+# 1; an estimate, not measured: this file has not run yet). Nightly: 30 x 6 = about 180 minutes a month,
+# plus manual runs. A scheduled workflow runs only on the default branch.
+#
+# 02:00 in Manila (UTC+8) is 18:00 UTC, so the cron below is 0 18 * * *.
+name: e2e
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DB_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: gabay_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gabay_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js (the version in .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            functions/package-lock.json
+            db/tools/package-lock.json
+            db/seeds/package-lock.json
+
+      - name: Install the API's packages
+        run: npm ci --prefix functions
+
+      - name: Install the database tools' packages
+        run: npm ci --prefix db/tools
+
+      - name: Install the seed's packages (firebase-tools lives here)
+        run: npm ci --prefix db/seeds
+
+      - name: Write .env from throwaway values (no repository secrets, nothing echoed)
+        shell: bash
+        run: |
+          set -eu
+          umask 077
+          {
+            echo "PGHOST=localhost"
+            echo "PGPORT=5432"
+            echo "PGDATABASE=gabay_dev"
+            echo "PGUSER=postgres"
+            echo "PGPASSWORD=$DB_PASSWORD"
+          } > .env
+          for account in SUPERADMIN MALLADMIN EDITOR VIEWER MALLADMIN_DEMO SHOPPER; do
+            value="$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            echo "SEED_PW_$account=$value" >> .env
+          done
+
+      - name: verify, the database half
+        shell: bash
+        run: |
+          node tools/verify.js --only schema-run-1,schema-run-2,seed,functions-health,api-tests,db-tools-tests 2>&1 | tee verify.log
+
+      - name: Collect the PostgreSQL service log (on failure)
+        if: failure()
+        run: docker logs "$(docker ps -aq --filter ancestor=postgres:18 | head -n 1)" > postgres.log 2>&1 || true
+
+      - name: Upload the server and emulator logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-logs-${{ github.run_id }}
+          path: |
+            verify.log
+            postgres.log
+            firebase-debug.log
+            ui-debug.log
+            db/seeds/firebase-debug.log
+          if-no-files-found: ignore
+          retention-days: 7

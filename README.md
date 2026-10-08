@@ -33,6 +33,8 @@ What the hooks do (`WORKING_AGREEMENT.md` §6):
 | `.githooks/pre-push` | verify checks the working tree, so the push is refused unless the refs pushed are the checked-out commit (deleting a remote branch needs no verify) and code has no uncommitted or untracked changes; then it runs `npm run verify` and the push is refused if that fails |
 | `.claude/settings.json` | the main session may not finish until `npm run verify` has run on the current code (a failed run is shown, not a trap); nor when screens changed with no changelog entry, unless the final message has a line `Changelog waived: <reason>` (L130); and the schema-to-form drift linter runs after every Dart edit |
 
+GitHub Actions (`.github/workflows/`, L133) report; they do not gate, because a private repository on GitHub Free has no branch protection. `lint.yml` (every push and pull request) runs `npm run ci:guards` (no tracked `.env`, no repeated changelog entry) and the database-free half of verify; `e2e.yml` (nightly 02:00 Manila, and on demand) runs the database half against PostgreSQL 18; `build.yml` (after lint passes on main) builds the admin web page and a debug APK as artifacts. Each workflow states its cost in minutes in its header.
+
 ## Stack (Blueprint Part 1 holds the pins)
 
 - **Shopper app and admin web page:** Flutter 3.47 (one project, `main_mobile.dart` and `main_admin.dart`), riverpod, go_router, dio. Android 7.0+ and iOS 15+ (L103).
@@ -52,6 +54,7 @@ What the hooks do (`WORKING_AGREEMENT.md` §6):
 | `db/` | `schema.sql` (the target schema), migrations (Phase 1), `SCHEMA_READING_GUIDE.md` |
 | `lib/` | Flutter: `core/` (positioning, routing, package, map3d, voice), `features/` (shopper, editor, admin) |
 | `.githooks/` | pre-commit, post-commit and pre-push hooks |
+| `.github/workflows/` | lint, e2e and build (L133) |
 | `tools/` | `verify.js` (`npm run verify`), `lint/` (the structural linters), `hooks/` (the pre-commit logic) |
 | `.claude/agents/` | the build agents, dormant until Phase 1 (L64) |
 | `docs/` | the project documents, grouped by purpose (L125); README, CLAUDE.md, REVIEW.md and INSTALL.md stay at the root |

@@ -9,6 +9,7 @@
 // Plain CommonJS, no dependencies, any Node >= 22.
 'use strict';
 
+const fs = require('node:fs');
 const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
 
@@ -114,11 +115,60 @@ async function waitPortsFree(ports, ms) {
   return ports.every((p) => listeners(p).length === 0);
 }
 
-/** The pids listening on a TCP port (best effort: netstat on Windows, lsof elsewhere). */
-function listeners(port) {
+/**
+ * The socket inodes listening on `port` in the text of /proc/net/tcp or /proc/net/tcp6 (Linux).
+ * Each line is "sl local_address rem_address st ... inode"; local_address is HEXIP:HEXPORT and state
+ * 0A is LISTEN.
+ */
+function parseProcNetTcp(text, port) {
+  const inodes = [];
+  for (const line of String(text).split('\n').slice(1)) {
+    const cols = line.trim().split(/\s+/);
+    if (cols.length < 10 || cols[3] !== '0A') continue;
+    if (Number.parseInt(cols[1].split(':')[1], 16) === port) inodes.push(cols[9]);
+  }
+  return inodes;
+}
+
+/** Linux, without lsof or ss: the sockets in /proc/net/tcp* mapped to their owners through /proc/<pid>/fd. */
+function listenersLinux(port) {
+  const wanted = new Set();
+  for (const file of ['/proc/net/tcp', '/proc/net/tcp6']) {
+    try {
+      parseProcNetTcp(fs.readFileSync(file, 'utf8'), port).forEach((i) => wanted.add(i));
+    } catch {
+      // no IPv6 table, or unreadable
+    }
+  }
   const pids = new Set();
+  if (wanted.size === 0) return pids;
+  for (const pid of fs.readdirSync('/proc').filter((n) => /^\d+$/.test(n))) {
+    let fds;
+    try {
+      fds = fs.readdirSync(`/proc/${pid}/fd`);
+    } catch {
+      continue; // gone, or not ours to read
+    }
+    for (const fd of fds) {
+      try {
+        const m = /^socket:\[(\d+)\]$/.exec(fs.readlinkSync(`/proc/${pid}/fd/${fd}`));
+        if (m && wanted.has(m[1])) pids.add(Number(pid));
+      } catch {
+        // the fd closed meanwhile
+      }
+    }
+  }
+  return pids;
+}
+
+/**
+ * The pids listening on a TCP port: netstat on Windows (IPv4 and IPv6 are listed separately), the
+ * /proc tables on Linux, lsof elsewhere (macOS). The Linux and macOS branches have not run on this
+ * Windows machine; parseProcNetTcp is unit-tested on real-format text, and CI exercises the rest.
+ */
+function listeners(port) {
+  let pids = new Set();
   if (WINDOWS) {
-    // IPv4 and IPv6 are listed separately; a server bound to ::1 only (localhost on Node 18+) is in tcpv6.
     for (const protocol of ['tcp', 'tcpv6']) {
       const out =
         spawnSync('netstat', ['-ano', '-p', protocol], { encoding: 'utf8', windowsHide: true })
@@ -128,6 +178,8 @@ function listeners(port) {
         if (cols[3] === 'LISTENING' && cols[1]?.endsWith(`:${port}`)) pids.add(Number(cols[4]));
       }
     }
+  } else if (fs.existsSync('/proc/net/tcp')) {
+    pids = listenersLinux(port);
   } else {
     const out =
       spawnSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' }).stdout ?? '';
@@ -154,6 +206,7 @@ function sweepPorts(ports) {
 }
 
 module.exports = {
+  parseProcNetTcp,
   runCommand,
   killTree,
   killAll,

@@ -43,7 +43,7 @@ fi
 
 # The same set of paths the code fingerprint covers (tools/fingerprint.js).
 dirty=$(git -c core.quotePath=false status --porcelain --untracked-files=all -- \
-  app functions db tools .githooks .claude/hooks .claude/settings.json \
+  app functions db tools .githooks .github .claude/hooks .claude/settings.json \
   package.json firebase.json .gitignore ':(exclude)*.md')
 if [ -n "$dirty" ]; then
   echo "pre-push: uncommitted or untracked code, so verify would not describe what you are pushing:" >&2

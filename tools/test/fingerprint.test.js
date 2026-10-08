@@ -53,6 +53,7 @@ test('which paths are code: app, functions, db, tools, hooks and the root config
     'db/seeds/seed.js',
     'tools/verify.js',
     '.githooks/pre-push',
+    '.github/workflows/lint.yml',
     '.claude/hooks/stop-verify.js',
     '.claude/settings.json',
     'package.json',

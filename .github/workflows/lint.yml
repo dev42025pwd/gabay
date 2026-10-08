@@ -1,0 +1,86 @@
+# lint: the fast, database-free half of `npm run verify`, plus the two guards that until now ran only in
+# the local pre-commit hook (L133, plan S7). It REPORTS: on GitHub Free a private repository has no branch
+# protection, so the local pre-push hook (verify) is the gate and this is the independent second look.
+#
+# Runs on every push and pull request. COST (GitHub Free private repository: 2,000 Actions minutes a month,
+# usage is blocked, not billed, when they run out; docs.github.com, fetched 2026-10-08):
+#   about 6 minutes a run with the Flutter and npm caches warm, about 10 on a cold cache (estimate, not
+#   measured: this file has not run yet). The concurrency group below makes a newer push, or the pull-request
+#   run for the same branch, cancel the older run, so a branch costs one run at a time.
+#   Budget: 2,000 minutes / 6 = about 330 runs a month before anything else; e2e.yml (about 200 a month) and
+#   build.yml (a few runs on main) come out of the same pool.
+#
+# Needs no database and no emulator: verify's api-tests and db-tools-tests connect to PostgreSQL, so they run
+# in e2e.yml with the schema, the seed and the Functions emulator.
+name: lint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the migration-history check below needs the base branch
+
+      - name: Set up Node.js (the version in .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            functions/package-lock.json
+            db/tools/package-lock.json
+
+      - name: Install the API's packages (ESLint and Prettier come from here)
+        run: npm ci --prefix functions
+
+      - name: Install the database tools' packages
+        run: npm ci --prefix db/tools
+
+      - name: Cache Flutter
+        id: flutter-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/flutter
+          key: flutter-3.47.5-${{ runner.os }}
+
+      - name: Install Flutter 3.47.5 (the Blueprint pin)
+        if: steps.flutter-cache.outputs.cache-hit != 'true'
+        run: git clone --depth 1 --branch 3.47.5 https://github.com/flutter/flutter.git "$HOME/flutter"
+
+      - name: Put Flutter on the PATH
+        run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Cache the Dart and Flutter packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('app/pubspec.lock') }}
+          restore-keys: pub-
+
+      - name: Secret guard and changelog duplicate guard (the committed tree)
+        run: npm run ci:guards
+
+      - name: Committed migrations are never edited (pull requests)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/lint/run.js migrations-immutable --base "origin/$BASE_REF"
+
+      - name: verify, the checks that need no database
+        run: >-
+          node tools/verify.js --only
+          node-version,node-check,structural-linters,linter-tests,tools-tests,eslint,prettier,flutter-analyze,flutter-test

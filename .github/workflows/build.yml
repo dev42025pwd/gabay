@@ -1,0 +1,130 @@
+# build: after lint succeeds on main, build the admin web page and a debug APK and keep them as artifacts
+# (L133, plan S7). Artifacts only: no store upload, no Firebase deploy, nothing is published anywhere.
+#
+# Stamps (standard §4.8): APP_VERSION is each surface's committed fallback (tools/ci-build-info.js reads
+# app/lib/core/config/app_version.dart), BUILD_NUMBER is `git rev-list --count HEAD` (so the checkout has
+# full history), GIT_COMMIT and BUILD_TIME. --build-name and --build-number carry the same numbers because
+# app/pubspec.yaml is never stamped (L129).
+#
+# API_BASE is a placeholder, https://api.invalid/api: the release guard in app/lib/core/config/app_config.dart
+# refuses a missing or local address, and no deployed API exists until the product owner's first deploy (L109).
+# The debug APK gets the same placeholder so a build can never silently target localhost.
+#
+# COST (GitHub Free private repository: 2,000 Actions minutes a month, 500 MB of artifact storage; usage is
+# blocked, not billed; docs.github.com, fetched 2026-10-08): about 15 minutes a run (Flutter install, Gradle
+# and the Android SDK downloads; an estimate, not measured: this file has not run yet), once per successful
+# lint run on main. Artifacts live 3 days. Sizes measured locally on 2026-10-08 are in the slice report.
+name: build
+
+on:
+  workflow_run:
+    workflows: [lint]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # A manual run always builds; an automatic one only when lint passed.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the commit that passed lint
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0 # BUILD_NUMBER counts every commit
+
+      - name: Set up Node.js (the version in .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Set up Java 17 for Gradle (the Android build)
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Flutter
+        id: flutter-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/flutter
+          key: flutter-3.47.5-${{ runner.os }}
+
+      - name: Install Flutter 3.47.5 (the Blueprint pin)
+        if: steps.flutter-cache.outputs.cache-hit != 'true'
+        run: git clone --depth 1 --branch 3.47.5 https://github.com/flutter/flutter.git "$HOME/flutter"
+
+      - name: Put Flutter on the PATH
+        run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Cache the Dart and Flutter packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('app/pubspec.lock') }}
+          restore-keys: pub-
+
+      - name: Work out the version, build number, commit and time
+        id: info
+        run: node tools/ci-build-info.js >> "$GITHUB_OUTPUT"
+
+      - name: Build the admin web page
+        working-directory: app
+        env:
+          VERSION: ${{ steps.info.outputs.admin_version }}
+          NUMBER: ${{ steps.info.outputs.build_number }}
+          COMMIT: ${{ steps.info.outputs.git_commit }}
+          TIME: ${{ steps.info.outputs.build_time }}
+        run: >-
+          flutter build web -t lib/main_admin.dart --release
+          --dart-define=API_BASE=https://api.invalid/api
+          --dart-define=APP_VERSION="$VERSION"
+          --dart-define=BUILD_NUMBER="$NUMBER"
+          --dart-define=GIT_COMMIT="$COMMIT"
+          --dart-define=BUILD_TIME="$TIME"
+          --build-name="$VERSION"
+          --build-number="$NUMBER"
+
+      - name: Build the shopper app (debug APK)
+        working-directory: app
+        env:
+          VERSION: ${{ steps.info.outputs.mobile_version }}
+          NUMBER: ${{ steps.info.outputs.build_number }}
+          COMMIT: ${{ steps.info.outputs.git_commit }}
+          TIME: ${{ steps.info.outputs.build_time }}
+        run: >-
+          flutter build apk --debug -t lib/main_mobile.dart
+          --dart-define=API_BASE=https://api.invalid/api
+          --dart-define=APP_VERSION="$VERSION"
+          --dart-define=BUILD_NUMBER="$NUMBER"
+          --dart-define=GIT_COMMIT="$COMMIT"
+          --dart-define=BUILD_TIME="$TIME"
+          --build-name="$VERSION"
+          --build-number="$NUMBER"
+
+      - name: Keep the admin web build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: admin-web-${{ steps.info.outputs.admin_version }}-${{ steps.info.outputs.git_commit }}
+          path: app/build/web
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Keep the debug APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobile-debug-apk-${{ steps.info.outputs.mobile_version }}-${{ steps.info.outputs.git_commit }}
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 3

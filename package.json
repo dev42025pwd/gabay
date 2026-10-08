@@ -15,6 +15,7 @@
     "test:schema-forms": "node tools/lint/run.js schema-forms",
     "lint:test": "node --test \"tools/lint/test/**/*.test.js\"",
     "verify": "node tools/verify.js",
-    "tools:test": "node --test \"tools/test/**/*.test.js\""
+    "tools:test": "node --test \"tools/test/**/*.test.js\"",
+    "ci:guards": "node tools/ci-guards.js"
   }
 }
