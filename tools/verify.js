@@ -10,10 +10,10 @@
 //   5  tools-tests         the tests of verify, the fingerprint and the hooks
 //   6  eslint              functions/, db/tools, tools/, .claude/hooks with functions' pinned ESLint and config
 //   7  prettier            the same folders, with functions' pinned Prettier and config
-//   8  api-tests           functions/ tests against the local gabay_dev
-//   9  db-tools-tests      the migration runner's tests
-//  10  schema-run-1        db/schema.sql applied (setup-db --skip-seed)
-//  11  schema-run-2        ... and applied again: it must be re-runnable (standard §8.2)
+//   8  schema-run-1        db/schema.sql applied (setup-db --skip-seed)
+//   9  schema-run-2        ... and applied again: it must be re-runnable (standard §8.2)
+//  10  api-tests           functions/ tests against gabay_dev (the schema is there since 8 and 9)
+//  11  db-tools-tests      the migration runner's tests
 //  12  seed                the test seed (starts the Auth emulator itself)
 //  13  functions-health    the Functions emulator answers GET /api/health { status, db } with an X-Request-Id
 //  14  flutter-analyze     app/
@@ -25,6 +25,9 @@
 // a listener left on their ports is itself a failure. An interrupt stops only what THIS run started
 // (its command trees, and the ports of servers it started); a process it did not start is never touched.
 //
+// GABAY_VERIFY_CHECK_TIMEOUT_MS (CI only) caps every check's own timeout, so a hung check fails with its
+// output before the CI job's timeout cancels the run.
+//
 // TEST SEAMS (used by tools/test, not for normal use): GABAY_VERIFY_EMULATOR_TIMEOUT_MS shortens the
 // emulator check's timeout; GABAY_VERIFY_TEST_INTERRUPT_MS makes the run call its Ctrl-C cleanup after
 // that many milliseconds, because a real Ctrl-C cannot be sent from a script on Windows.
@@ -34,7 +37,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { fingerprint, writeState, ROOT } = require('./fingerprint');
-const { runCommand, killAll, tail, listeners, waitPortsFree, sweepPorts } = require('./lib/proc');
+const {
+  runCommand,
+  killAll,
+  tail,
+  listeners,
+  waitPortsFree,
+  sweepPorts,
+  ownerText,
+} = require('./lib/proc');
 
 const NODE = `"${process.execPath}"`;
 const WINDOWS = process.platform === 'win32';
@@ -46,6 +57,18 @@ const TIMEOUT_MS = {
   // GABAY_VERIFY_EMULATOR_TIMEOUT_MS shortens it so the timeout path can be shown (tools/test).
   emulator: Number(process.env.GABAY_VERIFY_EMULATOR_TIMEOUT_MS) || 3 * 60_000,
 };
+/**
+ * How many lines of a failing check's output are printed. Locally the last 30 are enough to read; in CI
+ * (GitHub sets CI=true) the log is all there is afterwards, so the whole output is kept (the runner already
+ * caps it at 1 MB).
+ */
+const TAIL_LINES = process.env.CI === 'true' ? Number.MAX_SAFE_INTEGER : 30;
+/**
+ * GABAY_VERIFY_CHECK_TIMEOUT_MS caps EVERY check's timeout (CI sets it, S7 review I4): the CI job has its own
+ * timeout, and a check allowed ten minutes would be cut off by the job (a cancelled run, no output) before
+ * its own limit could fire and print what it had.
+ */
+const CHECK_TIMEOUT_CAP_MS = Number(process.env.GABAY_VERIFY_CHECK_TIMEOUT_MS) || Infinity;
 /** How long a server's ports may stay open after its command ended, before it counts as an orphan. */
 const SHUTDOWN_GRACE_MS = 30_000;
 /** Firebase emulator ports used by firebase.json (functions) and the seed (auth, hub, logging). */
@@ -88,8 +111,9 @@ function testsRan(output) {
  * checked nothing.
  */
 const command =
-  (commandLine, { cwd = ROOT, timeoutMs = TIMEOUT_MS.default, tests = false } = {}) =>
+  (commandLine, { cwd = ROOT, timeoutMs: ownTimeoutMs = TIMEOUT_MS.default, tests = false } = {}) =>
   async () => {
+    const timeoutMs = Math.min(ownTimeoutMs, CHECK_TIMEOUT_CAP_MS);
     const r = await runCommand(commandLine, { cwd, timeoutMs });
     let note = r.timedOut
       ? `\nTIMED OUT after ${timeoutMs / 1000} s; the process tree was stopped.`
@@ -99,7 +123,7 @@ const command =
       ok = false;
       note += '\nno tests ran (0, or no "# tests" line): the test glob probably matches nothing.';
     }
-    return { ok, output: tail(r.output) + note };
+    return { ok, output: tail(r.output, TAIL_LINES) + note };
   };
 
 /** Ports of servers THIS run has started and not yet seen stop: the only ones an interrupt may sweep. */
@@ -107,7 +131,9 @@ const startedPorts = new Set();
 
 /** A check that starts servers: refuses to start on busy ports, and fails if any listener is left. */
 const withServers = (ports, run) => async () => {
-  const busy = ports.flatMap((port) => listeners(port).map((pid) => `port ${port} (pid ${pid})`));
+  const busy = ports.flatMap((port) =>
+    listeners(port).map((pid) => `port ${port} (${ownerText(pid)})`),
+  );
   if (busy.length) {
     return {
       ok: false,
@@ -121,8 +147,11 @@ const withServers = (ports, run) => async () => {
   const orphans = sweepPorts(ports);
   ports.forEach((p) => startedPorts.delete(p));
   if (orphans.length) {
-    const list = orphans.map((o) => `port ${o.port} pid ${o.pid}`).join(', ');
-    return { ok: false, output: `${result.output}\nORPHAN left behind and now stopped: ${list}` };
+    const list = orphans.map((o) => `port ${o.port} ${ownerText(o.pid)}`).join(', ');
+    return {
+      ok: false,
+      output: `${result.output}\nORPHAN left behind (stopped when its pid could be read): ${list}`,
+    };
   }
   return result;
 };
@@ -185,7 +214,7 @@ async function structuralLinters() {
   return {
     ok: r.code === 0 && layoutSeen,
     output:
-      tail(r.output) +
+      tail(r.output, TAIL_LINES) +
       (layoutSeen
         ? ''
         : '\nThe "ok   repo-layout" line is missing: the run did not check the whole repo.'),
@@ -229,10 +258,13 @@ const CHECKS = [
   { name: 'tools-tests', run: command('npm run tools:test', { tests: true }) },
   { name: 'eslint', run: command(eslintCommand()) },
   { name: 'prettier', run: command(prettierCommand()) },
-  { name: 'api-tests', run: command('npm run api:test', { tests: true }) },
-  { name: 'db-tools-tests', run: command('npm --prefix db/tools test', { tests: true }) },
+  // The schema runs come BEFORE the tests that read the database: on a fresh database (CI) the API tests
+  // need the gabay schema to exist (S7 review I1). The order here is the order of every run, whatever
+  // order --only names the checks in.
   { name: 'schema-run-1', run: command('npm run setup-db -- --skip-seed --stop-on-error') },
   { name: 'schema-run-2', run: command('npm run setup-db -- --skip-seed --stop-on-error') },
+  { name: 'api-tests', run: command('npm run api:test', { tests: true }) },
+  { name: 'db-tools-tests', run: command('npm --prefix db/tools test', { tests: true }) },
   {
     name: 'seed',
     run: withServers(SEED_PORTS, command('npm run seed', { timeoutMs: TIMEOUT_MS.seed })),

@@ -18,6 +18,7 @@ const COPIED = [
   'tools/lint',
   'tools/fingerprint.js',
   'tools/ci-guards.js',
+  'tools/ci-migrations.js',
   '.claude/hooks',
   '.gitignore',
   'app/.gitignore',

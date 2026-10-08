@@ -7,7 +7,6 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { scratchRepo, git, write, read, remove } = require('./scratch');
-const { parseProcNetTcp } = require('../lib/proc');
 
 const CHANGELOG = 'app/lib/core/config/changelog.dart';
 const ARB = 'app/lib/l10n/app_en.arb';
@@ -109,11 +108,40 @@ test('ci-guards: a renumbered copy that reuses the bullets, and ARB text repeate
   });
 });
 
-test('ci-guards: the guards read the COMMITTED files, not an uncommitted working copy', () => {
+// S7 review nit: this test used to claim "the COMMITTED files" while the code reads the working tree. The rule:
+// the guards judge the TRACKED files as they are on disk. In CI the checkout is the commit, so that is the
+// committed tree; locally it also catches an edit you have not committed yet.
+test('ci-guards: an untracked .env is not their business (only tracked files are listed)', () => {
   withRepo((dir) => {
     write(dir, '.env', 'X=1\n'); // untracked only
     const r = guards(dir);
     assert.equal(r.status, 0, r.out);
+  });
+});
+
+test('ci-guards: a tracked file is read as it is on disk, so an uncommitted edit is seen locally (in CI disk = commit)', () => {
+  withRepo((dir) => {
+    write(
+      dir,
+      CHANGELOG,
+      read(dir, CHANGELOG).replace(
+        'const List<ChangelogEntry> mobileChangelog = [\n',
+        "const List<ChangelogEntry> mobileChangelog = [\n  ChangelogEntry(number: 1, version: '0.1.0', date: '2026-10-07', bullets: _mobileE002),\n",
+      ),
+    ); // edited, not committed
+    const r = guards(dir);
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /mobile changelog has entry number 1 twice/);
+  });
+});
+
+test('ci-guards: a tracked file deleted on disk is skipped, not a crash', () => {
+  withRepo((dir) => {
+    remove(path.join(dir, CHANGELOG));
+    remove(path.join(dir, ARB));
+    const r = guards(dir);
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /ci-guards: ok/);
   });
 });
 
@@ -137,26 +165,4 @@ test('ci-guards: outside a git repository it exits 2 with a message', () => {
       remove(lone);
     }
   });
-});
-
-// ---- Linux: the /proc parser used by proc.js listeners() on Linux --------------------------------------------------------
-
-test('proc (Linux): parseProcNetTcp finds the inode of a LISTEN socket on a port, IPv4 and IPv6', () => {
-  const v4 = `  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
-   0: 0100007F:1389 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 41001 1 0000000000000000 100 0 0 10 0
-   1: 0100007F:1389 0100007F:C350 01 00000000:00000000 00:00000000 00000000  1000        0 41002 1 0000000000000000 100 0 0 10 0
-   2: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 41003 1 0000000000000000 100 0 0 10 0
-`;
-  const v6 = `  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
-   0: 00000000000000000000000001000000:1389 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 41010 1 0000000000000000 100 0 0 10 0
-`;
-  assert.deepEqual(
-    parseProcNetTcp(v4, 0x1389),
-    ['41001'],
-    'port 5001 listening; the ESTABLISHED row (st 01) is not',
-  );
-  assert.deepEqual(parseProcNetTcp(v4, 22), ['41003']);
-  assert.deepEqual(parseProcNetTcp(v6, 0x1389), ['41010']);
-  assert.deepEqual(parseProcNetTcp(v4, 9999), []);
-  assert.deepEqual(parseProcNetTcp('', 1), []);
 });

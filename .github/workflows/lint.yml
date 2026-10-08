@@ -1,14 +1,23 @@
-# lint: the fast, database-free half of `npm run verify`, plus the two guards that until now ran only in
-# the local pre-commit hook (L133, plan S7). It REPORTS: on GitHub Free a private repository has no branch
-# protection, so the local pre-push hook (verify) is the gate and this is the independent second look.
+# lint: the fast, database-free half of `npm run verify`, plus the two guards that until now ran only in the
+# local pre-commit hook (secret guard, changelog duplicate guard) and the migration-history check (L133, plan S7).
+# L136: with e2e.yml, one of the two REQUIRED checks on every pull request to main ("lint" is this job's name);
+# every change reaches main through a branch and a pull request, and the local pre-push hook is the first gate.
 #
-# Runs on every push and pull request. COST (GitHub Free private repository: 2,000 Actions minutes a month,
-# usage is blocked, not billed, when they run out; docs.github.com, fetched 2026-10-08):
-#   about 6 minutes a run with the Flutter and npm caches warm, about 10 on a cold cache (estimate, not
-#   measured: this file has not run yet). The concurrency group below makes a newer push, or the pull-request
-#   run for the same branch, cancel the older run, so a branch costs one run at a time.
-#   Budget: 2,000 minutes / 6 = about 330 runs a month before anything else; e2e.yml (about 200 a month) and
-#   build.yml (a few runs on main) come out of the same pool.
+# Runs on every push and every pull request. A push run and a pull-request run for the same branch are two
+# separate runs (the event is in the concurrency group below); a push to main is never cancelled by anything.
+#
+# COST (L135: the repository is public): usage is free for public repositories that use standard GitHub-hosted
+# runners ("GitHub Actions usage is free for self-hosted runners and for public repositories that use standard
+# GitHub-hosted runners", docs.github.com, Actions billing, fetched 2026-10-08), so there is no monthly budget
+# of minutes to protect. Time, not money: about 6 minutes a run with the Flutter and npm caches warm, about 10
+# on a cold cache (estimate, not measured: this file has not run yet). Actions cache storage is 10 GB per
+# repository (same page).
+#
+# Fork pull requests: this workflow has no secrets and `contents: read`. A cache saved by a pull_request run is
+# scoped to the pull request's merge ref and cannot be restored by the base branch or other pull requests
+# (docs.github.com, dependency caching, "Restrictions for accessing a cache" and "Cache access for low-trust
+# workflow triggers", fetched 2026-10-08), so a fork cannot poison main's caches through this file. Only push
+# runs on main write the caches that every pull request restores.
 #
 # Needs no database and no emulator: verify's api-tests and db-tools-tests connect to PostgreSQL, so they run
 # in e2e.yml with the schema, the seed and the Functions emulator.
@@ -21,8 +30,10 @@ on:
 permissions:
   contents: read
 
+# Push runs are one per commit (so no pushed commit is ever left without its lint); a newer push to the same
+# pull request cancels the older pull-request run.
 concurrency:
-  group: lint-${{ github.head_ref || github.ref_name }}
+  group: lint-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -71,14 +82,19 @@ jobs:
           key: pub-${{ hashFiles('app/pubspec.lock') }}
           restore-keys: pub-
 
-      - name: Secret guard and changelog duplicate guard (the committed tree)
+      - name: Secret guard and changelog duplicate guard (the checked-out tree)
         run: npm run ci:guards
 
-      - name: Committed migrations are never edited (pull requests)
-        if: github.event_name == 'pull_request'
+      # On a pull request: against the base branch. On a push: against the tip the branch had before the push
+      # (a new branch or a force push is compared with origin/main, and a warning says so when there is
+      # nothing to compare with). tools/ci-migrations.js decides and prints which, and why.
+      - name: Committed migrations are never edited (push and pull request)
         env:
+          EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
-        run: node tools/lint/run.js migrations-immutable --base "origin/$BASE_REF"
+          BEFORE_SHA: ${{ github.event.before }}
+          REF_NAME: ${{ github.ref_name }}
+        run: node tools/ci-migrations.js
 
       - name: verify, the checks that need no database
         run: >-

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // The two pre-commit guards that CI must repeat (L133, S6): until now they ran only in the local
 // pre-commit hook, so a commit made with --no-verify, or on a machine without hooks, skipped them.
-// CI runs them over the CHECKED-OUT TREE (the committed files), and fails on any problem.
+// CI runs them over the checked-out tree and fails on any problem. The rule: the TRACKED files (git
+// ls-files), read as they are on disk. In CI the checkout is the commit, so that is the committed tree;
+// run locally (npm run ci:guards) it also sees an edit you have not committed yet. An untracked or
+// ignored .env is not their business.
 //
 //   secret guard           no tracked file named .env* except the templates (.example, .sample,
 //                          .template, .dist) (standard §8.1: a leaked .env forced a credential rotation)
@@ -52,10 +55,12 @@ function secretGuard(files) {
 function changelogGuard(root, files) {
   const problems = [];
   const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
-  if (files.includes(CHANGELOG_FILE)) {
+  // A tracked file deleted on disk but not yet removed from the index has nothing to read.
+  const onDisk = (rel) => fs.existsSync(path.join(root, rel));
+  if (files.includes(CHANGELOG_FILE) && onDisk(CHANGELOG_FILE)) {
     problems.push(...checkChangelogDart(read(CHANGELOG_FILE)));
   }
-  for (const f of files.filter((x) => /^app\/lib\/l10n\/[^/]+\.arb$/.test(x))) {
+  for (const f of files.filter((x) => /^app\/lib\/l10n\/[^/]+\.arb$/.test(x) && onDisk(x))) {
     problems.push(...checkArb(f, read(f)));
   }
   return problems.map((p) => ({ guard: 'changelog', message: p.message }));

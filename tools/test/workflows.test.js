@@ -1,7 +1,9 @@
-// .github/workflows: the rules of L133 and plan S7, checked on the text (no YAML package is installed in
-// CI's lint job). Actions cannot run here, so these tests pin what can be pinned: every action is GitHub's own
-// and pinned to a full SHA, nothing uses a secret or writes to GitHub, every job has a timeout, and the
-// `verify --only` lists name real checks and keep the database checks out of lint.yml.
+// .github/workflows: the rules of L133, L135, L136 and plan S7, checked on the text (no YAML package is installed in
+// CI's lint job; the rules are in workflow-rules.js). Actions cannot run here, so these tests pin what can be
+// pinned: every action is GitHub's own and pinned to a full SHA, nothing uses a secret or writes to GitHub, every
+// job has a timeout, no failure is swallowed, nothing is uploaded that is not on an allow-list, the build job
+// cannot be reached from a fork, and the `verify --only` lists name real checks. Then each rule is proved able to
+// FAIL: a table of deliberately broken copies, each of which must be reported (S7 review I3).
 'use strict';
 
 const test = require('./timeout');
@@ -9,15 +11,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { CHECKS } = require('../verify');
+const { checkWorkflow, flutterPinFromBlueprint, BUILD_IF } = require('./workflow-rules');
 
-const DIR = path.resolve(__dirname, '..', '..', '.github', 'workflows');
+const ROOT = path.resolve(__dirname, '..', '..');
+const DIR = path.join(ROOT, '.github', 'workflows');
 const FILES = ['lint.yml', 'e2e.yml', 'build.yml'];
 const text = (name) => fs.readFileSync(path.join(DIR, name), 'utf8');
-/** The lines that are not comments. */
-const code = (name) =>
-  text(name)
-    .split('\n')
-    .filter((l) => !/^\s*#/.test(l));
+const BLUEPRINT = fs.readFileSync(
+  path.join(ROOT, 'docs', 'product', 'GABAY_MASTER_BLUEPRINT.md'),
+  'utf8',
+);
 
 const DATABASE_CHECKS = [
   'schema-run-1',
@@ -28,123 +31,434 @@ const DATABASE_CHECKS = [
   'db-tools-tests',
 ];
 
+const CTX = {
+  checks: CHECKS.map((c) => c.name),
+  databaseChecks: DATABASE_CHECKS,
+  flutterPin: flutterPinFromBlueprint(BLUEPRINT),
+  setupMinutes: 10,
+};
+
 test('the three workflows exist and nothing else is in the folder', () => {
   assert.deepEqual(fs.readdirSync(DIR).sort(), [...FILES].sort());
 });
 
+test('the Flutter pin is read from Blueprint Part 1, so a Blueprint bump fails this test until the workflows follow', () => {
+  assert.match(CTX.flutterPin, /^\d+\.\d+$/, 'Blueprint Part 1 has a "Flutter / Dart" pin row');
+});
+
 for (const name of FILES) {
-  test(`${name}: top-level permissions are read-only, and every job has a timeout`, () => {
-    const src = code(name).join('\n');
-    assert.match(
-      src,
-      /^permissions:\n {2}contents: read$/m,
-      'permissions: contents: read at the top',
-    );
-    assert.doesNotMatch(src, /^[ \t]+permissions:/m, 'no job widens it');
-    const jobs = src.slice(src.indexOf('\njobs:'));
-    const jobNames = [...jobs.matchAll(/^ {2}([a-z0-9_-]+):\n/gm)].map((m) => m[1]);
-    assert.ok(jobNames.length >= 1);
-    assert.equal(
-      [...jobs.matchAll(/^ {4}timeout-minutes: \d+$/gm)].length,
-      jobNames.length,
-      'a timeout per job',
-    );
-  });
-
-  test(`${name}: only GitHub's own actions, each pinned to a full commit SHA with its version in a comment`, () => {
-    const uses = code(name).filter((l) => /^\s*(- )?uses:/.test(l));
-    assert.ok(uses.length > 0);
-    for (const line of uses) {
-      assert.match(line, /uses: actions\/[a-z-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/, line.trim());
-    }
-  });
-
-  test(`${name}: no repository secrets, no writes to GitHub, no deploy, no store upload`, () => {
-    const src = code(name).join('\n');
-    assert.doesNotMatch(src, /secrets\./);
-    assert.doesNotMatch(src, /\bgh (pr|issue|release|api|repo)\b/);
-    assert.doesNotMatch(
-      src,
-      /git push|firebase deploy|docker push|fastlane|flutter publish|upload-to-store/i,
-    );
-    assert.doesNotMatch(src, /GITHUB_TOKEN/);
-  });
-
-  test(`${name}: states its cost in minutes in the header comment`, () => {
-    const header = text(name).split('\n').slice(0, 30).join('\n');
-    assert.match(header, /COST/);
-    assert.match(header, /minutes/);
+  test(`${name}: keeps every rule (permissions, timeouts, pinned actions, no secrets, no swallowed failure, upload allow-list, cost header)`, () => {
+    assert.deepEqual(checkWorkflow(name, text(name), CTX), []);
   });
 }
 
-test('lint.yml: every push and pull request; one run per branch; the guards and the database-free verify checks', () => {
-  const src = code('lint.yml').join('\n');
-  assert.match(src, /^on:\n {2}push:\n {2}pull_request:$/m);
-  assert.match(
-    src,
-    /concurrency:\n {2}group: lint-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}\n {2}cancel-in-progress: true/,
-  );
-  assert.match(src, /run: npm run ci:guards/);
-  assert.match(src, /node-version-file: \.nvmrc/);
-  assert.match(
-    src,
-    /git clone --depth 1 --branch 3\.47\.5 https:\/\/github\.com\/flutter\/flutter\.git/,
-  );
-  const only = /--only\s+([a-z0-9,-]+)/.exec(src.replace(/\n\s+/g, ' '))[1].split(',');
-  const known = CHECKS.map((c) => c.name);
-  for (const c of only) assert.ok(known.includes(c), `${c} is a verify check`);
-  for (const c of only)
-    assert.ok(!DATABASE_CHECKS.includes(c), `${c} needs the database: it belongs in e2e.yml`);
+test('lint.yml and build.yml install the same Flutter', () => {
+  const version = (name) => /--branch (\d+\.\d+\.\d+) /.exec(text(name))[1];
+  assert.equal(version('lint.yml'), version('build.yml'));
+});
+
+test('lint.yml: the verify --only list is every check that needs no database, and in verify the order is cheap first', () => {
+  const only = /--only\s+([a-z0-9,-]+)/.exec(text('lint.yml').replace(/\n\s+/g, ' '))[1].split(',');
   assert.deepEqual(
-    known.filter((c) => !only.includes(c) && !DATABASE_CHECKS.includes(c)),
-    [],
-    'every other check runs here',
+    CTX.checks.filter((c) => !DATABASE_CHECKS.includes(c)),
+    CTX.checks.filter((c) => only.includes(c)),
   );
 });
 
-test('e2e.yml: nightly at 02:00 Manila (18:00 UTC) and on demand; PostgreSQL 18; throwaway .env; logs kept 7 days', () => {
-  const src = code('e2e.yml').join('\n');
-  assert.match(src, /schedule:\n\s+- cron: '0 18 \* \* \*'/);
-  assert.match(src, /workflow_dispatch:/);
-  assert.match(src, /image: postgres:18$/m);
-  assert.match(src, /openssl rand -hex 16/);
-  assert.match(src, /::add-mask::/);
-  const only = /--only ([a-z0-9,-]+)/.exec(src)[1].split(',');
-  assert.deepEqual([...only].sort(), [...DATABASE_CHECKS].sort(), 'exactly the database half');
-  for (const c of only) assert.ok(CHECKS.some((x) => x.name === c));
-  assert.match(src, /if: failure\(\)\n\s+uses: actions\/upload-artifact@/);
-  assert.match(src, /retention-days: 7/);
-  assert.doesNotMatch(src, /^\s+(\.env|\*\*\/\.env)\s*$/m, 'the .env is never uploaded');
+test('e2e.yml: the database half, and the schema runs come before the tests that read it (verify ignores the order of --only)', () => {
+  const only = /--only ([a-z0-9,-]+)/.exec(text('e2e.yml'))[1].split(',');
+  const inRunOrder = CTX.checks.filter((c) => only.includes(c));
+  assert.deepEqual(only, inRunOrder, 'the list is written in the order verify will run it');
+  assert.ok(inRunOrder.indexOf('schema-run-2') < inRunOrder.indexOf('api-tests'));
 });
 
-test('build.yml: after lint succeeds on main (or by hand); both builds stamped; artifacts kept 3 days', () => {
-  const src = code('build.yml').join('\n');
-  assert.match(
-    src,
-    /workflow_run:\n\s+workflows: \[lint\]\n\s+types: \[completed\]\n\s+branches: \[main\]/,
-  );
-  assert.match(src, /workflow_dispatch:/);
-  assert.match(src, /github\.event\.workflow_run\.conclusion == 'success'/);
-  assert.match(src, /flutter build web -t lib\/main_admin\.dart --release/);
-  assert.match(src, /flutter build apk --debug -t lib\/main_mobile\.dart/);
-  assert.equal([...src.matchAll(/--dart-define=API_BASE=https:\/\/api\.invalid\/api/g)].length, 2);
-  for (const define of ['APP_VERSION', 'BUILD_NUMBER', 'GIT_COMMIT', 'BUILD_TIME']) {
-    assert.equal([...src.matchAll(new RegExp(`--dart-define=${define}=`, 'g'))].length, 2, define);
+test('build.yml: the job runs only after lint succeeded on a push of this repository (C1), or by hand', () => {
+  const m = /^ {4}if: (.+)$/m.exec(text('build.yml'));
+  assert.equal(m[1], BUILD_IF);
+  for (const needle of [
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.event == 'push'",
+    'github.event.workflow_run.head_repository.full_name == github.repository',
+  ]) {
+    assert.ok(m[1].includes(needle), needle);
   }
-  assert.equal([...src.matchAll(/--build-name=/g)].length, 2);
-  assert.equal([...src.matchAll(/--build-number=/g)].length, 2);
-  assert.match(src, /fetch-depth: 0/);
-  assert.equal([...src.matchAll(/retention-days: 3/g)].length, 2);
-  assert.match(
-    src,
-    /actions\/setup-java@[0-9a-f]{40} # v\d+\.\d+\.\d+\n\s+with:\n\s+distribution: temurin\n\s+java-version: '17'/,
-  );
+  assert.doesNotMatch(m[1], /always\(\)/);
 });
 
-test('flutter: the version in every workflow is the Blueprint pin, and the cache key says so', () => {
-  for (const name of ['lint.yml', 'build.yml']) {
-    const src = code(name).join('\n');
-    assert.match(src, /--branch 3\.47\.5 /);
-    assert.match(src, /key: flutter-3\.47\.5-\$\{\{ runner\.os \}\}/);
-  }
+// ---- every rule must be able to fail ---------------------------------------------------------------------
+
+/** Replaces `from` by `to` in the named file's text; the edit must really change it. */
+const edit = (file, from, to) => ({ file, apply: (t) => t.replace(from, to) });
+
+const MUTATIONS = [
+  // C1: the build job reachable from a fork
+  [
+    'build: the fork-PR guard (event == push) removed',
+    'build.yml',
+    edit('build.yml', " && github.event.workflow_run.event == 'push'", ''),
+    /build\.yml: the job's if:/,
+  ],
+  [
+    'build: the head-repository guard removed',
+    'build.yml',
+    edit(
+      'build.yml',
+      ' && github.event.workflow_run.head_repository.full_name == github.repository',
+      '',
+    ),
+    /build\.yml: the job's if:/,
+  ],
+  [
+    'build: && turned into || in the if',
+    'build.yml',
+    edit('build.yml', "'success' && github.event", "'success' || github.event"),
+    /build\.yml: the job's if:/,
+  ],
+  [
+    'build: always() added to the if',
+    'build.yml',
+    edit('build.yml', 'github.repository)\n', 'github.repository) || always()\n'),
+    /build\.yml/,
+  ],
+  [
+    'build: the branches: [main] filter removed',
+    'build.yml',
+    edit('build.yml', '    branches: [main]\n', ''),
+    /build\.yml: triggers/,
+  ],
+  // I3
+  [
+    'e2e: continue-on-error on the verify step',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '      - name: verify, the database half\n',
+      '      - name: verify, the database half\n        continue-on-error: true\n',
+    ),
+    /continue-on-error/,
+  ],
+  [
+    'lint: "|| true" after the guards',
+    'lint.yml',
+    edit('lint.yml', 'run: npm run ci:guards', 'run: npm run ci:guards || true'),
+    /swallow/,
+  ],
+  [
+    'lint: "|| :" after the guards',
+    'lint.yml',
+    edit('lint.yml', 'run: npm run ci:guards', 'run: npm run ci:guards || :'),
+    /swallow/,
+  ],
+  [
+    'e2e: "|| true" after docker logs',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      'docker logs "$id" > postgres.log 2>&1',
+      'docker logs "$id" > postgres.log 2>&1 || true',
+    ),
+    /swallow/,
+  ],
+  [
+    'lint: a ${{ }} expression inside run:',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'run: node tools/ci-migrations.js',
+      'run: node tools/ci-migrations.js ${{ github.head_ref }}',
+    ),
+    /expression inside run:/,
+  ],
+  [
+    'build: a ${{ }} expression inside run: (the commit stamp)',
+    'build.yml',
+    edit(
+      'build.yml',
+      'run: node tools/ci-build-info.js >> "$GITHUB_OUTPUT"',
+      'run: echo ${{ github.event.workflow_run.head_branch }} && node tools/ci-build-info.js >> "$GITHUB_OUTPUT"',
+    ),
+    /expression inside run:/,
+  ],
+  [
+    'e2e: the tee step loses shell: bash (a pipe without pipefail)',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '      - name: verify, the database half\n        shell: bash\n',
+      '      - name: verify, the database half\n',
+    ),
+    /pipe needs "shell: bash"/,
+  ],
+  [
+    'e2e: the log step loses shell: bash',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '        if: failure() || cancelled()\n        shell: bash\n        run: |\n          id=',
+      '        if: failure() || cancelled()\n        run: |\n          id=',
+    ),
+    /pipe needs "shell: bash"/,
+  ],
+  [
+    'e2e: the upload path becomes "."',
+    'e2e.yml',
+    edit('e2e.yml', '            verify.log\n', '            .\n'),
+    /uploads "\."/,
+  ],
+  [
+    'e2e: the .env is added to the upload',
+    'e2e.yml',
+    edit('e2e.yml', '            verify.log\n', '            verify.log\n            .env\n'),
+    /uploads "\.env"/,
+  ],
+  [
+    'e2e: a whole folder is uploaded',
+    'e2e.yml',
+    edit('e2e.yml', '            postgres.log\n', '            db/seeds\n'),
+    /uploads "db\/seeds"/,
+  ],
+  [
+    'build: the web build path widened to app',
+    'build.yml',
+    edit('build.yml', 'path: app/build/web', 'path: app'),
+    /uploads "app"/,
+  ],
+  [
+    'lint: an upload added',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: verify, the checks that need no database',
+      '      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          path: .\n      - name: verify, the checks that need no database',
+    ),
+    /lint\.yml/,
+  ],
+  // I4
+  [
+    'e2e: the upload runs on failure only (a timeout is a cancel)',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '        if: failure() || cancelled()\n        uses: actions/upload-artifact',
+      '        if: failure()\n        uses: actions/upload-artifact',
+    ),
+    /if: failure\(\) \|\| cancelled\(\)/,
+  ],
+  [
+    'e2e: the service log is collected on failure only',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '        if: failure() || cancelled()\n        shell: bash',
+      '        if: failure()\n        shell: bash',
+    ),
+    /if: failure\(\) \|\| cancelled\(\)/,
+  ],
+  [
+    'e2e: the job timeout shortened below the checks',
+    'e2e.yml',
+    edit('e2e.yml', 'timeout-minutes: 40', 'timeout-minutes: 30'),
+    /timeout-minutes 30 is shorter/,
+  ],
+  [
+    'e2e: the per-check cap removed',
+    'e2e.yml',
+    edit('e2e.yml', "      GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'\n", ''),
+    /GABAY_VERIFY_CHECK_TIMEOUT_MS/,
+  ],
+  // I2
+  [
+    'lint: the event left out of the concurrency group',
+    'lint.yml',
+    edit('lint.yml', 'lint-${{ github.event_name }}-', 'lint-'),
+    /concurrency group/,
+  ],
+  [
+    'lint: the migration step limited to pull requests',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: Committed migrations are never edited (push and pull request)\n',
+      "      - name: Committed migrations are never edited (push and pull request)\n        if: github.event_name == 'pull_request'\n",
+    ),
+    /no if:/,
+  ],
+  [
+    'lint: the migration step removed',
+    'lint.yml',
+    edit('lint.yml', 'run: node tools/ci-migrations.js', 'run: echo skipped'),
+    /migration-history step/,
+  ],
+  [
+    'lint: the push base (BEFORE_SHA) not passed',
+    'lint.yml',
+    edit('lint.yml', '          BEFORE_SHA: ${{ github.event.before }}\n', ''),
+    /BEFORE_SHA/,
+  ],
+  [
+    'lint: cancel-in-progress turned off',
+    'lint.yml',
+    edit('lint.yml', 'cancel-in-progress: true', 'cancel-in-progress: false'),
+    /cancel-in-progress/,
+  ],
+  // L136
+  [
+    'e2e: the pull_request trigger removed',
+    'e2e.yml',
+    edit('e2e.yml', '  pull_request:\n    branches: [main]\n', ''),
+    /triggers: pull_request to main/,
+  ],
+  [
+    'e2e: a pull_request_target trigger',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '  pull_request:\n    branches: [main]\n',
+      '  pull_request_target:\n    branches: [main]\n',
+    ),
+    /pull_request_target|triggers/,
+  ],
+  [
+    'e2e: superseded pull-request runs no longer cancel',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+      'cancel-in-progress: false',
+    ),
+    /superseded pull-request runs cancel/,
+  ],
+  [
+    'e2e: the nightly schedule removed',
+    'e2e.yml',
+    edit('e2e.yml', "  schedule:\n    - cron: '0 18 * * *'\n", ''),
+    /triggers/,
+  ],
+  [
+    'e2e: a repository secret used',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      'DB_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}',
+      'DB_PASSWORD: ${{ secrets.DB_PASSWORD }}',
+    ),
+    /repository secret/,
+  ],
+  [
+    'e2e: the schema runs after the tests in the --only list',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '--only schema-run-1,schema-run-2,api-tests,db-tools-tests,seed,functions-health',
+      '--only api-tests,schema-run-1,schema-run-2,db-tools-tests,seed,functions-health',
+    ),
+    /e2e\.yml/,
+  ],
+  [
+    'e2e: a database check dropped from --only',
+    'e2e.yml',
+    edit('e2e.yml', ',db-tools-tests', ''),
+    /exactly the database half/,
+  ],
+  // the common rules
+  [
+    'lint: an action pinned by tag',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+      'actions/checkout@v7',
+    ),
+    /pinned to a full SHA/,
+  ],
+  [
+    'lint: a third-party action',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+      'someone/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+    ),
+    /pinned to a full SHA/,
+  ],
+  [
+    'lint: write permission added',
+    'lint.yml',
+    edit('lint.yml', 'permissions:\n  contents: read', 'permissions:\n  contents: write'),
+    /top-level permissions/,
+  ],
+  [
+    'lint: the job timeout removed',
+    'lint.yml',
+    edit('lint.yml', '    timeout-minutes: 25\n', ''),
+    /timeout-minutes/,
+  ],
+  [
+    'lint: a deploy step',
+    'lint.yml',
+    edit('lint.yml', 'run: npm run ci:guards', 'run: npm run ci:guards && firebase deploy'),
+    /deploys/,
+  ],
+  [
+    'lint: the cost header removed',
+    'lint.yml',
+    edit('lint.yml', '# COST (L135', '# BUDGET (L135'),
+    /COST/,
+  ],
+  [
+    'lint: a Flutter other than the Blueprint pin',
+    'lint.yml',
+    edit('lint.yml', '--branch 3.47.5 ', '--branch 3.46.0 '),
+    /not the Blueprint pin/,
+  ],
+  [
+    'lint: a cache key that no longer carries the version',
+    'lint.yml',
+    edit('lint.yml', 'key: flutter-3.47.5-', 'key: flutter-'),
+    /cache key/,
+  ],
+  [
+    'lint: an unconditional guard weakened to a pull-request trigger only',
+    'lint.yml',
+    edit('lint.yml', 'on:\n  push:\n  pull_request:', 'on:\n  pull_request:'),
+    /every push and pull request/,
+  ],
+  [
+    'e2e: the header calls the repository private again',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '# COST (L135: the repository is public)',
+      '# COST (private repository, 2,000 minutes)',
+    ),
+    /private repository/,
+  ],
+];
+
+for (const [label, file, mutation, expected] of MUTATIONS) {
+  test(`a broken copy is reported: ${label}`, () => {
+    const original = text(file);
+    const mutated = mutation.apply(original);
+    assert.notEqual(mutated, original, 'the edit must really change the file');
+    const problems = checkWorkflow(file, mutated, CTX);
+    assert.ok(problems.length > 0, 'the rules let this edit through');
+    assert.ok(
+      problems.some((p) => expected.test(p)),
+      `expected ${expected}, got:\n${problems.join('\n')}`,
+    );
+  });
+}
+
+test('the mutation table covers each rule kind named in the S7 review (I3) at least once', () => {
+  const kinds = [
+    /continue-on-error/,
+    /\|\| true/,
+    /\|\| :/,
+    /expression inside run/,
+    /shell: bash/,
+    /upload/,
+    /build:.*if|always/,
+  ];
+  const labels = MUTATIONS.map((m) => m[0]).join('\n');
+  for (const k of kinds) assert.match(labels, k);
 });

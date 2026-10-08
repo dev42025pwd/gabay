@@ -1,6 +1,6 @@
 // npm run setup-db: the one orchestrator for a database (standard §8.2).
 //
-//   dev mode (default)   schema -> migrations -> test seed (db/seeds, needs Java for the Auth emulator)
+//   dev mode (default)   schema -> migrations -> test seed (db/seeds; starts the Auth emulator, which runs on Node: no Java)
 //   --bootstrap          schema -> reference seed (platform lookups and roles) -> tenant provisioning (Phase 2)
 //
 //   --stop-on-error      stop at the first failed step (default: report it and run the rest)
@@ -103,7 +103,11 @@ async function seedReference(client) {
   }
 }
 
-/** The dev seed is the existing seed project; it needs Java 11+ for the Firebase Auth emulator. */
+/**
+ * The dev seed is the existing seed project. It starts the Firebase Auth emulator, which runs on Node: firebase-tools
+ * 15.32.1 needs Java only for the Firestore, Realtime Database and Storage emulators (source check 2026-10-08:
+ * downloadableEmulators.js, `binary: "java"` on exactly those three), and Gabay starts none of them.
+ */
 function runDevSeed() {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   // Fixed arguments, nothing from the user. shell:true is required to start a .cmd file on Windows.

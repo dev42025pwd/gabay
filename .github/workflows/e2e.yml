@@ -1,10 +1,12 @@
-# e2e: the database half of `npm run verify`, against a real PostgreSQL 18 service, every night and on
-# demand (L133, plan S7): the schema twice (it must be re-runnable), the test seed with the Firebase Auth
-# emulator, the API's tests, the database tools' tests, and the Functions emulator answering /api/health.
+# e2e: the database half of `npm run verify`, against a real PostgreSQL 18 service, on every pull request to main,
+# every night and on demand (L133, plan S7, L136): the schema twice (it must be re-runnable), the API's tests and
+# the database tools' tests against that schema, the test seed with the Firebase Auth emulator, and the Functions
+# emulator answering /api/health. L136: with lint.yml, one of the two REQUIRED checks on every pull request to main
+# ("e2e" is this job's name).
 #
-# NO repository secrets. The .env is written during the job from throwaway values: the database password is
-# derived from the run id (the service container is only reachable on the runner), and every SEED_PW_* is
-# random per run and masked in the log. Nothing is echoed.
+# NO repository secrets, and none needed: a pull request from a fork gets none anyway. The .env is written during
+# the job from throwaway values: the database password is derived from the run id (the service container is only
+# reachable on the runner), and every SEED_PW_* is random per run and masked in the log. Nothing is echoed.
 #
 # Java: not installed on purpose. firebase-tools 15.32.1 checks for Java 21 or newer only when an emulator
 # that runs on Java is started (controller.js: targets.some(requiresJava); commandUtils.js:
@@ -12,16 +14,24 @@
 # (downloadableEmulators.js: binary "java"). Auth and Functions, the only emulators Gabay starts, run on Node.
 # If Gabay ever starts one of the Java emulators, add actions/setup-java with Temurin 21 before the seed.
 #
-# COST (GitHub Free private repository: 2,000 Actions minutes a month; usage is blocked, not billed,
-# when exhausted; docs.github.com, fetched 2026-10-08): about 6 minutes a run (checkout and npm ci of three
-# packages including firebase-tools about 2, schema and seed about 1, emulator health about 1, tests about
-# 1; an estimate, not measured: this file has not run yet). Nightly: 30 x 6 = about 180 minutes a month,
-# plus manual runs. A scheduled workflow runs only on the default branch.
+# COST (L135: the repository is public): usage is free for public repositories that use standard GitHub-hosted
+# runners ("GitHub Actions usage is free for self-hosted runners and for public repositories that use standard
+# GitHub-hosted runners", docs.github.com, Actions billing, fetched 2026-10-08), so there is no monthly budget of
+# minutes to protect. Time: about 6 minutes a run (checkout and npm ci of three packages including firebase-tools
+# about 2, schema and seed about 1, emulator health about 1, tests about 1; an estimate, not measured: this file
+# has not run yet). The log artifact lives 7 days. A scheduled workflow runs only on the default branch.
+#
+# TIMEOUTS: every verify check is capped at 5 minutes here (GABAY_VERIFY_CHECK_TIMEOUT_MS), so a hung check
+# fails by itself with its output. Six checks at 5 minutes plus about 10 minutes of setup fit the 40-minute job
+# limit; before this the checks' own limits (10 minutes each) were longer than the job's, so a hang ended as a
+# cancelled run with no log. The log steps below also run when the run is cancelled.
 #
 # 02:00 in Manila (UTC+8) is 18:00 UTC, so the cron below is 0 18 * * *.
 name: e2e
 
 on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: '0 18 * * *'
   workflow_dispatch:
@@ -29,16 +39,18 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request cancels the older run; nightly and manual runs queue and never cancel.
 concurrency:
-  group: e2e
-  cancel-in-progress: false
+  group: e2e-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       DB_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'
     services:
       postgres:
         image: postgres:18
@@ -93,17 +105,26 @@ jobs:
             echo "SEED_PW_$account=$value" >> .env
           done
 
+      # verify runs its checks in its own fixed order whatever the order named here: the schema twice first
+      # (a fresh database has no schema), then the tests that read it, then the seed and the emulator.
       - name: verify, the database half
         shell: bash
         run: |
-          node tools/verify.js --only schema-run-1,schema-run-2,seed,functions-health,api-tests,db-tools-tests 2>&1 | tee verify.log
+          node tools/verify.js --only schema-run-1,schema-run-2,api-tests,db-tools-tests,seed,functions-health 2>&1 | tee verify.log
 
-      - name: Collect the PostgreSQL service log (on failure)
-        if: failure()
-        run: docker logs "$(docker ps -aq --filter ancestor=postgres:18 | head -n 1)" > postgres.log 2>&1 || true
+      - name: Collect the PostgreSQL service log (on failure or cancel)
+        if: failure() || cancelled()
+        shell: bash
+        run: |
+          id="$(docker ps -aq --filter ancestor=postgres:18 | head -n 1)"
+          if [ -n "$id" ]; then
+            docker logs "$id" > postgres.log 2>&1
+          else
+            echo "no postgres:18 container found: there is no service log to collect"
+          fi
 
-      - name: Upload the server and emulator logs (on failure)
-        if: failure()
+      - name: Upload the server and emulator logs (on failure or cancel)
+        if: failure() || cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-logs-${{ github.run_id }}

@@ -8,7 +8,18 @@ const fs = require('node:fs');
 const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
-const { runCommand, listeners, sweepPorts, tail, childEnv } = require('../lib/proc');
+const {
+  runCommand,
+  listeners,
+  sweepPorts,
+  tail,
+  childEnv,
+  killTree,
+  parseProcNetTcp,
+  listenersLinux,
+  UNKNOWN_OWNER,
+  ownerText,
+} = require('../lib/proc');
 
 const NODE = `"${process.execPath}"`;
 
@@ -124,4 +135,99 @@ test('tail keeps the last lines, childEnv puts this Node first on PATH', () => {
     1,
     'one PATH variable, not two',
   );
+});
+
+// ---- Linux: the /proc parser and the owner lookup used by listeners() on Linux -----------------------------------------
+
+test('proc (Linux): parseProcNetTcp finds the inode of a LISTEN socket on a port, IPv4 and IPv6', () => {
+  const v4 = `  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 0100007F:1389 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 41001 1 0000000000000000 100 0 0 10 0
+   1: 0100007F:1389 0100007F:C350 01 00000000:00000000 00:00000000 00000000  1000        0 41002 1 0000000000000000 100 0 0 10 0
+   2: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 41003 1 0000000000000000 100 0 0 10 0
+`;
+  const v6 = `  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000000000000000000001000000:1389 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 41010 1 0000000000000000 100 0 0 10 0
+`;
+  assert.deepEqual(
+    parseProcNetTcp(v4, 0x1389),
+    ['41001'],
+    'port 5001 listening; the ESTABLISHED row (st 01) is not',
+  );
+  assert.deepEqual(parseProcNetTcp(v4, 22), ['41003']);
+  assert.deepEqual(parseProcNetTcp(v6, 0x1389), ['41010']);
+  assert.deepEqual(parseProcNetTcp(v4, 9999), []);
+  assert.deepEqual(parseProcNetTcp('', 1), []);
+});
+
+/**
+ * A fake /proc for listenersLinux: `tcp` is the text of /proc/net/tcp, `procs` maps a pid to its fd table
+ * ({ fd: 'socket:[inode]' }) or to 'EACCES' for a process whose fds this user may not read.
+ */
+function fakeProc(tcp, procs) {
+  const eacces = () => Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+  const enoent = () => Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+  return {
+    procRoot: '/proc',
+    fs: {
+      readFileSync: (file) => {
+        if (file === '/proc/net/tcp') return tcp;
+        throw enoent();
+      },
+      readdirSync: (dir) => {
+        if (dir === '/proc') return ['self', ...Object.keys(procs)];
+        const pid = /^\/proc\/(\d+)\/fd$/.exec(dir)?.[1];
+        if (pid === undefined || !(pid in procs)) throw enoent();
+        if (procs[pid] === 'EACCES') throw eacces();
+        return Object.keys(procs[pid]);
+      },
+      readlinkSync: (file) => {
+        const m = /^\/proc\/(\d+)\/fd\/(\d+)$/.exec(file);
+        return procs[m[1]][m[2]];
+      },
+    },
+  };
+}
+
+const TCP = `  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 0100007F:1389 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 41001 1 0000000000000000 100 0 0 10 0
+`;
+
+test('proc (Linux): the owner of a listening socket is found through /proc/<pid>/fd', () => {
+  const io = fakeProc(TCP, {
+    100: { 3: 'socket:[777]' },
+    200: { 3: 'socket:[41001]', 4: 'pipe:[9]' },
+  });
+  assert.deepEqual([...listenersLinux(5001, io)], [200]);
+  assert.deepEqual([...listenersLinux(5002, io)], [], 'a port nobody listens on is free');
+});
+
+// S7 review nit: a listener owned by ANOTHER user (its /proc/<pid>/fd is unreadable) used to be reported as
+// free, so verify would start an emulator on a busy port, or call a leftover server "stopped".
+test('proc (Linux): a LISTEN socket whose owner cannot be read counts as busy (UNKNOWN_OWNER), not free', () => {
+  const io = fakeProc(TCP, { 100: { 3: 'socket:[777]' }, 300: 'EACCES' });
+  assert.deepEqual([...listenersLinux(5001, io)], [UNKNOWN_OWNER]);
+});
+
+test('proc (Linux): a readable owner wins; an unreadable process elsewhere adds nothing', () => {
+  const io = fakeProc(TCP, { 200: { 3: 'socket:[41001]' }, 300: 'EACCES' });
+  assert.deepEqual([...listenersLinux(5001, io)], [200]);
+});
+
+test('killTree never signals the unknown-owner marker (a negative pid would otherwise address a process group)', () => {
+  const calls = [];
+  const original = process.kill;
+  process.kill = (...args) => calls.push(args);
+  try {
+    killTree(UNKNOWN_OWNER);
+    killTree(0);
+    killTree(undefined);
+  } finally {
+    process.kill = original;
+  }
+  assert.deepEqual(calls, []);
+});
+
+test('ownerText names a pid, or says the owner is not readable', () => {
+  assert.equal(ownerText(4242), 'pid 4242');
+  assert.equal(ownerText(UNKNOWN_OWNER), 'owner not readable');
 });

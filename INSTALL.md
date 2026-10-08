@@ -33,7 +33,7 @@
 ```sh
 cd db/seeds
 npm install          # pg 8.23.1 and firebase-tools 15.32.1 (pinned)
-npm run seed         # needs Java 11+ for the Auth emulator; fill PG* and SEED_PW_* in .env first
+npm run seed         # starts the Auth emulator (Node, no Java needed); fill PG* and SEED_PW_* in .env first
 ```
 
 It creates the two test tenants, their venues and the six `@gabay.test` accounts; see `db/seeds/README.md`. Put your spike exports in `db/seeds/sources/spike-exports/` and run it again.
@@ -48,7 +48,7 @@ cd db/tools && npm ci && cd ../..    # the database scripts' own packages (pg 8.
 
 npm run api:test      # the API tests (node --test) against the local gabay_dev; they create only TEMP tables
 npm run api:lint      # ESLint and Prettier check; both exit non-zero on a violation
-npm run setup-db      # dev mode: db/schema.sql -> db/migrations -> the test seed (needs Java 11+). RESETS gabay_dev
+npm run setup-db      # dev mode: db/schema.sql -> db/migrations -> the test seed (no Java needed). RESETS gabay_dev
 npm run setup-db -- --bootstrap     # schema -> reference seed (platform lookups, roles) -> tenant provisioning (Phase 2)
 npm run migrate       # apply db/migrations in order (none exist yet; it says so and exits 0)
 ```

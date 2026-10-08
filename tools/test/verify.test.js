@@ -61,7 +61,7 @@ const verify = (dir, args, { env = {}, node = process.execPath, preload } = {}) 
   return { status: r.status, out: r.stdout, err: r.stderr, state };
 };
 
-test('the checks are the fifteen of plan S5 (+ L126), cheap ones first, node-version first and fatal', () => {
+test('the checks are the fifteen of plan S5 (+ L126), cheap ones first, the schema before the tests that need it, node-version first and fatal', () => {
   assert.deepEqual(
     CHECKS.map((c) => c.name),
     [
@@ -72,10 +72,10 @@ test('the checks are the fifteen of plan S5 (+ L126), cheap ones first, node-ver
       'tools-tests',
       'eslint',
       'prettier',
-      'api-tests',
-      'db-tools-tests',
       'schema-run-1',
       'schema-run-2',
+      'api-tests',
+      'db-tools-tests',
       'seed',
       'functions-health',
       'flutter-analyze',
@@ -83,6 +83,32 @@ test('the checks are the fifteen of plan S5 (+ L126), cheap ones first, node-ver
     ],
   );
   assert.equal(CHECKS[0].fatal, true);
+});
+
+// S7 review I1: verify runs its checks in CHECKS order whatever the order of --only, and api-tests and
+// db-tools-tests used to come BEFORE schema-run-1/2. On a fresh database (CI's postgres:18) they failed with
+// 'relation "gabay.globalsetting" does not exist'. Anything that needs the schema in the database must come
+// after the run that applies it.
+test('I1: every check that needs the schema in the database runs after the two schema runs', () => {
+  const names = CHECKS.map((c) => c.name);
+  const at = (n) => names.indexOf(n);
+  for (const needsSchema of ['api-tests', 'db-tools-tests', 'seed', 'functions-health']) {
+    assert.ok(at(needsSchema) > at('schema-run-2'), `${needsSchema} runs after schema-run-2`);
+  }
+  assert.equal(at('schema-run-2'), at('schema-run-1') + 1, 'the two schema runs are back to back');
+  for (const cheap of [
+    'node-check',
+    'structural-linters',
+    'linter-tests',
+    'tools-tests',
+    'eslint',
+    'prettier',
+  ]) {
+    assert.ok(
+      at(cheap) < at('schema-run-1'),
+      `${cheap} (no database) stays before the schema runs`,
+    );
+  }
 });
 
 test('verify --list and a bad --only', () => {
@@ -233,6 +259,52 @@ test('a test check passes when tests ran (I1)', () => {
     const r = verify(dir, ['--only', 'linter-tests']);
     assert.equal(r.status, 0, r.out);
     assert.match(r.out, /^ok\s+linter-tests/m);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- S7 review nit: in CI the log is all there is, so a failing check keeps its whole output ------------
+
+test('a failing check shows its last 30 lines locally and (CI=true) all of its output, so the uploaded log is useful', () => {
+  const dir = scratch({
+    'package.json': JSON.stringify({ scripts: { 'lint:test': 'node noisy.js' } }),
+    'noisy.js':
+      "for (let i = 1; i <= 100; i += 1) console.log(`line ${i}`);\nconsole.log('# tests 1');\nprocess.exit(1);\n",
+  });
+  try {
+    const local = verify(dir, ['--only', 'linter-tests'], { env: { CI: '' } });
+    assert.equal(local.status, 1, local.out);
+    assert.match(local.out, /line 100/);
+    assert.doesNotMatch(local.out, /line 50\b/, 'locally only the tail is kept');
+    const ci = verify(dir, ['--only', 'linter-tests'], { env: { CI: 'true' } });
+    assert.equal(ci.status, 1, ci.out);
+    assert.match(ci.out, /line 1\b/, 'in CI the first line is still there');
+    assert.match(ci.out, /line 50\b/);
+    assert.match(ci.out, /line 100/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- S7 review I4: a check's own timeout must be able to fire before the CI job's timeout -----------------
+
+test('GABAY_VERIFY_CHECK_TIMEOUT_MS caps every check: a hung check fails as TIMED OUT, with its output, and the run goes on', () => {
+  const dir = scratch({
+    'package.json': JSON.stringify({ scripts: { 'lint:test': 'node hang.js' } }),
+    'hang.js':
+      "console.log('# tests 1');\nconsole.log('about to hang');\nsetTimeout(() => {}, 120000);\n",
+  });
+  try {
+    const started = Date.now();
+    const r = verify(dir, ['--only', 'linter-tests'], {
+      env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: '2000' },
+    });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /^FAIL linter-tests/m);
+    assert.match(r.out, /TIMED OUT after 2 s/);
+    assert.match(r.out, /about to hang/, 'what it printed before hanging is kept');
+    assert.ok(Date.now() - started < 60_000, 'it did not wait for the default ten minutes');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -15,10 +15,18 @@ const path = require('node:path');
 
 const live = new Set();
 const WINDOWS = process.platform === 'win32';
+/**
+ * What listeners() reports for a listening socket whose owner cannot be read (Linux: another user's process,
+ * so its /proc/<pid>/fd is closed to us). It counts as busy, and it is never a pid: killTree ignores it.
+ */
+const UNKNOWN_OWNER = -1;
 
-/** Ends the process tree rooted at pid. Safe to call for a pid that has already gone. */
+/** "pid 123", or why there is no pid: how a message names the owner of a listening socket. */
+const ownerText = (pid) => (pid === UNKNOWN_OWNER ? 'owner not readable' : `pid ${pid}`);
+
+/** Ends the process tree rooted at pid. Safe to call for a pid that has already gone, or for none. */
 function killTree(pid) {
-  if (!pid) return;
+  if (!(pid > 0)) return; // none, 0, or UNKNOWN_OWNER: a negative number would address a process group
   if (WINDOWS) {
     spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
       stdio: 'ignore',
@@ -130,34 +138,46 @@ function parseProcNetTcp(text, port) {
   return inodes;
 }
 
-/** Linux, without lsof or ss: the sockets in /proc/net/tcp* mapped to their owners through /proc/<pid>/fd. */
-function listenersLinux(port) {
+/**
+ * Linux, without lsof or ss: the sockets in /proc/net/tcp* mapped to their owners through /proc/<pid>/fd.
+ * A LISTEN socket that no readable process owns is reported as UNKNOWN_OWNER (busy, owner not ours to see).
+ * `io` is the file system and the /proc folder, a seam for the tests (a fake /proc).
+ */
+function listenersLinux(port, io = { fs, procRoot: '/proc' }) {
+  const { fs: fsApi, procRoot } = io;
   const wanted = new Set();
-  for (const file of ['/proc/net/tcp', '/proc/net/tcp6']) {
+  for (const file of ['net/tcp', 'net/tcp6']) {
     try {
-      parseProcNetTcp(fs.readFileSync(file, 'utf8'), port).forEach((i) => wanted.add(i));
+      parseProcNetTcp(fsApi.readFileSync(`${procRoot}/${file}`, 'utf8'), port).forEach((i) =>
+        wanted.add(i),
+      );
     } catch {
       // no IPv6 table, or unreadable
     }
   }
   const pids = new Set();
   if (wanted.size === 0) return pids;
-  for (const pid of fs.readdirSync('/proc').filter((n) => /^\d+$/.test(n))) {
+  const owned = new Set();
+  for (const pid of fsApi.readdirSync(procRoot).filter((n) => /^\d+$/.test(n))) {
     let fds;
     try {
-      fds = fs.readdirSync(`/proc/${pid}/fd`);
+      fds = fsApi.readdirSync(`${procRoot}/${pid}/fd`);
     } catch {
-      continue; // gone, or not ours to read
+      continue; // gone, or another user's: an inode nobody readable owns is caught below
     }
     for (const fd of fds) {
       try {
-        const m = /^socket:\[(\d+)\]$/.exec(fs.readlinkSync(`/proc/${pid}/fd/${fd}`));
-        if (m && wanted.has(m[1])) pids.add(Number(pid));
+        const m = /^socket:\[(\d+)\]$/.exec(fsApi.readlinkSync(`${procRoot}/${pid}/fd/${fd}`));
+        if (m && wanted.has(m[1])) {
+          pids.add(Number(pid));
+          owned.add(m[1]);
+        }
       } catch {
         // the fd closed meanwhile
       }
     }
   }
+  if ([...wanted].some((inode) => !owned.has(inode))) pids.add(UNKNOWN_OWNER);
   return pids;
 }
 
@@ -207,6 +227,9 @@ function sweepPorts(ports) {
 
 module.exports = {
   parseProcNetTcp,
+  listenersLinux,
+  UNKNOWN_OWNER,
+  ownerText,
   runCommand,
   killTree,
   killAll,
