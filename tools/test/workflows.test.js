@@ -38,6 +38,10 @@ const DATABASE_CHECKS = [
   'db-tools-tests',
 ];
 
+// Built from code points: a literal LS or PS in this file would be a line break to ESLint and to editors.
+const LS_CHAR = String.fromCodePoint(0x2028);
+const PS_CHAR = String.fromCodePoint(0x2029);
+const BOM_CHAR = String.fromCodePoint(0xfeff);
 const SNAPSHOT_DIR = path.join(__dirname, 'workflow-snapshots');
 const snapshots = Object.fromEntries(
   FILES.filter((n) => fs.existsSync(path.join(SNAPSHOT_DIR, `${n}.snap`))).map((n) => [
@@ -837,8 +841,8 @@ const MUTATIONS = [
   ...[
     ['R5-1', 'a bare CR', '\r', /^lint\.yml:\d+: character U\+000D \(CR\)/],
     ['R5-2', 'a NEL (U+0085)', '\u0085', /^lint\.yml:\d+: character U\+0085/],
-    ['R5-3', 'an LS (U+2028)', ' ', /^lint\.yml:\d+: character U\+2028/],
-    ['R5-4', 'a PS (U+2029)', ' ', /^lint\.yml:\d+: character U\+2029/],
+    ['R5-3', 'an LS (U+2028)', LS_CHAR, /^lint\.yml:\d+: character U\+2028/],
+    ['R5-4', 'a PS (U+2029)', PS_CHAR, /^lint\.yml:\d+: character U\+2029/],
   ].map(([id, what, ch, expected]) => [
     `${id} lint: ${what} inside a comment line hides a NODE_OPTIONS line from the rules, not from the runner`,
     'lint.yml',
@@ -864,7 +868,7 @@ const MUTATIONS = [
   [
     'R5-7 build: a PS inside a comment line',
     'build.yml',
-    edit('build.yml', '\npermissions:', '\n# note permissions:\npermissions:'),
+    edit('build.yml', '\npermissions:', '\n# note' + PS_CHAR + 'permissions:\npermissions:'),
     /^build\.yml:\d+: character U\+2029/,
   ],
   // ---- S7 round 5, 3: the action SHA is part of the snapshot ----
@@ -1036,8 +1040,8 @@ test('plainProblems names the file, the line and the character code, and says wh
 for (const [label, ch, code] of [
   ['CR', '\r', 'U+000D'],
   ['NEL', '\u0085', 'U+0085'],
-  ['LS', ' ', 'U+2028'],
-  ['PS', ' ', 'U+2029'],
+  ['LS', LS_CHAR, 'U+2028'],
+  ['PS', PS_CHAR, 'U+2029'],
   ['VT', '\u000b', 'U+000B'],
   ['DEL', '\u007f', 'U+007F'],
   ['a letter with an accent', 'é', 'U+00E9'],
@@ -1053,7 +1057,7 @@ for (const [label, ch, code] of [
 }
 
 test('a BOM at the start of a workflow is reported', () => {
-  const problems = checkWorkflow('lint.yml', `﻿${text('lint.yml')}`, CTX);
+  const problems = checkWorkflow('lint.yml', `${BOM_CHAR}${text('lint.yml')}`, CTX);
   assert.ok(
     problems.some((p) => /^lint\.yml:1: character U\+FEFF/.test(p)),
     problems.join('\n'),
