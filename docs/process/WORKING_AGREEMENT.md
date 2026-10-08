@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.7 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.8 | **Date**: 2026-10-07 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -21,7 +21,7 @@ The product owner set these rules so they never have to be repeated. When the pr
 | Plan | `plan/<id>.md` (names the spec revision, the §5 items it triggers, its DESIGN CHOICES) | The product owner |
 | Code and tests | the diff (coders), the tests (test-verifier) | Nobody yet: the agent that wrote it can never approve it (standard §14.2) |
 | Review | dod-reviewer: runs `npm run verify` in a fresh context, then `REVIEW.md` and §5 | An AI self-check, never a sign-off |
-| PR | with the evidence of §5.3 | The product owner |
+| PR | with the evidence of §5.3; lint and e2e green on GitHub (required checks, L136) | The product owner approves the merge; nothing reaches `main` except through a pull request, for anyone (L136) |
 
 **Phase setup work the standard itself defines** (Phase 1's rails, Appendix C) has no intent or spec: it runs as one plan, approved once, built in slices, each closed with pasted proof (L123). Product features always take the full chain above.
 
@@ -69,7 +69,7 @@ One-time, after cloning: `git config core.hooksPath .githooks` (README).
 
 ## 7. Repository (L121)
 
-A private GitHub repository under `dev42025pwd`, with GitHub Actions for CI. It is created, and anything pushed, only on the product owner's go, after they sign in to the GitHub CLI as that account: `dev42025pwd/gabay`, at Phase 1's CI slice (L123).
+A **public** GitHub repository, `dev42025pwd/gabay` (L135; private before), with GitHub Actions for CI. It is created, and anything pushed, only on the product owner's go, after they sign in to the GitHub CLI as that account (L123). Commits carry `dev42025pwd`'s GitHub noreply address, never a work email (L135). **Branch flow (L136):** work happens on a branch; a pull request into `main` merges only when lint and e2e pass and the product owner approves; branch protection has no bypass, the product owner included.
 
 **Never in git (L123):** `Gabay Demo.apk` (too large for a repository) and `db/seeds/sources/internal/` (the penthouse, internal only, L48), besides `.env` and generated output. A clean clone seeds without the penthouse.
 
