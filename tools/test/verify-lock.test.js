@@ -11,71 +11,26 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
-const { scratch, verify, startVerify, lockFileOf } = require('./verify-scratch');
 const { pidExists } = require('../lib/proc');
 
-const NODE = process.execPath;
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function waitUntil(fn, ms = 20_000) {
-  const until = Date.now() + ms;
-  while (Date.now() < until) {
-    if (await fn()) return true;
-    await sleep(50);
-  }
-  return false;
-}
-
-/** A process that stays alive until killed, standing in for another verify. */
-function liveHolder() {
-  return spawn(NODE, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-}
-
-/** The pid of a process that has already ended. */
-async function deadPid() {
-  const child = spawn(NODE, ['-e', ''], { stdio: 'ignore' });
-  await new Promise((resolve) => child.on('exit', resolve));
-  return child.pid;
-}
-
-const holderRecord = (pid, over = {}) => ({
-  token: `test-${pid}`,
-  owner: 'api-coder',
-  pid,
-  folder: 'C:\\work\\gabay-a',
-  commit: 'abc1234',
-  startedAt: '2026-10-08T01:02:03.000Z',
-  ...over,
-});
-
-const writeLock = (dir, record) => fs.writeFileSync(lockFileOf(dir), JSON.stringify(record));
-const readLock = (dir) => JSON.parse(fs.readFileSync(lockFileOf(dir), 'utf8'));
-const lockExists = (dir) => fs.existsSync(lockFileOf(dir));
-const clean = (dir) => fs.rmSync(dir, { recursive: true, force: true });
-
-/** A scratch path outside the scratch repo, for what a check wants to tell its test. */
-const seenFile = (name) =>
-  path.join(os.tmpdir(), `gabay-lock-${name}-${process.pid}-${Date.now()}.json`);
-
-/**
- * A check ("linter-tests") that notes whether the lock was held while it ran (copying it to `seen`), then ends
- * with `exitCode`, after sleeping `napMs`.
- */
-const noteLockCheck = (seen, { exitCode = 0, napMs = 0 } = {}) => ({
-  'package.json': JSON.stringify({ scripts: { 'lint:test': 'node peek.js' } }),
-  'peek.js': `const fs = require('fs');
-fs.copyFileSync(process.env.GABAY_VERIFY_LOCK_FILE, ${JSON.stringify(seen)});
-console.log('# tests 1');
-setTimeout(() => process.exit(${exitCode}), ${napMs});
-`,
-});
-
-/** A check that sleeps `ms`, then passes (the "# tests 1" line is what the tests check wants). */
-const sleepingCheck = (ms) => ({
-  'package.json': JSON.stringify({ scripts: { 'lint:test': 'node nap.js' } }),
-  'nap.js': `console.log('# tests 1'); setTimeout(() => {}, ${ms});\n`,
-});
+const {
+  scratch,
+  verify,
+  startVerify,
+  lockFileOf,
+  sleep,
+  waitUntil,
+  liveHolder,
+  deadPid,
+  holderRecord,
+  writeLock,
+  readLock,
+  lockExists,
+  clean,
+  seenFile,
+  noteLockCheck,
+  sleepingCheck,
+} = require('./verify-scratch');
 
 test('pidExists: true for a live process, false for one that has ended', async () => {
   assert.equal(pidExists(process.pid), true);

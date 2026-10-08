@@ -33,7 +33,7 @@
 // (tools/lib/verify-lock.js) before its first check, because all runs share gabay_dev and the emulator ports. A
 // second run prints who holds it and waits; after GABAY_VERIFY_LOCK_WAIT_MS (default 15 minutes) it stops with
 // exit 2, and records nothing. GABAY_VERIFY_OWNER names the run in the lock (for example "api-coder"). The lock
-// is released on every way out of this process: the end, a failed check, Ctrl-C and SIGTERM. --list and CI
+// is released on every way out of this process: the end, a failed check, Ctrl-C, SIGTERM and SIGHUP. --list and CI
 // (CI=true: a fresh runner, one job) take no lock.
 //
 // TEST SEAMS (used by tools/test, not for normal use): GABAY_VERIFY_EMULATOR_TIMEOUT_MS shortens the
@@ -425,6 +425,9 @@ const CHECKS = [
 
 const pad = (name) => name.padEnd(20);
 
+/** The signals that stop a run cleanly: Ctrl-C, termination, and a closed terminal (SIGHUP). */
+const STOP_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+
 /** The verify lock this process holds, or null (GitHub's runners and a run that has not got it yet hold none). */
 let heldLock = null;
 function releaseHeldLock() {
@@ -468,7 +471,6 @@ async function main() {
     releaseHeldLock();
     process.exit(130);
   };
-  process.on('SIGINT', () => stop('SIGINT'));
   // A Ctrl-C cannot be scripted from a non-interactive shell on Windows, so a test can ask for the same
   // cleanup after a delay: GABAY_VERIFY_TEST_INTERRUPT_MS (not for normal use).
   if (process.env.GABAY_VERIFY_TEST_INTERRUPT_MS) {
@@ -477,7 +479,7 @@ async function main() {
       Number(process.env.GABAY_VERIFY_TEST_INTERRUPT_MS),
     ).unref();
   }
-  process.on('SIGTERM', () => stop('SIGTERM'));
+  for (const signal of STOP_SIGNALS) process.on(signal, () => stop(signal));
   process.on('exit', () => {
     killAll();
     releaseHeldLock(); // the backstop for every other way out (an error, a plain exit)
@@ -563,4 +565,11 @@ if (require.main === module) {
   );
 }
 
-module.exports = { CHECKS, jsFiles, repairSeedExport, AFTER_CHECK, EXPORT_SETTLE_MS };
+module.exports = {
+  CHECKS,
+  jsFiles,
+  repairSeedExport,
+  AFTER_CHECK,
+  EXPORT_SETTLE_MS,
+  STOP_SIGNALS,
+};
