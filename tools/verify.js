@@ -29,6 +29,11 @@
 // GABAY_VERIFY_CHECK_TIMEOUT_MS (CI only) caps every check's own timeout, so a hung check fails with its
 // output before the CI job's timeout cancels the run.
 //
+// A FAILING CHECK'S WHOLE OUTPUT IS KEPT (plan/PH1-verify-logs.md): the console shows its last 30 lines, and
+// everything it printed is saved first to .verify/logs/<check>.log (tools/lib/verify-logs.js; at most 5 MB, the
+// start and the end past that). The FAIL line names the file. A run empties that folder right after it has the
+// lock, so it holds the latest run's failures only and a green run leaves it empty. --list never touches it.
+//
 // ONE RUN AT A TIME (plan/PH1-verify-lock.md): every run, a partial one too, takes a lock for the whole machine
 // (tools/lib/verify-lock.js) before its first check, because all runs share gabay_dev and the emulator ports. A
 // second run prints who holds it and waits; after GABAY_VERIFY_LOCK_WAIT_MS (default 15 minutes) it stops with
@@ -63,6 +68,7 @@ const {
   acquireLock,
   releaseLock,
 } = require('./lib/verify-lock');
+const { resetLogs, writeLog } = require('./lib/verify-logs');
 
 const NODE = `"${process.execPath}"`;
 const WINDOWS = process.platform === 'win32';
@@ -250,6 +256,9 @@ function testsRan(output) {
 }
 
 /**
+ * What a check returns: { ok, output, full? }. `output` is what the console shows (the tail); `full` is
+ * everything the check had, saved to .verify/logs/<check>.log when it fails (`output` when there is no `full`).
+ *
  * A check that is one command. With { tests: true } it also fails when the run reports no tests:
  * `node --test "<glob>"` exits 0 when the glob matches nothing, which would pass a check that
  * checked nothing.
@@ -267,38 +276,45 @@ const command =
       ok = false;
       note += '\nno tests ran (0, or no "# tests" line): the test glob probably matches nothing.';
     }
-    return { ok, output: tail(r.output, TAIL_LINES) + note };
+    return { ok, output: tail(r.output, TAIL_LINES) + note, full: r.output + note };
   };
 
 /** Ports of servers THIS run has started and not yet seen stop: the only ones an interrupt may sweep. */
 const startedPorts = new Set();
 
-/** A check that starts servers: refuses to start on busy ports, and fails if any listener is left. */
-const withServers = (ports, run) => async () => {
-  const busy = ports.flatMap((port) =>
-    listeners(port).map((pid) => `port ${port} (${ownerText(pid)})`),
-  );
-  if (busy.length) {
-    return {
-      ok: false,
-      output: `Cannot start: ${busy.join(', ')} already in use. Stop that process (an emulator you started?) and run verify again.`,
-    };
-  }
-  // The ports were free a moment ago, so a listener on them from here on is ours.
-  ports.forEach((p) => startedPorts.add(p));
-  const result = await run();
-  await waitPortsFree(ports, SHUTDOWN_GRACE_MS); // a normal shutdown takes a few seconds
-  const orphans = sweepPorts(ports);
-  ports.forEach((p) => startedPorts.delete(p));
-  if (orphans.length) {
-    const list = orphans.map((o) => `port ${o.port} ${ownerText(o.pid)}`).join(', ');
-    return {
-      ok: false,
-      output: `${result.output}\nORPHAN left behind (stopped when its pid could be read): ${list}`,
-    };
-  }
-  return result;
-};
+/**
+ * A check that starts servers: refuses to start on busy ports, and fails if any listener is left.
+ * `graceMs` is how long the ports may stay open after the command ended (a test shortens it).
+ */
+const withServers =
+  (ports, run, graceMs = SHUTDOWN_GRACE_MS) =>
+  async () => {
+    const busy = ports.flatMap((port) =>
+      listeners(port).map((pid) => `port ${port} (${ownerText(pid)})`),
+    );
+    if (busy.length) {
+      return {
+        ok: false,
+        output: `Cannot start: ${busy.join(', ')} already in use. Stop that process (an emulator you started?) and run verify again.`,
+      };
+    }
+    // The ports were free a moment ago, so a listener on them from here on is ours.
+    ports.forEach((p) => startedPorts.add(p));
+    const result = await run();
+    await waitPortsFree(ports, graceMs); // a normal shutdown takes a few seconds
+    const orphans = sweepPorts(ports);
+    ports.forEach((p) => startedPorts.delete(p));
+    if (orphans.length) {
+      const list = orphans.map((o) => `port ${o.port} ${ownerText(o.pid)}`).join(', ');
+      const orphanLine = `\nORPHAN left behind (stopped when its pid could be read): ${list}`;
+      return {
+        ok: false,
+        output: result.output + orphanLine,
+        full: (result.full ?? result.output) + orphanLine,
+      };
+    }
+    return result;
+  };
 
 function nodeVersion() {
   const major = process.versions.node.split('.')[0];
@@ -335,18 +351,23 @@ async function nodeCheck() {
     ...jsFiles('.claude/hooks'),
   ].filter((f) => fs.existsSync(path.join(ROOT, f)));
   const failures = [];
+  const wholeFailures = [];
   // Eight at once, without a shell: one process per file is the literal `node --check`, and quick this way.
   const queue = [...files];
   const worker = async () => {
     for (let file = queue.shift(); file; file = queue.shift()) {
       const r = await checkSyntax(file);
-      if (!r.ok) failures.push(`${file}\n${tail(r.output, 6)}`);
+      if (!r.ok) {
+        failures.push(`${file}\n${tail(r.output, 6)}`);
+        wholeFailures.push(`${file}\n${r.output.trimEnd()}`);
+      }
     }
   };
   await Promise.all(Array.from({ length: 8 }, worker));
   return {
     ok: failures.length === 0,
     output: failures.length ? failures.join('\n') : `${files.length} files`,
+    full: wholeFailures.join('\n'),
   };
 }
 
@@ -355,13 +376,13 @@ async function structuralLinters() {
   // The runner prints "ok   repo-layout" only when db/schema.sql, app/lib and functions/src exist:
   // without it a pass could mean "there was nothing to look at".
   const layoutSeen = /^ok\s+repo-layout/m.test(r.output);
+  const note = layoutSeen
+    ? ''
+    : '\nThe "ok   repo-layout" line is missing: the run did not check the whole repo.';
   return {
     ok: r.code === 0 && layoutSeen,
-    output:
-      tail(r.output, TAIL_LINES) +
-      (layoutSeen
-        ? ''
-        : '\nThe "ok   repo-layout" line is missing: the run did not check the whole repo.'),
+    output: tail(r.output, TAIL_LINES) + note,
+    full: r.output + note,
   };
 }
 
@@ -508,6 +529,11 @@ async function main() {
     heldLock = got.handle;
   }
 
+  // The logs hold the latest run's failures only: emptied once this run has the lock (a run that waits must not
+  // wipe what the run ahead of it left), and never by --list, which returned above.
+  const reset = resetLogs(ROOT);
+  if (reset.error) console.log(`verify: could not empty .verify/logs: ${reset.error}`);
+
   const started = Date.now();
   const printAtStart = fingerprint();
   const selected = CHECKS.filter((c) => !only || only.includes(c.name));
@@ -515,7 +541,14 @@ async function main() {
   for (const check of selected) {
     const r = await timed(() => Promise.resolve(check.run()));
     results.push({ name: check.name, ok: r.ok, seconds: Number(r.seconds.toFixed(1)) });
-    console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${pad(check.name)} (${r.seconds.toFixed(1)} s)`);
+    // A failing check's whole output goes to its log BEFORE the console shows the tail of it.
+    const saved = r.ok ? null : writeLog(ROOT, check.name, r.full ?? r.output ?? '');
+    const where = !saved
+      ? ''
+      : saved.error
+        ? `  (could not save the full output: ${saved.error})`
+        : `  full output: ${saved.file} (${saved.lines} lines)`;
+    console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${pad(check.name)} (${r.seconds.toFixed(1)} s)${where}`);
     if (!r.ok && r.output)
       console.log(
         r.output
@@ -574,6 +607,7 @@ if (require.main === module) {
 
 module.exports = {
   CHECKS,
+  withServers,
   jsFiles,
   repairSeedExport,
   AFTER_CHECK,

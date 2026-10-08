@@ -71,6 +71,58 @@ function childEnv(extra = {}) {
   return env;
 }
 
+/**
+ * How many characters a command's captured output (and so a verify log) may hold: 5 MB. Past it the middle is
+ * cut and the start and the end are kept, because the first lines of a failure (a test's name, the first error)
+ * are often at the start. Characters, not bytes: the same for plain ASCII output.
+ */
+const OUTPUT_CAP_CHARS = 5 * 1024 * 1024;
+
+/** The line that stands where the middle of an over-long output was cut. */
+const cutLine = (cut, head, tail, cap) =>
+  `\n[... cut ${cut} characters here: the output was over the ${cap}-character limit, so only its first ${head} and last ${tail} characters are kept ...]\n`;
+
+/**
+ * Collects text of any length in bounded memory. add() takes chunks; text() is everything while it fits in
+ * `cap` characters, and otherwise the first cap/2 characters, a line saying how many were cut, and the last cap/2.
+ */
+function boundedOutput(cap = OUTPUT_CAP_CHARS) {
+  const half = Math.max(1, Math.floor(cap / 2));
+  let head = '';
+  let tail = '';
+  let dropped = 0;
+  return {
+    add(chunk) {
+      let text = String(chunk);
+      if (head.length < half) {
+        const room = half - head.length;
+        head += text.slice(0, room);
+        text = text.slice(room);
+      }
+      tail += text;
+      if (tail.length > 2 * half) {
+        // trimmed in big steps, so a long output is not copied once per chunk
+        dropped += tail.length - half;
+        tail = tail.slice(-half);
+      }
+    },
+    text() {
+      if (dropped === 0 && head.length + tail.length <= cap) return head + tail;
+      const keptTail = tail.slice(-half);
+      const cut = dropped + tail.length - keptTail.length;
+      if (cut === 0) return head + keptTail;
+      return head + cutLine(cut, head.length, keptTail.length, cap) + keptTail;
+    },
+  };
+}
+
+/** A text as boundedOutput would keep it: whole within `cap` characters, else its start and end with a "cut" line. */
+function capText(text, cap = OUTPUT_CAP_CHARS) {
+  const buffer = boundedOutput(cap);
+  buffer.add(text);
+  return buffer.text();
+}
+
 /** The last `lines` lines of some text. */
 function tail(text, lines = 30) {
   const all = String(text).replace(/\r/g, '').split('\n');
@@ -94,14 +146,10 @@ function runCommand(commandLine, { cwd, env, timeoutMs = 10 * 60_000 } = {}) {
       detached: !WINDOWS, // own process group, so the whole tree can be signalled
     });
     live.add(child.pid);
-    let output = '';
+    const output = boundedOutput(); // its start and its end, at most OUTPUT_CAP_CHARS in all
     let timedOut = false;
-    const take = (chunk) => {
-      output += chunk;
-      if (output.length > 2_000_000) output = output.slice(-1_000_000);
-    };
-    child.stdout.on('data', take);
-    child.stderr.on('data', take);
+    child.stdout.on('data', output.add);
+    child.stderr.on('data', output.add);
     const timer = setTimeout(() => {
       timedOut = true;
       killTree(child.pid);
@@ -113,10 +161,10 @@ function runCommand(commandLine, { cwd, env, timeoutMs = 10 * 60_000 } = {}) {
       clearTimeout(timer);
       live.delete(child.pid);
       killTree(child.pid); // a finished shell can still have left children behind
-      resolve({ code, timedOut, output });
+      resolve({ code, timedOut, output: output.text() });
     };
     child.on('error', (err) => {
-      output += `\n${err.message}`;
+      output.add(`\n${err.message}`);
       finish(null);
     });
     // 'close' waits for every stdio pipe to end, and a grandchild that outlives its parent (an emulator
@@ -250,6 +298,9 @@ module.exports = {
   killAll,
   childEnv,
   tail,
+  OUTPUT_CAP_CHARS,
+  boundedOutput,
+  capText,
   listeners,
   waitPortsFree,
   sweepPorts,
