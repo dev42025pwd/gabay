@@ -1,8 +1,8 @@
 # Gabay — REVIEW.md
 
-> **Version**: 1.1 | **Date**: 2026-10-08 | **Status**: in force (standard §8.6; plan.html L121; trimmed in Phase 1 S6, L131) | **Audience**: dod-reviewer and any reviewer of a Gabay change | **Scope**: the passes a change goes through before the product owner signs its PR
+> **Version**: 1.2 | **Date**: 2026-10-08 | **Status**: in force (standard §8.6; plan.html L121; trimmed in Phase 1 S6, L131; the guards moved to CI in S7, L136) | **Audience**: dod-reviewer and any reviewer of a Gabay change | **Scope**: the passes a change goes through before the product owner signs its PR
 
-Run the passes in order. Skip what `npm run verify` already enforces (standard §8.6; step 0 runs it): rules 2, 3, 4, 6 and 7 as far as the structural linters reach (`tools/lint/README.md`; their "Accepted limits" are reviewed by hand), and the schema-to-form drift. Until CI exists (S7), the secret guard and the changelog duplicate guard run only in the local pre-commit hook, which `--no-verify` skips: check both by hand (no staged `.env*`; no repeated changelog entry).
+Run the passes in order. Skip what `npm run verify` already enforces (standard §8.6; step 0 runs it): rules 2, 3, 4, 6 and 7 as far as the structural linters reach (`tools/lint/README.md`; their "Accepted limits" are reviewed by hand), and the schema-to-form drift. The secret guard and the changelog duplicate guard also run in CI (`npm run ci:guards` in `lint.yml`, a required check on every pull request since S7, L136), so a commit made with `--no-verify` is still caught before merge: skip them too.
 
 **Skip entirely:** generated files (`app/lib/l10n/app_localizations*.dart`, `build/`, `.dart_tool/`, `node_modules/`, lockfiles unless a pin moved).
 
