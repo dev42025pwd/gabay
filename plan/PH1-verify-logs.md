@@ -1,6 +1,6 @@
 # Plan: a failing check's whole output is kept (verify logs)
 
-> **Version**: 1.0 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-08 (plan.html L141) | **Spec**: none (tooling for Phase 1's rails, as `plan/PH1-rails.md`, L123) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
+> **Version**: 1.1 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-08 (plan.html L141); 1.1 adds the review fixes (L142) | **Spec**: none (tooling for Phase 1's rails, as `plan/PH1-rails.md`, L123) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
 
 ## Why
 
@@ -29,6 +29,14 @@
 - A green run leaves `.verify/logs/` empty, including after a red run.
 - A timed-out check's output is saved.
 - An output past the cap keeps its start and end with the "cut" line.
+
+## Review fixes (1.1; dod-reviewer's review of `2fe0898`, the product owner's rulings, L142)
+
+1. **The cut is made once and its count is true.** `runCommand` already caps its output (head, tail and a "cut N characters" line); `writeLog` must not cap that text again, which replaced the true count with the size of the first cut line (reviewer: a 300 MB failure saved as "cut 154 characters"). Test: an output past the cap is saved with the real number of characters cut.
+2. **One locked log does not stop the reset.** Each old log is removed on its own, with a short retry for a brief antivirus or indexer lock; any that still cannot be removed are named in one line, and the rest are removed (reviewer: one log held open on Windows left all three in place). Test: one log held open, the others removed, the held one named.
+3. **Why a check stopped.** `node-check` and `structural-linters` say "TIMED OUT" in their console tail and their log when they are cut off, as the command checks do.
+4. **The finish check points to the logs.** When the last verify failed, the Stop hook's notice (`.claude/hooks/stop-verify.js`) also says the full output is in `.verify/logs/`.
+5. **The pull request states** that a failing check on GitHub now prints up to about 5 MB of output instead of 2 MB (CI prints the whole output; no workflow change).
 
 ## Companion files (CLAUDE.md's sync table)
 
