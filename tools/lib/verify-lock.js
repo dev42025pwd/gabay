@@ -106,9 +106,9 @@ const describeHolder = (r) =>
 const busyLine = (r) => `verify is busy: held by ${describeHolder(r)}${since(r)}`;
 const since = (r) => (r.startedAt ? ` since ${r.startedAt}` : '');
 
-/** The line for a lock that is there but cannot be read now. */
-const busyUnknownLine = (file) =>
-  `verify is busy: ${file} is held by a run that cannot be identified (the file cannot be read or cleared now)`;
+/** The line for a lock file that names no holder: its content is not a verify lock, or it could not be read now. */
+const busyUnknownLine = (file, notALock) =>
+  `verify is busy: ${file} is held by a run that cannot be identified (${notALock ? 'its content is not a verify lock' : 'it cannot be read now'}, and it cannot be cleared now)`;
 
 /** The text of a duration as a person says it: "15 min", "90 s", "1500 ms". */
 function durationText(ms) {
@@ -231,6 +231,7 @@ async function acquireLock({
   let reported = { key: null, at: 0 };
   let cannotClear = null; // the text of the stale lock whose removal failed: its line is printed once
   let holder = null;
+  let notALock; // the lock file's content is not a verify lock (as opposed to a read error)
   for (;;) {
     const current = readLock(file);
     if (current.missing) {
@@ -258,15 +259,16 @@ async function acquireLock({
       }
     }
 
+    notALock = Boolean(current.unreadable);
     const key = current.text ?? current.error;
     if (reported.key !== key || Date.now() - reported.at >= reportMs) {
-      log(current.record ? busyLine(current.record) : busyUnknownLine(file));
+      log(current.record ? busyLine(current.record) : busyUnknownLine(file, current.unreadable));
       reported = { key, at: Date.now() };
     }
     if (Date.now() - waitStarted >= waitMs) {
       const who = holder
         ? `${describeHolder(holder)}${since(holder)}`
-        : `a run that cannot be identified (${file} cannot be read)`;
+        : `a run that cannot be identified (${file} ${notALock ? 'is not a verify lock' : 'could not be read'})`;
       const stuck = Number.isInteger(holder?.pid)
         ? `If that run is stuck, first check that process ${holder.pid} is a node process running verify (the number may belong to another program by now), then end it; or delete ${file}.`
         : `If that run is stuck, delete ${file}.`;

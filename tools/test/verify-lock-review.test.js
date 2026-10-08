@@ -1,5 +1,5 @@
 // The verify lock, review fixes (plan/PH1-verify-lock.md 1.1; dod-reviewer's findings on e9836a7, L140). Each test
-// names the bug it guards and failed on e9836a7:
+// names the bug it guards, and each failed on e9836a7 except the two simultaneous-start rounds (S2a), see below:
 //   I1  a stale lock that cannot be removed made a waiting run spin: no pause, no limit check, no output, a temp
 //       file per loop, and a run that never ended while the lock was held open;
 //   S2a clearing a dead lock could remove the live lock another run had just taken (check, then delete);
@@ -7,8 +7,9 @@
 //   S2c a waiting run created (and removed) a temp file at every poll;
 //   S2d a lock written by newer code (a "version" it does not know) was cleared as unreadable;
 //   W3  the time-out message told the reader to end a pid that may now belong to another program.
-// Not failing before: the "nothing there at the start" round of the simultaneous start (e9836a7's exclusive create
-// already held), kept as the plan's item 4.
+// Both simultaneous-start rounds (S2a: nothing there at the start, and all eight clearing one dead lock) PASS on
+// e9836a7's code too: its exclusive create already held, and the window the claim-by-rename closes is microseconds
+// wide, so no test reproduces it. They are the plan's item 4 and a guard for the new clearing, not a regression test.
 'use strict';
 
 const test = require('./timeout');
@@ -96,6 +97,11 @@ for (const kind of ['dead process', 'unreadable content']) {
       assert.match(r.out, /verify is busy: /, 'it waits as for a live lock');
       assert.ok((r.out.match(/verify is busy: /g) ?? []).length <= 6, 'no flood of lines');
       assert.match(r.err, /gave up waiting/);
+      if (kind === 'unreadable content') {
+        // The file was read; it is just not a lock (the message must not say it cannot be read).
+        assert.match(r.err, /test.lock is not a verify lock/);
+        assert.doesNotMatch(r.err, /cannot be read|could not be read/);
+      }
       assert.equal(r.state, null);
       assert.deepEqual(fs.readdirSync(stuck.folder), ['test.lock'], 'no temp or claimed file left');
     } finally {
