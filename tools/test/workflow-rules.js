@@ -5,6 +5,8 @@
 // copies to prove every rule can fail (S7 review I3: the first version let 8 of 11 gate-breaking edits through).
 'use strict';
 
+const { stepListProblems } = require('./workflow-steps');
+
 /** Exactly what each workflow may upload; anything else (a "." or an .env among them) is a problem. */
 const ALLOWED_UPLOADS = {
   'lint.yml': [],
@@ -21,6 +23,15 @@ const ALLOWED_UPLOADS = {
 /** The build job's `if:`, exactly (S7 review C1: a fork's pull request must never reach this job). */
 const BUILD_IF =
   "github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)";
+
+/** The migration-history step's env, line for line (tools/ci-migrations.js reads exactly these). */
+const MIGRATION_ENV = [
+  'EVENT_NAME: ${{ github.event_name }}',
+  'BASE_REF: ${{ github.base_ref }}',
+  'BEFORE_SHA: ${{ github.event.before }}',
+  'REF_NAME: ${{ github.ref_name }}',
+  'REF_TYPE: ${{ github.ref_type }}',
+];
 
 const LINT_CONCURRENCY_GROUP =
   'lint-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}';
@@ -97,6 +108,9 @@ function stepKeys(stepLines) {
   });
   return keys;
 }
+
+/** The readers workflow-steps.js uses to identify a step. */
+const READERS = { runText, stepAttr, stepKeys };
 
 const squash = (text) => text.replace(/\s+/g, ' ').trim();
 
@@ -286,12 +300,17 @@ function lintProblems(text, ctx) {
   else {
     if (stepAttr(migration, 'if') !== null)
       add('the migration-history step must run on push AND pull_request: no if:');
-    for (const key of ['EVENT_NAME', 'BASE_REF', 'BEFORE_SHA', 'REF_NAME', 'REF_TYPE']) {
-      if (!migration.some((l) => new RegExp(`^\\s+${key}: \\$\\{\\{ [a-z_.]+ \\}\\}$`).test(l))) {
-        add(`the migration-history step needs ${key} from the event, through env`);
-      }
+    // Every value pinned (S7 round 3): a push to main compared with `github.sha` would compare the commit with itself.
+    const envAt = migration.findIndex((l) => /^\s*env:\s*$/.test(l));
+    const env = envAt === -1 ? [] : valueLines(migration, envAt);
+    if (env.join('\n') !== MIGRATION_ENV.join('\n')) {
+      add(
+        `the migration-history step's env must be exactly (in this order): ${MIGRATION_ENV.join('; ')}`,
+      );
     }
   }
+  const clone = /--branch (\d+\.\d+\.\d+) https:\/\/github\.com\/flutter\/flutter\.git/.exec(src);
+  problems.push(...stepListProblems('lint.yml', lintSteps, ctx, READERS, clone?.[1] ?? null));
 
   const only = /--only\s+([a-z0-9,-]+)/.exec(src.replace(/\n\s+/g, ' '));
   if (!only) add('no verify --only list');
@@ -333,6 +352,7 @@ function e2eProblems(text, ctx) {
       ['name', 'shell', 'run'],
     ).map((m) => `e2e.yml: ${m}`),
   );
+  problems.push(...stepListProblems('e2e.yml', e2eSteps, ctx, READERS, null));
   const e2eVerify = e2eSteps.find((st) => (runText(st) ?? '').includes('verify.js'));
   if (e2eVerify && stepAttr(e2eVerify, 'shell') !== 'bash')
     add('the verify step needs shell: bash (pipefail)');

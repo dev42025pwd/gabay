@@ -26,11 +26,20 @@ async function get(url) {
   return { status: res.status, body: await res.json() };
 }
 
-/** An app whose only route runs one query on a db built from the env overrides. */
-async function mountWithDb(overrides, { holdConnection = false } = {}) {
+/**
+ * An app whose only route runs one query on a db built from the env overrides.
+ * holdConnection: take a connection out of the pool before the request, so the pool is full.
+ * requestTimeoutMs: the pool's connection limit WHILE the request runs. The held connection is opened under the
+ * configured limit (S7 round 3: pg-pool uses connectionTimeoutMillis both for waiting for a free connection and
+ * for logging in on a new one, so a 300 ms limit also cut the setup's own login short on a busy machine); only
+ * then is the limit lowered, so only the request being tested waits under it.
+ */
+async function mountWithDb(overrides, { holdConnection = false, requestTimeoutMs = null } = {}) {
   const logger = fakeLogger();
   const db = createDb(testConfig(overrides), logger);
   const held = holdConnection ? await db.pool.connect() : null;
+  // pg-pool reads options.connectionTimeoutMillis each time a connection is asked for.
+  if (requestTimeoutMs !== null) db.pool.options.connectionTimeoutMillis = requestTimeoutMs;
   const s = await mount(
     (app) =>
       app.get('/q', async () => {
@@ -72,14 +81,19 @@ test('db unavailable: an unknown database host (ENOTFOUND) is 503', async () => 
 });
 
 test('db unavailable: a pool that cannot hand out a connection in time ("timeout exceeded") is 503', async () => {
+  // The login of the held connection gets a generous limit (it is setup, not the thing under test);
+  // the request then waits 300 ms for a connection that never frees up.
   const s = await mountWithDb(
-    { PG_POOL_MAX: '1', PG_CONNECT_TIMEOUT_MS: '300' },
-    { holdConnection: true },
+    { PG_POOL_MAX: '1', PG_CONNECT_TIMEOUT_MS: '10000' },
+    { holdConnection: true, requestTimeoutMs: 300 },
   );
   try {
     const r = await get(`${s.url}/q`);
     assert.equal(r.status, 503);
     assert.deepEqual(r.body, UNAVAILABLE);
+    // The real pg-pool wait-for-a-free-connection path, not a login failure.
+    assert.equal(s.logger.calls.error.length, 1, 'logged server-side');
+    assert.equal(s.logger.calls.error[0][0].err.message, 'timeout exceeded when trying to connect');
   } finally {
     await s.close();
   }

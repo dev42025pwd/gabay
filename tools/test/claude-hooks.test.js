@@ -346,3 +346,16 @@ test('stop-verify: a corrupt verify record blocks and says it is corrupt, not th
     assert.doesNotMatch(r.json.reason, /has not been run/);
   });
 });
+
+test('stop-verify: a record that cannot be read (not missing, not corrupt) blocks and names the error, not "has not been run" (S7 round 3)', () => {
+  withRepo((dir) => {
+    // A folder where the record should be: reading it fails with EISDIR (EACCES and EBUSY take the same path).
+    fs.mkdirSync(path.join(dir, '.verify', 'last-run.json'), { recursive: true });
+    const r = hook(dir, 'stop-verify', { hook_event_name: 'Stop' });
+    assert.equal(r.json.decision, 'block');
+    assert.match(r.json.reason, /\.verify\/last-run\.json could not be read/);
+    assert.match(r.json.reason, /EISDIR/);
+    assert.match(r.json.reason, /Run npm run verify/);
+    assert.doesNotMatch(r.json.reason, /has not been run|is corrupt/);
+  });
+});

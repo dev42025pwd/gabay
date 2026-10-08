@@ -74,16 +74,19 @@ function fingerprint(root = ROOT) {
 const stateFile = (root = ROOT) => path.join(root, '.verify', 'last-run.json');
 
 /**
- * The last verify run and how it was read: { state, corrupt, error }. A missing record is { state: null,
- * corrupt: false }; one that does not parse (an interrupted or interleaved write, an edit) is { state: null,
- * corrupt: true, error } so a caller can say "corrupt" instead of "not run".
+ * The last verify run and how it was read: { state, corrupt, error } (and `unreadable: true` on a read error).
+ *   - missing (ENOENT): { state: null, corrupt: false, error: null }
+ *   - does not parse (an interrupted or interleaved write, an edit): { state: null, corrupt: true, error }
+ *   - could not be read for another reason (EACCES, EBUSY, EISDIR ...): { state: null, corrupt: false,
+ *     unreadable: true, error }, so a caller can name the error instead of saying "not run".
  */
 function readStateDetailed(root = ROOT) {
   let text;
   try {
     text = fs.readFileSync(stateFile(root), 'utf8');
-  } catch {
-    return { state: null, corrupt: false, error: null };
+  } catch (err) {
+    if (err.code === 'ENOENT') return { state: null, corrupt: false, error: null };
+    return { state: null, corrupt: false, unreadable: true, error: err.message };
   }
   try {
     return { state: JSON.parse(text), corrupt: false, error: null };
@@ -97,6 +100,36 @@ function readState(root = ROOT) {
   return readStateDetailed(root).state;
 }
 
+/**
+ * A temp file older than this is the leftover of a writer that was killed (or whose write failed): no live
+ * writer holds one longer than its rename retries (under 5 s), so 10 minutes can never hit a live one.
+ */
+const STALE_TEMP_MS = 10 * 60 * 1000;
+
+/** writeState's temp names: last-run.json.<pid>.<random>.tmp */
+const TEMP_NAME = /^last-run\.json\.\d+\.[a-z0-9]+\.tmp$/;
+
+/** Removes the stale temp files of killed writers (older than STALE_TEMP_MS); never fails the write it serves. */
+function removeStaleTemps(folder) {
+  let names;
+  try {
+    names = fs.readdirSync(folder);
+  } catch {
+    return;
+  }
+  for (const name of names.filter((n) => TEMP_NAME.test(n))) {
+    try {
+      const file = path.join(folder, name);
+      const info = fs.statSync(file);
+      if (info.isFile() && Date.now() - info.mtimeMs > STALE_TEMP_MS) {
+        fs.rmSync(file, { force: true });
+      }
+    } catch {
+      // gone already, or held by another process: not ours to worry about
+    }
+  }
+}
+
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
@@ -108,8 +141,14 @@ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 
 function writeState(state, root = ROOT) {
   const file = stateFile(root);
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  removeStaleTemps(path.dirname(file));
   const temp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-  fs.writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`);
+  try {
+    fs.writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`);
+  } catch (err) {
+    fs.rmSync(temp, { force: true }); // a failed write (a full disk) leaves no half file behind
+    throw err;
+  }
   for (let attempt = 1; ; attempt += 1) {
     try {
       fs.renameSync(temp, file);
@@ -133,4 +172,5 @@ module.exports = {
   readState,
   readStateDetailed,
   writeState,
+  STALE_TEMP_MS,
 };

@@ -589,6 +589,139 @@ const MUTATIONS = [
     ),
     /private repository/,
   ],
+  // ---- S7 round 3: two holes the round-3 review got through (env values unpinned; a step added before a gate) ----
+  [
+    'R3-a1 lint: BEFORE_SHA from github.sha (a push to main would compare the commit with itself)',
+    'lint.yml',
+    edit('lint.yml', 'BEFORE_SHA: ${{ github.event.before }}', 'BEFORE_SHA: ${{ github.sha }}'),
+    /migration-history step's env must be exactly/,
+  ],
+  [
+    'R3-a2 lint: EVENT_NAME from another context value',
+    'lint.yml',
+    edit('lint.yml', 'EVENT_NAME: ${{ github.event_name }}', 'EVENT_NAME: ${{ github.ref_type }}'),
+    /migration-history step's env must be exactly/,
+  ],
+  [
+    'R3-a3 lint: an extra variable in the migration step env (NODE_OPTIONS)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '          REF_TYPE: ${{ github.ref_type }}\n',
+      '          REF_TYPE: ${{ github.ref_type }}\n          NODE_OPTIONS: --require ./x.js\n',
+    ),
+    /migration-history step's env must be exactly/,
+  ],
+  [
+    "R3-b1 lint: a step before verify rewrites it (sed -i '1i process.exit(0);' tools/v*.js)",
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: verify, the checks that need no database\n',
+      "      - name: Tidy\n        run: sed -i '1i process.exit(0);' tools/v*.js\n\n      - name: verify, the checks that need no database\n",
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b2 lint: a step before verify puts a fake node first on $GITHUB_PATH',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: verify, the checks that need no database\n',
+      '      - name: Tools\n        run: mkdir -p "$HOME/fake" && printf \'#!/bin/sh\\nexit 0\\n\' > "$HOME/fake/node" && chmod +x "$HOME/fake/node" && echo "$HOME/fake" >> "$GITHUB_PATH"\n\n      - name: verify, the checks that need no database\n',
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b3 lint: an existing step (Put Flutter on the PATH) also prepends a fake node folder',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH"',
+      'run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH" && echo "$HOME/fake" >> "$GITHUB_PATH"',
+    ),
+    /step "Put Flutter on the PATH": .*run/,
+  ],
+  [
+    'R3-b4 lint: a step removed (the database tools install)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      "      - name: Install the database tools' packages\n        run: npm ci --prefix db/tools\n\n",
+      '',
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b5 lint: two steps swapped (the two installs)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      "      - name: Install the API's packages (ESLint and Prettier come from here)\n        run: npm ci --prefix functions\n\n      - name: Install the database tools' packages\n        run: npm ci --prefix db/tools\n",
+      "      - name: Install the database tools' packages\n        run: npm ci --prefix db/tools\n\n      - name: Install the API's packages (ESLint and Prettier come from here)\n        run: npm ci --prefix functions\n",
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b6 lint: an env added to an install step (NODE_OPTIONS)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '        run: npm ci --prefix db/tools\n',
+      '        env:\n          NODE_OPTIONS: --require ./x.js\n        run: npm ci --prefix db/tools\n',
+    ),
+    /step "Install the database tools' packages": .*keys/,
+  ],
+  [
+    "R3-b7 e2e: a step before verify rewrites it (sed -i '1i process.exit(0);' tools/v*.js)",
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '      - name: verify, the database half\n',
+      "      - name: Tidy\n        run: sed -i '1i process.exit(0);' tools/v*.js\n\n      - name: verify, the database half\n",
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b8 e2e: a step before verify puts a fake node first on $GITHUB_PATH',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '      - name: verify, the database half\n',
+      '      - name: Tools\n        run: mkdir -p "$HOME/fake" && printf \'#!/bin/sh\\nexit 0\\n\' > "$HOME/fake/node" && chmod +x "$HOME/fake/node" && echo "$HOME/fake" >> "$GITHUB_PATH"\n\n      - name: verify, the database half\n',
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b9 e2e: the .env step changed (it runs before verify)',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '          set -eu\n',
+      '          set -eu\n          echo "$HOME/fake" >> "$GITHUB_PATH"\n',
+    ),
+    /step "Write \.env from throwaway values.*": .*run/,
+  ],
+  [
+    'R3-b10 e2e: two steps swapped (the installs)',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      "      - name: Install the API's packages\n        run: npm ci --prefix functions\n\n      - name: Install the database tools' packages\n        run: npm ci --prefix db/tools\n",
+      "      - name: Install the database tools' packages\n        run: npm ci --prefix db/tools\n\n      - name: Install the API's packages\n        run: npm ci --prefix functions\n",
+    ),
+    /step list/,
+  ],
+  [
+    'R3-b11 e2e: a step removed (the seed packages install)',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      "      - name: Install the seed's packages (firebase-tools lives here)\n        run: npm ci --prefix db/seeds\n\n",
+      '',
+    ),
+    /step list/,
+  ],
 ];
 
 for (const [label, file, mutation, expected] of MUTATIONS) {

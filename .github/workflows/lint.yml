@@ -98,9 +98,10 @@ jobs:
       - name: Secret guard and changelog duplicate guard (the checked-out tree)
         run: npm run ci:guards
 
-      # On a pull request: against the base branch. On a push: against the tip the branch had before the push
-      # (a new branch or a force push is compared with origin/main, and a warning says so when there is
-      # nothing to compare with). tools/ci-migrations.js decides and prints which, and why.
+      # On a pull request: against the base branch. On a push (this workflow pushes only on main): against the
+      # tip main had before the push. The very first push of main has nothing to compare with, and a warning says
+      # so; a force push of main (its old tip is not an ancestor) or a shallow clone fails the step with exit 2.
+      # tools/ci-migrations.js decides and prints which, and why.
       - name: Committed migrations are never edited (push and pull request)
         env:
           EVENT_NAME: ${{ github.event_name }}

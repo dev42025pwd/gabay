@@ -14,6 +14,7 @@ const {
   readState,
   readStateDetailed,
   writeState,
+  STALE_TEMP_MS,
 } = require('../fingerprint');
 
 /** A git repository with one commit of the given files. */
@@ -240,6 +241,95 @@ test('readStateDetailed tells a missing record from a corrupt one, and names the
     assert.equal(d.corrupt, true);
     assert.match(d.error, /JSON|Unexpected/i);
     assert.equal(readState(dir), null, 'readState keeps its meaning: no usable state');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- S7 round 3: stale temp files, and a read error that is not "missing" -------------------------------------
+
+const tempName = (tag) => `last-run.json.${process.pid}.${tag}.tmp`;
+const age = (file, ms) => {
+  const when = new Date(Date.now() - ms);
+  fs.utimesSync(file, when, when);
+};
+
+test('writeState removes a stale last-run.json.*.tmp (a hard kill between write and rename), keeps a fresh one and anything else', () => {
+  const dir = repo(BASE);
+  try {
+    const folder = path.join(dir, '.verify');
+    fs.mkdirSync(folder, { recursive: true });
+    const stale = path.join(folder, tempName('stale1'));
+    const fresh = path.join(folder, tempName('fresh1')); // another live writer, about to rename
+    const other = path.join(folder, 'notes.tmp'); // not ours
+    const staleSubfolder = path.join(folder, `last-run.json.1.dir.tmp`); // not a file
+    for (const f of [stale, fresh, other]) fs.writeFileSync(f, '{"fingerprint":"zzz"}\n');
+    fs.mkdirSync(staleSubfolder);
+    for (const f of [stale, other, staleSubfolder]) age(f, STALE_TEMP_MS + 60_000);
+    age(fresh, STALE_TEMP_MS - 60_000);
+
+    writeState({ fingerprint: 'abc', result: 'green', failed: [] }, dir);
+
+    assert.deepEqual(fs.readdirSync(folder).sort(), [
+      'last-run.json',
+      'last-run.json.1.dir.tmp',
+      path.basename(fresh),
+      'notes.tmp',
+    ]);
+    assert.equal(readState(dir).fingerprint, 'abc');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a temp file is never read as the record, even a whole, valid one next to a missing record', () => {
+  const dir = repo(BASE);
+  try {
+    const folder = path.join(dir, '.verify');
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(
+      path.join(folder, tempName('x')),
+      JSON.stringify({ fingerprint: fingerprint(dir), result: 'green', failed: [] }),
+    );
+    assert.equal(readState(dir), null);
+    assert.deepEqual(readStateDetailed(dir), { state: null, corrupt: false, error: null });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failed temp write leaves no temp file behind, and the error reaches the caller', () => {
+  const dir = repo(BASE);
+  const real = fs.writeFileSync;
+  fs.writeFileSync = (target, ...rest) => {
+    real(target, '{ half'); // what a full disk leaves
+    throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
+  };
+  try {
+    assert.throws(
+      () => writeState({ fingerprint: 'abc', result: 'green', failed: [] }, dir),
+      /ENOSPC/,
+    );
+  } finally {
+    fs.writeFileSync = real;
+  }
+  try {
+    assert.deepEqual(fs.readdirSync(path.join(dir, '.verify')), []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readStateDetailed reports a read error that is not "missing" (here EISDIR; EACCES and EBUSY are the same path) and carries it', () => {
+  const dir = repo(BASE);
+  try {
+    fs.mkdirSync(path.join(dir, '.verify', 'last-run.json'), { recursive: true });
+    const d = readStateDetailed(dir);
+    assert.equal(d.state, null);
+    assert.equal(d.corrupt, false, 'it is not corrupt: it could not be read');
+    assert.equal(d.unreadable, true);
+    assert.match(d.error, /EISDIR/);
+    assert.equal(readState(dir), null, 'readState: still no usable state');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
