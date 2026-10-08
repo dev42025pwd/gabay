@@ -181,19 +181,27 @@ test('the lock is held during a green run and a red run, and released after each
   }
 });
 
-test('the lock is released on an interrupt (the Ctrl-C and SIGTERM path), and exit stays 130', () => {
+test('the lock is released on an interrupt (the Ctrl-C and SIGTERM path), and exit stays 130', async () => {
   const seen = seenFile('interrupt');
+  const trigger = seenFile('interrupt-now');
   const dir = scratch(noteLockCheck(seen, { napMs: 20_000 }));
   try {
-    const r = verify(dir, ['--only', 'linter-tests'], {
-      env: { GABAY_VERIFY_TEST_INTERRUPT_MS: '2500' },
+    const run = startVerify(dir, ['--only', 'linter-tests'], {
+      env: { GABAY_VERIFY_TEST_INTERRUPT_FILE: trigger },
     });
+    // Interrupt only once the check is running, so the lock is certainly held (no guess of how long that takes).
+    assert.ok(
+      await waitUntil(() => fs.existsSync(seen), 60_000),
+      'the check ran, so the lock was held',
+    );
+    fs.writeFileSync(trigger, 'now');
+    const r = await run.done;
     assert.equal(r.status, 130, r.out + r.err);
-    assert.ok(fs.existsSync(seen), 'the lock was held when the interrupt came');
     assert.equal(lockExists(dir), false);
   } finally {
     clean(dir);
     fs.rmSync(seen, { force: true });
+    fs.rmSync(trigger, { force: true });
   }
 });
 

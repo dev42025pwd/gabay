@@ -39,7 +39,8 @@
 // TEST SEAMS (used by tools/test, not for normal use): GABAY_VERIFY_EMULATOR_TIMEOUT_MS shortens the
 // emulator check's timeout; GABAY_VERIFY_TEST_INTERRUPT_MS makes the run call its Ctrl-C cleanup after
 // that many milliseconds, because a real Ctrl-C cannot be sent from a script on Windows;
-// GABAY_VERIFY_LOCK_FILE and GABAY_VERIFY_LOCK_REPORT_MS move the lock and shorten its reminder.
+// GABAY_VERIFY_TEST_INTERRUPT_FILE does the same when that file appears; GABAY_VERIFY_LOCK_FILE and
+// GABAY_VERIFY_LOCK_REPORT_MS move the lock and shorten its reminder.
 'use strict';
 
 const fs = require('node:fs');
@@ -478,6 +479,12 @@ async function main() {
       () => stop('TEST-INTERRUPT'),
       Number(process.env.GABAY_VERIFY_TEST_INTERRUPT_MS),
     ).unref();
+  }
+  // The same, when a file appears: GABAY_VERIFY_TEST_INTERRUPT_FILE (a test that must interrupt at a known moment,
+  // not after a guess of how long the run needs to get there; not for normal use).
+  if (process.env.GABAY_VERIFY_TEST_INTERRUPT_FILE) {
+    const trigger = process.env.GABAY_VERIFY_TEST_INTERRUPT_FILE;
+    setInterval(() => fs.existsSync(trigger) && stop('TEST-INTERRUPT'), 100).unref();
   }
   for (const signal of STOP_SIGNALS) process.on(signal, () => stop(signal));
   process.on('exit', () => {
