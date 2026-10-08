@@ -301,7 +301,7 @@ test('a temp file is never read as the record, even a whole, valid one next to a
 test('a failed temp write leaves no temp file behind, and the error reaches the caller', () => {
   const dir = repo(BASE);
   const real = fs.writeFileSync;
-  fs.writeFileSync = (target, ...rest) => {
+  fs.writeFileSync = (target) => {
     real(target, '{ half'); // what a full disk leaves
     throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
   };
