@@ -8,13 +8,18 @@
 //   EVENT_NAME   github.event_name   push or pull_request
 //   BASE_REF     github.base_ref     pull_request: the branch the PR targets (compared as origin/<it>)
 //   BEFORE_SHA   github.event.before push: the branch tip before the push; all zeros for a new branch
-//   REF_NAME     github.ref_name     push: the branch or tag pushed (used only in messages)
+//   REF_NAME     github.ref_name     push: the branch or tag pushed
+//   REF_TYPE     github.ref_type     push: branch or tag (for the wording, and a tag named main is not main)
 //
 // push, in order of preference:
 //   1. the tip the branch had before the push, when this clone has it and it is an ancestor of HEAD;
 //   2. a new branch (all-zeros BEFORE_SHA) or a force push (the old tip is not in this history): origin/main;
-//   3. nothing to compare with (the first push of main, or a force push of main, which L136's branch rule
-//      forbids): a `::warning::` says so, and the migration FILE-NAME rules still run (never a silent pass).
+//   3. nothing to compare with (the very first push of main: all-zeros BEFORE_SHA): a `::warning::` says so,
+//      and the migration FILE-NAME rules still run (never a silent pass).
+// Two things FAIL (exit 2) instead of falling back: a shallow clone (fetch-depth: 0 is required, or a normal
+// push would look like a force push and be skipped), and a push to main whose previous tip is missing or not an
+// ancestor (a force push of main, which L136's branch rule forbids).
+// lint.yml runs this on pushes to main and on pull requests only; the other branches are covered by their PR.
 //
 // Exit code: the linter's (the number of violations), or 2 for a missing or unusable input. Plain CommonJS, no
 // dependencies, any Node >= 22.
@@ -38,7 +43,14 @@ const exists = (ref) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit
  * What to compare with: { base, reason } for a comparison, { base: null, reason } when there is nothing to
  * compare with, or { error } when the input is unusable.
  */
-function chooseBase({ event, baseRef, before, refName }) {
+function chooseBase({ event, baseRef, before, refName, refType }) {
+  // Without the whole history every comparison below is wrong (a normal push would look like a force push).
+  if (git(['rev-parse', '--is-shallow-repository']).out === 'true') {
+    return {
+      error:
+        'this clone is shallow: the history is incomplete, so nothing can be compared. The checkout needs fetch-depth: 0',
+    };
+  }
   if (event === 'pull_request') {
     if (!baseRef) return { error: 'BASE_REF is empty: a pull request run needs its base branch' };
     const base = `origin/${baseRef}`;
@@ -48,9 +60,19 @@ function chooseBase({ event, baseRef, before, refName }) {
   if (event !== 'push') {
     return { error: `event "${event}": this check handles push and pull_request only` };
   }
+  const isMain = refName === 'main' && refType !== 'tag';
+  const missingTip =
+    !before || ZEROS.test(before)
+      ? null
+      : !exists(before) || !git(['merge-base', '--is-ancestor', before, 'HEAD']).ok;
+  if (isMain && missingTip) {
+    return {
+      error: `the previous tip of main (${before}) is not an ancestor of this push, or not in this clone: a force push of main, which the branch rule (L136) forbids. Nothing was compared`,
+    };
+  }
   let why;
   if (!before || ZEROS.test(before)) {
-    why = 'a new branch (no earlier tip)';
+    why = refType === 'tag' ? 'a new tag (no earlier tip)' : 'a new branch (no earlier tip)';
   } else if (!exists(before)) {
     why = 'a force push (the old tip is not in this history)';
   } else if (!git(['merge-base', '--is-ancestor', before, 'HEAD']).ok) {
@@ -74,6 +96,7 @@ function main() {
     baseRef: process.env.BASE_REF,
     before: process.env.BEFORE_SHA,
     refName: process.env.REF_NAME,
+    refType: process.env.REF_TYPE,
   });
   if (choice.error) {
     console.error(`ci-migrations: ${choice.error}`);

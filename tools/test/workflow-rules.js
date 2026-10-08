@@ -88,6 +88,44 @@ function uploadPaths(stepLines) {
   return at === -1 ? [] : valueLines(stepLines, at);
 }
 
+/** The step's own keys (name, if, run, env, shell, with, uses, ...): the first line's key and those at 8 spaces. */
+function stepKeys(stepLines) {
+  const keys = [];
+  stepLines.forEach((line, i) => {
+    const m = i === 0 ? /^ {6}- ([a-z-]+):/.exec(line) : /^ {8}([a-z-]+):/.exec(line);
+    if (m) keys.push(m[1]);
+  });
+  return keys;
+}
+
+const squash = (text) => text.replace(/\s+/g, ' ').trim();
+
+/**
+ * A step the gate stands on (S7 round 2, I-C): the one step whose run: mentions `marker` must run EXACTLY
+ * `expected` (a pinned text, like BUILD_IF), carry no if:, and have no key outside `allowedKeys`. A skipped job or
+ * step reports success and does not block a required check, so none of these may be skippable or rewritable.
+ */
+function gateStepProblems(stepList, label, marker, expected, allowedKeys) {
+  const problems = [];
+  const found = stepList.filter((st) => (runText(st) ?? '').includes(marker));
+  if (found.length !== 1) {
+    problems.push(
+      `gate step "${label}": exactly one step must run ${marker} (found ${found.length})`,
+    );
+    return problems;
+  }
+  const [st] = found;
+  if (squash(runText(st)) !== expected) {
+    problems.push(`gate step "${label}": its run: must be exactly: ${expected}`);
+  }
+  const keys = stepKeys(st);
+  if (keys.includes('if')) problems.push(`gate step "${label}": no if: (a skipped gate passes)`);
+  for (const k of keys) {
+    if (!allowedKeys.includes(k)) problems.push(`gate step "${label}": unexpected key "${k}"`);
+  }
+  return problems;
+}
+
 const PIPE = /(^|[^|])\|(?!\|)/m;
 const SWALLOW = /\|\|\s*(true\b|:|exit\s+0\b|echo\b)/;
 
@@ -193,8 +231,12 @@ function lintProblems(text, ctx) {
   const problems = [];
   const add = (message) => problems.push(`lint.yml: ${message}`);
   const src = codeLines(text).join('\n');
-  if (!/^on:\n {2}push:\n {2}pull_request:$/m.test(src))
-    add('runs on every push and pull request, nothing else');
+  if (!/^on:\n {2}push:\n {4}branches: \[main\]\n {2}pull_request:$/m.test(src))
+    add(
+      'runs on every pull request and on pushes to main only (a feature-branch push run would disagree with its PR run)',
+    );
+  if (/^ {4}if:/m.test(src))
+    add('the lint job has no if: (a skipped job reports success to a required check)');
   const group = /^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: (.+)$/m.exec(src);
   if (!group || group[1] !== LINT_CONCURRENCY_GROUP) {
     add(
@@ -202,8 +244,41 @@ function lintProblems(text, ctx) {
     );
   }
   if (!group || group[2] !== 'true') add('cancel-in-progress: true');
-  if (!/run: npm run ci:guards$/m.test(src))
-    add('the secret and changelog guards (npm run ci:guards) must run');
+  const lintSteps = steps(text);
+  problems.push(
+    ...gateStepProblems(lintSteps, 'guards', 'ci:guards', 'npm run ci:guards', ['name', 'run']).map(
+      (m) => `lint.yml: ${m}`,
+    ),
+    ...gateStepProblems(
+      lintSteps,
+      'migration history',
+      'ci-migrations',
+      'node tools/ci-migrations.js',
+      ['name', 'env', 'run'],
+    ).map((m) => `lint.yml: ${m}`),
+    ...gateStepProblems(
+      lintSteps,
+      'verify',
+      'verify.js',
+      `node tools/verify.js --only ${ctx.checks.filter((c) => !ctx.databaseChecks.includes(c)).join(',')}`,
+      ['name', 'run'],
+    ).map((m) => `lint.yml: ${m}`),
+  );
+  const checkout = lintSteps.find((st) => st.some((l) => /uses: actions\/checkout@/.test(l)));
+  if (!checkout || !checkout.some((l) => /^ {10}fetch-depth: 0( #.*)?$/.test(l))) {
+    add('the checkout must be fetch-depth: 0 (the migration check needs the whole history)');
+  }
+  const lintKnob = /^ {6}GABAY_VERIFY_CHECK_TIMEOUT_MS: '(\d+)'$/m.exec(src);
+  const lintTimeout = /^ {4}timeout-minutes: (\d+)$/m.exec(src);
+  if (!lintKnob) add('GABAY_VERIFY_CHECK_TIMEOUT_MS must cap every check');
+  else if (lintTimeout) {
+    const need = Number(lintKnob[1]) / 60_000 + ctx.lintRestMinutes;
+    if (Number(lintTimeout[1]) < need) {
+      add(
+        `timeout-minutes ${lintTimeout[1]} is shorter than one hung check at the cap plus ${ctx.lintRestMinutes} min for the rest (${need})`,
+      );
+    }
+  }
   if (!/node-version-file: \.nvmrc/.test(src)) add('Node comes from .nvmrc');
 
   const migration = steps(text).find((s) => runText(s) === 'node tools/ci-migrations.js');
@@ -211,7 +286,7 @@ function lintProblems(text, ctx) {
   else {
     if (stepAttr(migration, 'if') !== null)
       add('the migration-history step must run on push AND pull_request: no if:');
-    for (const key of ['EVENT_NAME', 'BASE_REF', 'BEFORE_SHA', 'REF_NAME']) {
+    for (const key of ['EVENT_NAME', 'BASE_REF', 'BEFORE_SHA', 'REF_NAME', 'REF_TYPE']) {
       if (!migration.some((l) => new RegExp(`^\\s+${key}: \\$\\{\\{ [a-z_.]+ \\}\\}$`).test(l))) {
         add(`the migration-history step needs ${key} from the event, through env`);
       }
@@ -246,6 +321,21 @@ function e2eProblems(text, ctx) {
       "triggers: pull_request to main (L136), nightly '0 18 * * *' (02:00 Manila), workflow_dispatch, nothing else",
     );
   }
+  if (/^ {4}if:/m.test(src))
+    add('the e2e job has no if: (a skipped job reports success to a required check)');
+  const e2eSteps = steps(text);
+  problems.push(
+    ...gateStepProblems(
+      e2eSteps,
+      'verify',
+      'verify.js',
+      `node tools/verify.js --only ${ctx.checks.filter((c) => ctx.databaseChecks.includes(c)).join(',')} 2>&1 | tee verify.log`,
+      ['name', 'shell', 'run'],
+    ).map((m) => `e2e.yml: ${m}`),
+  );
+  const e2eVerify = e2eSteps.find((st) => (runText(st) ?? '').includes('verify.js'));
+  if (e2eVerify && stepAttr(e2eVerify, 'shell') !== 'bash')
+    add('the verify step needs shell: bash (pipefail)');
   const group = /^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: (.+)$/m.exec(src);
   if (!group || group[1] !== E2E_CONCURRENCY_GROUP)
     add(`concurrency group must be "${E2E_CONCURRENCY_GROUP}"`);
@@ -287,10 +377,11 @@ function e2eProblems(text, ctx) {
   if (!knob) add('GABAY_VERIFY_CHECK_TIMEOUT_MS must cap every check (I4)');
   else if (timeout && only) {
     const perCheckMinutes = Number(knob[1]) / 60_000;
-    const worst = only[1].split(',').length * perCheckMinutes + ctx.setupMinutes;
+    const n = only[1].split(',').length;
+    const worst = n * perCheckMinutes + ctx.setupMinutes + ctx.shutdownMinutes + ctx.marginMinutes;
     if (Number(timeout[1]) < worst) {
       add(
-        `timeout-minutes ${timeout[1]} is shorter than ${only[1].split(',').length} checks x ${perCheckMinutes} min + ${ctx.setupMinutes} min of setup`,
+        `timeout-minutes ${timeout[1]} is shorter than ${n} checks x ${perCheckMinutes} min + ${ctx.setupMinutes} setup + ${ctx.shutdownMinutes} shutdown waits + ${ctx.marginMinutes} margin = ${worst}`,
       );
     }
   }

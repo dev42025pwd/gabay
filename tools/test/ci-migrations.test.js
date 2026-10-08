@@ -7,6 +7,7 @@ const test = require('./timeout');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { pathToFileURL } = require('node:url');
 const { scratchRepo, git, write, remove } = require('./scratch');
 
 const ZEROS = '0'.repeat(40);
@@ -41,7 +42,15 @@ const run = (dir, env) => {
   const r = spawnSync(process.execPath, [path.join(dir, 'tools', 'ci-migrations.js')], {
     cwd: dir,
     encoding: 'utf8',
-    env: { ...process.env, EVENT_NAME: '', BASE_REF: '', BEFORE_SHA: '', REF_NAME: '', ...env },
+    env: {
+      ...process.env,
+      EVENT_NAME: '',
+      BASE_REF: '',
+      BEFORE_SHA: '',
+      REF_NAME: '',
+      REF_TYPE: '',
+      ...env,
+    },
   });
   return { status: r.status, out: r.stdout + r.stderr };
 };
@@ -134,5 +143,82 @@ test('an event that is neither push nor pull_request is an error', () => {
     const r = run(dir, { EVENT_NAME: 'schedule' });
     assert.equal(r.status, 2, r.out);
     assert.match(r.out, /schedule/);
+  });
+});
+
+// ---- S7 round 2 (I-C): a missing pre-push tip on main is a failure, not a quiet fallback ------------------------------
+
+test('push to main whose previous tip is not in the clone fails (a force push of main, which L136 forbids)', () => {
+  withRepo((dir) => {
+    const r = run(dir, {
+      EVENT_NAME: 'push',
+      BEFORE_SHA: 'a'.repeat(40),
+      REF_NAME: 'main',
+      REF_TYPE: 'branch',
+    });
+    assert.equal(r.status, 2, r.out);
+    assert.match(r.out, /previous tip/);
+    assert.match(r.out, /force push of main/);
+    assert.doesNotMatch(r.out, /::warning::/, 'a failure, not a warning');
+  });
+});
+
+test('push to main whose previous tip is not an ancestor fails too', () => {
+  withRepo((dir) => {
+    const sideTip = head(dir);
+    git(dir, ['checkout', '-q', '--orphan', 'other']);
+    commit(dir, { 'db/migrations/0002_second.sql': 'SELECT 2;\n' });
+    const r = run(dir, {
+      EVENT_NAME: 'push',
+      BEFORE_SHA: sideTip,
+      REF_NAME: 'main',
+      REF_TYPE: 'branch',
+    });
+    assert.equal(r.status, 2, r.out);
+    assert.match(r.out, /force push of main/);
+  });
+});
+
+test('a shallow clone fails with a clear message, on a push and on a pull request (fetch-depth: 0 is required)', () => {
+  withRepo((dir) => {
+    const before = head(dir);
+    commit(dir, { 'db/migrations/0002_second.sql': 'SELECT 2;\n' });
+    const shallow = path.join(path.dirname(dir), `${path.basename(dir)}-shallow`);
+    try {
+      const c = git(path.dirname(dir), [
+        'clone',
+        '-q',
+        '--depth',
+        '1',
+        pathToFileURL(dir).href,
+        shallow,
+      ]);
+      assert.equal(c.status, 0, c.all);
+      const push = run(shallow, {
+        EVENT_NAME: 'push',
+        BEFORE_SHA: before,
+        REF_NAME: 'main',
+        REF_TYPE: 'branch',
+      });
+      assert.equal(push.status, 2, push.out);
+      assert.match(push.out, /shallow/);
+      assert.match(push.out, /fetch-depth: 0/);
+      const pr = run(shallow, { EVENT_NAME: 'pull_request', BASE_REF: 'main' });
+      assert.equal(pr.status, 2, pr.out);
+      assert.match(pr.out, /shallow/);
+    } finally {
+      remove(shallow);
+    }
+  });
+});
+
+test('a new tag is called a tag in the message, not a branch', () => {
+  withRepo((dir) => {
+    git(dir, ['checkout', '-q', '-b', 'feature']);
+    commit(dir, { 'db/migrations/0002_second.sql': 'SELECT 2;\n' });
+    const r = run(dir, { EVENT_NAME: 'push', BEFORE_SHA: ZEROS, REF_NAME: 'v1', REF_TYPE: 'tag' });
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /a new tag/);
+    assert.doesNotMatch(r.out, /new branch/);
   });
 });

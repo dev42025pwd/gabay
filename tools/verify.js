@@ -68,7 +68,17 @@ const TAIL_LINES = process.env.CI === 'true' ? Number.MAX_SAFE_INTEGER : 30;
  * timeout, and a check allowed ten minutes would be cut off by the job (a cancelled run, no output) before
  * its own limit could fire and print what it had.
  */
-const CHECK_TIMEOUT_CAP_MS = Number(process.env.GABAY_VERIFY_CHECK_TIMEOUT_MS) || Infinity;
+let checkTimeoutCapMs = Infinity;
+/** The cap from the environment: Infinity when unset or empty; an error for anything but a positive whole number. */
+function readCheckTimeoutCap(raw = process.env.GABAY_VERIFY_CHECK_TIMEOUT_MS) {
+  if (raw === undefined || raw === '') return Infinity;
+  if (!/^[1-9]\d*$/.test(raw)) {
+    throw new Error(
+      `GABAY_VERIFY_CHECK_TIMEOUT_MS must be a positive whole number of milliseconds, got "${raw}"`,
+    );
+  }
+  return Number(raw);
+}
 /** How long a server's ports may stay open after its command ended, before it counts as an orphan. */
 const SHUTDOWN_GRACE_MS = 30_000;
 /** Firebase emulator ports used by firebase.json (functions) and the seed (auth, hub, logging). */
@@ -113,7 +123,7 @@ function testsRan(output) {
 const command =
   (commandLine, { cwd = ROOT, timeoutMs: ownTimeoutMs = TIMEOUT_MS.default, tests = false } = {}) =>
   async () => {
-    const timeoutMs = Math.min(ownTimeoutMs, CHECK_TIMEOUT_CAP_MS);
+    const timeoutMs = Math.min(ownTimeoutMs, checkTimeoutCapMs);
     const r = await runCommand(commandLine, { cwd, timeoutMs });
     let note = r.timedOut
       ? `\nTIMED OUT after ${timeoutMs / 1000} s; the process tree was stopped.`
@@ -285,8 +295,19 @@ const pad = (name) => name.padEnd(20);
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--list')) {
+    // --list alone: with anything else it would print and exit 0 having run nothing.
+    if (args.length !== 1) {
+      console.error('--list takes no other argument');
+      return 2;
+    }
     console.log(CHECKS.map((c) => c.name).join('\n'));
     return 0;
+  }
+  try {
+    checkTimeoutCapMs = readCheckTimeoutCap();
+  } catch (err) {
+    console.error(err.message);
+    return 2;
   }
   const onlyAt = args.indexOf('--only');
   const only = onlyAt === -1 ? null : (args[onlyAt + 1] ?? '').split(',').filter(Boolean);

@@ -114,6 +114,13 @@ test('I1: every check that needs the schema in the database runs after the two s
 test('verify --list and a bad --only', () => {
   const dir = scratch();
   try {
+    const mixed = verify(dir, ['--list', '--only', 'node-version']);
+    assert.equal(
+      mixed.status,
+      2,
+      '--list with another argument runs nothing, so it must not look like a pass',
+    );
+    assert.match(mixed.err, /--list takes no other argument/);
     assert.equal(verify(dir, ['--list']).out.trim().split('\n').length, 15);
     const bad = verify(dir, ['--only', 'nope']);
     assert.equal(bad.status, 2);
@@ -298,13 +305,37 @@ test('GABAY_VERIFY_CHECK_TIMEOUT_MS caps every check: a hung check fails as TIME
   try {
     const started = Date.now();
     const r = verify(dir, ['--only', 'linter-tests'], {
-      env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: '2000' },
+      // 10 s, not 2: under load the child may need seconds just to start and print before the cap fires.
+      env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: '10000' },
     });
     assert.equal(r.status, 1, r.out);
     assert.match(r.out, /^FAIL linter-tests/m);
-    assert.match(r.out, /TIMED OUT after 2 s/);
+    assert.match(r.out, /TIMED OUT after 10 s/);
     assert.match(r.out, /about to hang/, 'what it printed before hanging is kept');
     assert.ok(Date.now() - started < 60_000, 'it did not wait for the default ten minutes');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// S7 round 2: a cap that is not a positive whole number of milliseconds must stop the run, not be ignored
+// (an ignored typo would leave a hung CI check to the job timeout again).
+test('GABAY_VERIFY_CHECK_TIMEOUT_MS that is not a positive whole number is rejected with a clear error', () => {
+  const dir = scratch();
+  try {
+    for (const bad of ['abc', '0', '-5', '1.5', '10s']) {
+      const r = verify(dir, ['--only', 'node-version'], {
+        env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: bad },
+      });
+      assert.equal(r.status, 2, `${bad}: ${r.out}${r.err}`);
+      assert.match(r.err, /GABAY_VERIFY_CHECK_TIMEOUT_MS/);
+      assert.ok(r.err.includes(`"${bad}"`), 'the message quotes the bad value');
+      assert.doesNotMatch(r.out, /^ok /m, 'no check ran');
+    }
+    const empty = verify(dir, ['--only', 'node-version'], {
+      env: { GABAY_VERIFY_CHECK_TIMEOUT_MS: '' },
+    });
+    assert.equal(empty.status, 0, 'empty means not set');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

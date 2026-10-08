@@ -22,9 +22,10 @@
 # has not run yet). The log artifact lives 7 days. A scheduled workflow runs only on the default branch.
 #
 # TIMEOUTS: every verify check is capped at 5 minutes here (GABAY_VERIFY_CHECK_TIMEOUT_MS), so a hung check
-# fails by itself with its output. Six checks at 5 minutes plus about 10 minutes of setup fit the 40-minute job
-# limit; before this the checks' own limits (10 minutes each) were longer than the job's, so a hang ended as a
-# cancelled run with no log. The log steps below also run when the run is cancelled.
+# fails by itself with its output. The job limit is 50 minutes: six checks at the cap (30), about 10 minutes of
+# setup, the two 30-second shutdown waits of the seed and the emulator check (1), and 5 minutes of margin
+# (tools/test/workflow-rules.js computes it). Before this the checks' own limits (10 minutes each) were longer
+# than the job's, so a hang ended as a cancelled run with no log. The log steps below also run when cancelled.
 #
 # 02:00 in Manila (UTC+8) is 18:00 UTC, so the cron below is 0 18 * * *.
 name: e2e
@@ -47,7 +48,7 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     env:
       DB_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
       GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'

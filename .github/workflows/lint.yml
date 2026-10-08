@@ -3,8 +3,11 @@
 # L136: with e2e.yml, one of the two REQUIRED checks on every pull request to main ("lint" is this job's name);
 # every change reaches main through a branch and a pull request, and the local pre-push hook is the first gate.
 #
-# Runs on every push and every pull request. A push run and a pull-request run for the same branch are two
-# separate runs (the event is in the concurrency group below); a push to main is never cancelled by anything.
+# Runs on every pull request and on every push to main. Branch work is covered by its pull request (a push
+# run on a feature branch would compare migrations with a different base than the pull-request run for the same
+# commit, and both would post a "lint" check). A push to main compares with the tip main had before the push.
+# The two kinds of run are separate runs (the event is in the concurrency group below), and a push to main is
+# never cancelled by anything.
 #
 # COST (L135: the repository is public): usage is free for public repositories that use standard GitHub-hosted
 # runners ("GitHub Actions usage is free for self-hosted runners and for public repositories that use standard
@@ -19,19 +22,27 @@
 # workflow triggers", fetched 2026-10-08), so a fork cannot poison main's caches through this file. Only push
 # runs on main write the caches that every pull request restores.
 #
+# TIMEOUTS: every verify check is capped at 10 minutes here (GABAY_VERIFY_CHECK_TIMEOUT_MS), so a hung check
+# fails by itself with its output while the others still run; the job limit is 30 minutes (one hung check at the
+# cap plus the normal rest, about 15 minutes with setup). Sized from a measurement on 2026-10-08: flutter test
+# from a clean .dart_tool took 16 s (31 s with pub get), flutter analyze about 75 s and the tools tests about
+# 90 s, so 10 minutes is more than 6 times the slowest of them and leaves room for a cold Flutter download
+# (estimate, not measured on a runner).
+#
 # Needs no database and no emulator: verify's api-tests and db-tools-tests connect to PostgreSQL, so they run
 # in e2e.yml with the schema, the seed and the Functions emulator.
 name: lint
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
-# Push runs are one per commit (so no pushed commit is ever left without its lint); a newer push to the same
-# pull request cancels the older pull-request run.
+# Push runs (main only) are one per commit, so no commit on main is ever left without its lint; a newer push to
+# the same pull request cancels the older pull-request run.
 concurrency:
   group: lint-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
@@ -39,7 +50,9 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    env:
+      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,6 +107,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
           REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
         run: node tools/ci-migrations.js
 
       - name: verify, the checks that need no database

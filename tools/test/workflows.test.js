@@ -36,6 +36,9 @@ const CTX = {
   databaseChecks: DATABASE_CHECKS,
   flutterPin: flutterPinFromBlueprint(BLUEPRINT),
   setupMinutes: 10,
+  shutdownMinutes: 1,
+  marginMinutes: 5,
+  lintRestMinutes: 15,
 };
 
 test('the three workflows exist and nothing else is in the folder', () => {
@@ -257,8 +260,8 @@ const MUTATIONS = [
   [
     'e2e: the job timeout shortened below the checks',
     'e2e.yml',
-    edit('e2e.yml', 'timeout-minutes: 40', 'timeout-minutes: 30'),
-    /timeout-minutes 30 is shorter/,
+    edit('e2e.yml', 'timeout-minutes: 50', 'timeout-minutes: 45'),
+    /timeout-minutes 45 is shorter/,
   ],
   [
     'e2e: the per-check cap removed',
@@ -390,7 +393,7 @@ const MUTATIONS = [
   [
     'lint: the job timeout removed',
     'lint.yml',
-    edit('lint.yml', '    timeout-minutes: 25\n', ''),
+    edit('lint.yml', '    timeout-minutes: 30\n', ''),
     /timeout-minutes/,
   ],
   [
@@ -420,8 +423,161 @@ const MUTATIONS = [
   [
     'lint: an unconditional guard weakened to a pull-request trigger only',
     'lint.yml',
-    edit('lint.yml', 'on:\n  push:\n  pull_request:', 'on:\n  pull_request:'),
-    /every push and pull request/,
+    edit('lint.yml', 'on:\n  push:\n    branches: [main]\n  pull_request:', 'on:\n  pull_request:'),
+    /pull request and on pushes to main only/,
+  ],
+  [
+    'lint: the push trigger on every branch again (I-B)',
+    'lint.yml',
+    edit('lint.yml', '  push:\n    branches: [main]\n', '  push:\n'),
+    /pull request and on pushes to main only/,
+  ],
+  [
+    'lint: REF_TYPE not passed to the migration step',
+    'lint.yml',
+    edit('lint.yml', '          REF_TYPE: ${{ github.ref_type }}\n', ''),
+    /REF_TYPE/,
+  ],
+  // ---- S7 round 2, I-C: the probes that switched the gate off without tripping the old rules ----
+  [
+    'P1 lint: if: false on the verify step',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: verify, the checks that need no database\n',
+      '      - name: verify, the checks that need no database\n        if: false\n',
+    ),
+    /gate step "verify": no if:/,
+  ],
+  [
+    'P2 lint: if: false on the guards step',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: Secret guard and changelog duplicate guard (the checked-out tree)\n',
+      '      - name: Secret guard and changelog duplicate guard (the checked-out tree)\n        if: false\n',
+    ),
+    /gate step "guards": no if:/,
+  ],
+  [
+    'P3 lint: if: false on the job (a skipped job reports success)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '  lint:\n    runs-on: ubuntu-latest\n',
+      '  lint:\n    if: false\n    runs-on: ubuntu-latest\n',
+    ),
+    /the lint job has no if:/,
+  ],
+  [
+    "P4 e2e: if: github.event_name != 'pull_request' on the job",
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '  e2e:\n    runs-on: ubuntu-latest\n',
+      "  e2e:\n    if: github.event_name != 'pull_request'\n    runs-on: ubuntu-latest\n",
+    ),
+    /the e2e job has no if:/,
+  ],
+  [
+    'P6 e2e: verify.js --list --only (prints, runs nothing, exits 0)',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      'node tools/verify.js --only schema',
+      'node tools/verify.js --list --only schema',
+    ),
+    /gate step "verify": its run: must be exactly/,
+  ],
+  [
+    'P7 e2e: set +o pipefail before verify',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '        run: |\n          node tools/verify.js --only',
+      '        run: |\n          set +o pipefail\n          node tools/verify.js --only',
+    ),
+    /gate step "verify": its run: must be exactly/,
+  ],
+  [
+    'P8 e2e: "; exit 0" after the tee',
+    'e2e.yml',
+    edit('e2e.yml', 'tee verify.log\n', 'tee verify.log; exit 0\n'),
+    /gate step "verify": its run: must be exactly/,
+  ],
+  [
+    'P10 lint: fetch-depth 0 -> 1 (a normal push would look like a force push)',
+    'lint.yml',
+    edit('lint.yml', 'fetch-depth: 0 # the migration', 'fetch-depth: 1 # the migration'),
+    /fetch-depth: 0/,
+  ],
+  [
+    'P12 lint: echo in front of the verify command',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'run: >-\n          node tools/verify.js --only',
+      'run: >-\n          echo node tools/verify.js --only',
+    ),
+    /gate step "verify": its run: must be exactly/,
+  ],
+  [
+    'P13 e2e: echo in front of the verify command',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      'node tools/verify.js --only schema',
+      'echo node tools/verify.js --only schema',
+    ),
+    /gate step "verify": its run: must be exactly/,
+  ],
+  [
+    'lint: a check dropped from the verify list',
+    'lint.yml',
+    edit('lint.yml', ',flutter-test', ''),
+    /gate step "verify": its run: must be exactly/,
+  ],
+  [
+    'lint: a working-directory on the guards step',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '        run: npm run ci:guards',
+      '        working-directory: app\n        run: npm run ci:guards',
+    ),
+    /unexpected key "working-directory"/,
+  ],
+  [
+    'lint: an env on the verify step',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '      - name: verify, the checks that need no database\n',
+      '      - name: verify, the checks that need no database\n        env:\n          CI: false\n',
+    ),
+    /unexpected key "env"/,
+  ],
+  [
+    'lint: the per-check cap removed',
+    'lint.yml',
+    edit('lint.yml', "    env:\n      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'\n", ''),
+    /GABAY_VERIFY_CHECK_TIMEOUT_MS/,
+  ],
+  [
+    'lint: the job timeout shortened below the cap plus the rest',
+    'lint.yml',
+    edit('lint.yml', 'timeout-minutes: 30', 'timeout-minutes: 20'),
+    /timeout-minutes 20 is shorter/,
+  ],
+  [
+    'e2e: the verify step loses its shell',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '      - name: verify, the database half\n        shell: bash\n',
+      '      - name: verify, the database half\n',
+    ),
+    /shell: bash/,
   ],
   [
     'e2e: the header calls the repository private again',
