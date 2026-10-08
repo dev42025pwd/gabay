@@ -6,6 +6,7 @@
 'use strict';
 
 const { stepListProblems } = require('./workflow-steps');
+const { snapshotProblems } = require('./workflow-snapshot');
 
 /** Exactly what each workflow may upload; anything else (a "." or an .env among them) is a problem. */
 const ALLOWED_UPLOADS = {
@@ -464,7 +465,12 @@ function checkWorkflow(name, text, ctx) {
   const specific = { 'lint.yml': lintProblems, 'e2e.yml': e2eProblems, 'build.yml': buildProblems }[
     name
   ];
-  return [...commonProblems(name, text, ctx), ...(specific ? specific(text, ctx) : [])];
+  return [
+    ...commonProblems(name, text, ctx),
+    ...(specific ? specific(text, ctx) : []),
+    // The backstop: any edit the rules above do not name still fails here (workflow-snapshot.js).
+    ...snapshotProblems(name, text, ctx.snapshots?.[name]),
+  ];
 }
 
 /** "3.47" from the Blueprint's pin row ("| Flutter / Dart | Flutter 3.47 / Dart 3.13 | ..."), or null. */

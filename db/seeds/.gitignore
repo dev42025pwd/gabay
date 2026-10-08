@@ -1,2 +1,5 @@
 node_modules/
 .emulator-data/
+# firebase-tools' temporary export folder (HubExport), left behind when its move to .emulator-data fails;
+# tools/verify.js repairs or removes it after the seed check.
+firebase-export-*/

@@ -1,0 +1,94 @@
+name: e2e
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: e2e-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      DB_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: gabay_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gabay_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@<sha> # <version>
+      - name: Set up Node.js (the version in .nvmrc)
+        uses: actions/setup-node@<sha> # <version>
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            functions/package-lock.json
+            db/tools/package-lock.json
+            db/seeds/package-lock.json
+      - name: Install the API's packages
+        run: npm ci --prefix functions
+      - name: Install the database tools' packages
+        run: npm ci --prefix db/tools
+      - name: Install the seed's packages (firebase-tools lives here)
+        run: npm ci --prefix db/seeds
+      - name: Write .env from throwaway values (no repository secrets, nothing echoed)
+        shell: bash
+        run: |
+          set -eu
+          umask 077
+          {
+            echo "PGHOST=localhost"
+            echo "PGPORT=5432"
+            echo "PGDATABASE=gabay_dev"
+            echo "PGUSER=postgres"
+            echo "PGPASSWORD=$DB_PASSWORD"
+          } > .env
+          for account in SUPERADMIN MALLADMIN EDITOR VIEWER MALLADMIN_DEMO SHOPPER; do
+            value="$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            echo "SEED_PW_$account=$value" >> .env
+          done
+      - name: verify, the database half
+        shell: bash
+        run: |
+          node tools/verify.js --only schema-run-1,schema-run-2,api-tests,db-tools-tests,seed,functions-health 2>&1 | tee verify.log
+      - name: Collect the PostgreSQL service log (on failure or cancel)
+        if: failure() || cancelled()
+        shell: bash
+        run: |
+          id="$(docker ps -aq --filter ancestor=postgres:18 | head -n 1)"
+          if [ -n "$id" ]; then
+            docker logs "$id" > postgres.log 2>&1
+          else
+            echo "no postgres:18 container found: there is no service log to collect"
+          fi
+      - name: Upload the server and emulator logs (on failure or cancel)
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@<sha> # <version>
+        with:
+          name: e2e-logs-${{ github.run_id }}
+          path: |
+            verify.log
+            postgres.log
+            firebase-debug.log
+            ui-debug.log
+            db/seeds/firebase-debug.log
+          if-no-files-found: ignore
+          retention-days: 7

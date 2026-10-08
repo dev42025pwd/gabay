@@ -13,6 +13,8 @@ npm run seed:db-only   # venues only
 
 Needs `../../.env` with `PG*` and every `SEED_PW_*` filled (see `.env.example`). Re-runnable: it first removes its own two tenants and six accounts. Emulator users persist in `.emulator-data/` (git-ignored).
 
+firebase-tools exports into a temporary `firebase-export-*/` folder and then moves it to `.emulator-data/`. When that move fails (seen once on Windows) the folder stays behind and `.emulator-data/` is gone; both are git-ignored. After the seed check, `npm run verify` puts the newest folder with a valid `firebase-export-metadata.json` back as `.emulator-data/`, deletes any other `firebase-export-*/` folder, and prints one line saying what it did.
+
 ## What it creates
 
 | Tenant | Venues | Beacons |

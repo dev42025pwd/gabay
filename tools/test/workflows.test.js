@@ -4,6 +4,8 @@
 // job has a timeout, no failure is swallowed, nothing is uploaded that is not on an allow-list, the build job
 // cannot be reached from a fork, and the `verify --only` lists name real checks. Then each rule is proved able to
 // FAIL: a table of deliberately broken copies, each of which must be reported (S7 review I3).
+// S7 round 4: the whole non-comment text of each workflow is also pinned by a snapshot (workflow-snapshot.js), the
+// backstop for every edit no rule names.
 'use strict';
 
 const test = require('./timeout');
@@ -31,7 +33,16 @@ const DATABASE_CHECKS = [
   'db-tools-tests',
 ];
 
+const SNAPSHOT_DIR = path.join(__dirname, 'workflow-snapshots');
+const snapshots = Object.fromEntries(
+  FILES.filter((n) => fs.existsSync(path.join(SNAPSHOT_DIR, `${n}.snap`))).map((n) => [
+    n,
+    fs.readFileSync(path.join(SNAPSHOT_DIR, `${n}.snap`), 'utf8'),
+  ]),
+);
+
 const CTX = {
+  snapshots,
   checks: CHECKS.map((c) => c.name),
   databaseChecks: DATABASE_CHECKS,
   flutterPin: flutterPinFromBlueprint(BLUEPRINT),
@@ -89,6 +100,10 @@ test('build.yml: the job runs only after lint succeeded on a push of this reposi
 });
 
 // ---- every rule must be able to fail ---------------------------------------------------------------------
+
+/** What every snapshot failure says: the file and line, the snapshot it differs from, and how to update it. */
+const SNAPSHOT_MISMATCH =
+  /^(lint|e2e|build)\.yml:\d+: the workflow text differs from tools\/test\/workflow-snapshots\/\1\.yml\.snap/;
 
 /** Replaces `from` by `to` in the named file's text; the edit must really change it. */
 const edit = (file, from, to) => ({ file, apply: (t) => t.replace(from, to) });
@@ -722,6 +737,97 @@ const MUTATIONS = [
     ),
     /step list/,
   ],
+  // ---- S7 round 4: the whole non-comment text is pinned. Edits no rule above names ----
+  [
+    'R4-1 lint: NODE_OPTIONS --import data:...process.exit(0) in the job env (every node exits 0)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      "      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'\n",
+      "      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'\n      NODE_OPTIONS: --import data:text/javascript,process.exit(0)\n",
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-2 lint: NODE_OPTIONS at workflow level',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'permissions:\n  contents: read\n',
+      'permissions:\n  contents: read\n\nenv:\n  NODE_OPTIONS: --import data:text/javascript,process.exit(0)\n',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-3 e2e: NODE_OPTIONS in the job env',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      "      GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'\n",
+      "      GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'\n      NODE_OPTIONS: --import data:text/javascript,process.exit(0)\n",
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-4 lint: defaults: run: shell: true {0} at workflow level (every run: becomes a no-op)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'permissions:\n  contents: read\n',
+      'permissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: true {0}\n',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-5 e2e: defaults: run: shell: true {0} as the job default',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      '    timeout-minutes: 50\n',
+      '    timeout-minutes: 50\n    defaults:\n      run:\n        shell: true {0}\n',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-6 e2e: defaults: run: shell: true {0} at workflow level',
+    'e2e.yml',
+    edit(
+      'e2e.yml',
+      'permissions:\n  contents: read\n',
+      'permissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: true {0}\n',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    "R4-7 lint: the checkout gains ref: main (verify would test another commit's files)",
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '          fetch-depth: 0 # the migration',
+      '          ref: main\n          fetch-depth: 0 # the migration',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-8 lint: the checkout gains sparse-checkout: tools/',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      '          fetch-depth: 0 # the migration',
+      '          sparse-checkout: tools/\n          fetch-depth: 0 # the migration',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R4-9 build: NODE_OPTIONS in the job env (the workflow_run job is pinned too)',
+    'build.yml',
+    edit(
+      'build.yml',
+      '    timeout-minutes: 40\n',
+      '    timeout-minutes: 40\n    env:\n      NODE_OPTIONS: --import data:text/javascript,process.exit(0)\n',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
 ];
 
 for (const [label, file, mutation, expected] of MUTATIONS) {
@@ -751,3 +857,47 @@ test('the mutation table covers each rule kind named in the S7 review (I3) at le
   const labels = MUTATIONS.map((m) => m[0]).join('\n');
   for (const k of kinds) assert.match(labels, k);
 });
+
+// ---- S7 round 4: the snapshot of the whole non-comment text (tools/test/workflow-snapshots) ----------------
+
+test('every workflow has a snapshot, and no snapshot is left over from a deleted workflow', () => {
+  assert.deepEqual(fs.readdirSync(SNAPSHOT_DIR).sort(), FILES.map((n) => `${n}.snap`).sort());
+});
+
+test('a workflow without a snapshot fails closed', () => {
+  const problems = checkWorkflow('lint.yml', text('lint.yml'), { ...CTX, snapshots: {} });
+  assert.ok(
+    problems.some((p) => /lint\.yml: no snapshot/.test(p)),
+    problems.join('\n'),
+  );
+});
+
+test('the failure names the file and the first differing line, shows both texts and says how to update the snapshot', () => {
+  const mutated = text('lint.yml').replace(
+    '          fetch-depth: 0 # the migration',
+    '          ref: main\n          fetch-depth: 0 # the migration',
+  );
+  const line = mutated.split('\n').findIndex((l) => l.trim() === 'ref: main') + 1;
+  const [problem] = checkWorkflow('lint.yml', mutated, CTX).filter((p) =>
+    SNAPSHOT_MISMATCH.test(p),
+  );
+  assert.ok(problem.startsWith(`lint.yml:${line}: `), problem);
+  assert.match(problem, /ref: main/, 'the line found');
+  assert.match(problem, /fetch-depth: 0/, 'the line the snapshot has');
+  assert.match(problem, /edit tools\/test\/workflow-snapshots\/lint\.yml\.snap in the same commit/);
+});
+
+for (const name of FILES) {
+  test(`${name}: a routine action SHA bump, a Flutter version bump and a comment edit are not snapshot failures`, () => {
+    let mutated = text(name)
+      .replace(
+        /(uses: actions\/[a-z-]+@)[0-9a-f]{40}( # v)\d+\.\d+\.\d+/g,
+        '$1' + 'a'.repeat(40) + '$2' + '9.9.9',
+      )
+      .replace(/^# .*$/m, '# an edited comment line');
+    const flutter = /--branch (\d+\.\d+\.\d+) /.exec(mutated);
+    if (flutter) mutated = mutated.split(flutter[1]).join('3.47.9');
+    assert.notEqual(mutated, text(name));
+    assert.deepEqual(checkWorkflow(name, mutated, CTX), []);
+  });
+}

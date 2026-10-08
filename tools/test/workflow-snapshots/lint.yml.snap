@@ -1,0 +1,64 @@
+name: lint
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: lint-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@<sha> # <version>
+        with:
+          fetch-depth: 0 # the migration-history check below needs the base branch
+      - name: Set up Node.js (the version in .nvmrc)
+        uses: actions/setup-node@<sha> # <version>
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            functions/package-lock.json
+            db/tools/package-lock.json
+      - name: Install the API's packages (ESLint and Prettier come from here)
+        run: npm ci --prefix functions
+      - name: Install the database tools' packages
+        run: npm ci --prefix db/tools
+      - name: Cache Flutter
+        id: flutter-cache
+        uses: actions/cache@<sha> # <version>
+        with:
+          path: ~/flutter
+          key: flutter-<flutter>-${{ runner.os }}
+      - name: Install Flutter <flutter> (the Blueprint pin)
+        if: steps.flutter-cache.outputs.cache-hit != 'true'
+        run: git clone --depth 1 --branch <flutter> https://github.com/flutter/flutter.git "$HOME/flutter"
+      - name: Put Flutter on the PATH
+        run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+      - name: Cache the Dart and Flutter packages
+        uses: actions/cache@<sha> # <version>
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('app/pubspec.lock') }}
+          restore-keys: pub-
+      - name: Secret guard and changelog duplicate guard (the checked-out tree)
+        run: npm run ci:guards
+      - name: Committed migrations are never edited (push and pull request)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: node tools/ci-migrations.js
+      - name: verify, the checks that need no database
+        run: >-
+          node tools/verify.js --only
+          node-version,node-check,structural-linters,linter-tests,tools-tests,eslint,prettier,flutter-analyze,flutter-test

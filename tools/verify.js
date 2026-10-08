@@ -15,6 +15,7 @@
 //  10  api-tests           functions/ tests against gabay_dev (the schema is there since 8 and 9)
 //  11  db-tools-tests      the migration runner's tests
 //  12  seed                the test seed (starts the Auth emulator itself)
+//                          (afterwards: a leftover firebase-export-* folder in db/seeds is restored or removed, with a line)
 //  13  functions-health    the Functions emulator answers GET /api/health { status, db } with an X-Request-Id
 //  14  flutter-analyze     app/
 //  15  flutter-test        app/
@@ -102,6 +103,76 @@ function jsFiles(dir) {
   }
   return out;
 }
+
+/** A folder firebase-tools' HubExport exports into before moving it to .emulator-data: firebase-export-<ms><random>. */
+const EXPORT_LEFTOVER = /^firebase-export-.+$/;
+
+/** True when the folder holds a usable emulator export: a firebase-export-metadata.json that parses to an object. */
+function isValidExport(folder) {
+  try {
+    const text = fs.readFileSync(path.join(folder, 'firebase-export-metadata.json'), 'utf8');
+    const meta = JSON.parse(text);
+    return meta !== null && typeof meta === 'object' && !Array.isArray(meta);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * After the seed check (S7 round 4): firebase-tools 15.32.1 exports on exit into a temporary firebase-export-*
+ * folder in db/seeds, then removes .emulator-data and moves the folder into its place (HubExport). On Windows that
+ * move failed once and left .emulator-data missing and the folder behind. So: when .emulator-data is missing, the
+ * newest leftover with a valid firebase-export-metadata.json becomes .emulator-data; every other firebase-export-*
+ * folder is deleted. Only direct subfolders of seedsDir with that name are touched. One line says what was done;
+ * nothing is printed when there is nothing to do. Returns { restored: <folder name or null>, removed: [names] }.
+ */
+function repairSeedExport(seedsDir, log = console.log) {
+  const none = { restored: null, removed: [] };
+  let names;
+  try {
+    names = fs.readdirSync(seedsDir);
+  } catch {
+    return none;
+  }
+  const leftovers = names
+    .filter((n) => EXPORT_LEFTOVER.test(n))
+    .map((name) => ({ name, folder: path.join(seedsDir, name) }))
+    .filter((l) => fs.lstatSync(l.folder).isDirectory())
+    .map((l) => ({ ...l, mtime: fs.statSync(l.folder).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime || (a.name < b.name ? 1 : -1)); // newest first
+  if (leftovers.length === 0) return none;
+
+  const target = path.join(seedsDir, '.emulator-data');
+  let restored = null;
+  if (!fs.existsSync(target)) {
+    const best = leftovers.find((l) => isValidExport(l.folder));
+    if (best) {
+      fs.renameSync(best.folder, target);
+      restored = best.name;
+    }
+  }
+  const removed = [];
+  for (const l of leftovers) {
+    if (l.name === restored) continue;
+    fs.rmSync(l.folder, { recursive: true, force: true });
+    removed.push(l.name);
+  }
+  const gone = removed.length
+    ? `removed ${removed.length} leftover firebase-export folder(s) in db/seeds`
+    : '';
+  if (restored) {
+    const also = gone ? `; ${gone}` : '';
+    log(`verify: db/seeds/.emulator-data was missing; restored it from ${restored}${also}`);
+  } else if (!fs.existsSync(target)) {
+    log(`verify: ${gone}; db/seeds/.emulator-data is still missing (none held a valid export)`);
+  } else {
+    log(`verify: ${gone}`);
+  }
+  return { restored, removed };
+}
+
+/** Work done right after a check, by check name. */
+const AFTER_CHECK = { seed: () => repairSeedExport(path.join(ROOT, 'db', 'seeds')) };
 
 const timed = async (fn) => {
   const start = Date.now();
@@ -352,6 +423,11 @@ async function main() {
           .map((l) => `       ${l}`)
           .join('\n'),
       );
+    try {
+      AFTER_CHECK[check.name]?.();
+    } catch (err) {
+      console.log(`verify: the repair after ${check.name} failed: ${err.message}`);
+    }
     if (!r.ok && check.fatal) break;
   }
 
@@ -396,4 +472,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { CHECKS, jsFiles };
+module.exports = { CHECKS, jsFiles, repairSeedExport, AFTER_CHECK };

@@ -1,0 +1,106 @@
+name: build
+on:
+  workflow_run:
+    workflows: [lint]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the commit that passed lint
+        uses: actions/checkout@<sha> # <version>
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0 # BUILD_NUMBER counts every commit
+      - name: Set up Node.js (the version in .nvmrc)
+        uses: actions/setup-node@<sha> # <version>
+        with:
+          node-version-file: .nvmrc
+      - name: Set up Java 17 for Gradle (the Android build)
+        uses: actions/setup-java@<sha> # <version>
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Cache Flutter
+        id: flutter-cache
+        uses: actions/cache@<sha> # <version>
+        with:
+          path: ~/flutter
+          key: flutter-android-<flutter>-${{ runner.os }}
+      - name: Install Flutter <flutter> (the Blueprint pin)
+        if: steps.flutter-cache.outputs.cache-hit != 'true'
+        run: git clone --depth 1 --branch <flutter> https://github.com/flutter/flutter.git "$HOME/flutter"
+      - name: Put Flutter on the PATH
+        run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+      - name: Cache the Dart and Flutter packages
+        uses: actions/cache@<sha> # <version>
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('app/pubspec.lock') }}
+          restore-keys: pub-
+      - name: Cache Gradle
+        uses: actions/cache@<sha> # <version>
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('app/android/**/*.gradle*', 'app/android/gradle/wrapper/gradle-wrapper.properties', 'app/pubspec.lock') }}
+          restore-keys: gradle-${{ runner.os }}-
+      - name: Work out the version, build number, commit and time
+        id: info
+        run: node tools/ci-build-info.js >> "$GITHUB_OUTPUT"
+      - name: Build the admin web page
+        working-directory: app
+        env:
+          VERSION: ${{ steps.info.outputs.admin_version }}
+          NUMBER: ${{ steps.info.outputs.build_number }}
+          COMMIT: ${{ steps.info.outputs.git_commit }}
+          TIME: ${{ steps.info.outputs.build_time }}
+        run: >-
+          flutter build web -t lib/main_admin.dart --release
+          --dart-define=API_BASE=https://api.invalid/api
+          --dart-define=APP_VERSION="$VERSION"
+          --dart-define=BUILD_NUMBER="$NUMBER"
+          --dart-define=GIT_COMMIT="$COMMIT"
+          --dart-define=BUILD_TIME="$TIME"
+          --build-name="$VERSION"
+          --build-number="$NUMBER"
+      - name: Build the shopper app (debug APK)
+        working-directory: app
+        env:
+          VERSION: ${{ steps.info.outputs.mobile_version }}
+          NUMBER: ${{ steps.info.outputs.build_number }}
+          COMMIT: ${{ steps.info.outputs.git_commit }}
+          TIME: ${{ steps.info.outputs.build_time }}
+        run: >-
+          flutter build apk --debug -t lib/main_mobile.dart
+          --dart-define=API_BASE=https://api.invalid/api
+          --dart-define=APP_VERSION="$VERSION"
+          --dart-define=BUILD_NUMBER="$NUMBER"
+          --dart-define=GIT_COMMIT="$COMMIT"
+          --dart-define=BUILD_TIME="$TIME"
+          --build-name="$VERSION"
+          --build-number="$NUMBER"
+      - name: Keep the admin web build
+        uses: actions/upload-artifact@<sha> # <version>
+        with:
+          name: admin-web-${{ steps.info.outputs.admin_version }}-${{ steps.info.outputs.git_commit }}
+          path: app/build/web
+          if-no-files-found: error
+          retention-days: 3
+      - name: Keep the debug APK
+        uses: actions/upload-artifact@<sha> # <version>
+        with:
+          name: mobile-debug-apk-${{ steps.info.outputs.mobile_version }}-${{ steps.info.outputs.git_commit }}
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 3
