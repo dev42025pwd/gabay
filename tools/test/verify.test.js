@@ -6,60 +6,9 @@
 const test = require('./timeout');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { REAL } = require('./scratch');
+const { scratch, verify } = require('./verify-scratch');
 const { CHECKS } = require('../verify');
-
-/** A git repo holding verify.js and its modules, plus the given extra files. */
-function scratch(extra = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gabay-verify-'));
-  for (const rel of [
-    'tools/verify.js',
-    'tools/fingerprint.js',
-    'tools/lib/proc.js',
-    'tools/health-probe.js',
-  ]) {
-    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-    fs.copyFileSync(path.join(REAL, rel), path.join(dir, rel));
-  }
-  fs.writeFileSync(path.join(dir, '.gitignore'), '.verify/\nnode_modules/\n');
-  fs.writeFileSync(path.join(dir, 'firebase.json'), '{}\n');
-  for (const [rel, content] of Object.entries(extra)) {
-    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-    fs.writeFileSync(path.join(dir, rel), content);
-  }
-  const git = (...args) =>
-    spawnSync('git', ['-c', 'user.email=t@e.test', '-c', 'user.name=T', ...args], { cwd: dir });
-  git('init', '-q', '-b', 'main');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'x');
-  return dir;
-}
-
-/** The environment for a child verify: this one, minus the parent's node:test context (a child `node --test` would then refuse to run files). */
-function childEnv(extra) {
-  const env = { ...process.env, ...extra };
-  delete env.NODE_TEST_CONTEXT;
-  return env;
-}
-
-const verify = (dir, args, { env = {}, node = process.execPath, preload } = {}) => {
-  const r = spawnSync(
-    node,
-    [...(preload ? ['-r', preload] : []), path.join(dir, 'tools', 'verify.js'), ...args],
-    {
-      cwd: dir,
-      encoding: 'utf8',
-      env: childEnv(env),
-    },
-  );
-  const state = fs.existsSync(path.join(dir, '.verify', 'last-run.json'))
-    ? JSON.parse(fs.readFileSync(path.join(dir, '.verify', 'last-run.json'), 'utf8'))
-    : null;
-  return { status: r.status, out: r.stdout, err: r.stderr, state };
-};
 
 test('the checks are the fifteen of plan S5 (+ L126), cheap ones first, the schema before the tests that need it, node-version first and fatal', () => {
   assert.deepEqual(

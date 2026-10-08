@@ -43,6 +43,20 @@ function killTree(pid) {
   }
 }
 
+/**
+ * True when a process with this pid exists (signal 0 only asks; it sends nothing). EPERM means it exists but is
+ * not ours to signal, which still counts as alive. Zero, negative and non-integer pids are never a process.
+ */
+function pidExists(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === 'EPERM';
+  }
+}
+
 /** Ends every command this process started and has not seen finish. */
 function killAll() {
   for (const pid of live) killTree(pid);
@@ -232,6 +246,7 @@ module.exports = {
   ownerText,
   runCommand,
   killTree,
+  pidExists,
   killAll,
   childEnv,
   tail,
