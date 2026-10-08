@@ -4,13 +4,23 @@
 // becomes a no-op), a `ref:` or `sparse-checkout:` on the checkout. Any change to a workflow file fails here until
 // tools/test/workflow-snapshots/<file>.snap is changed in the same commit, so every workflow edit is read twice.
 //
-// What is NOT compared, so a routine change still passes: whole-line comments, blank lines, trailing spaces, the
-// 40-hex SHA and the version comment of each `uses: actions/...@sha # vX.Y.Z` (the common rules still require every
-// action to be SHA-pinned), and the Flutter version (the common rules tie it to the Blueprint pin).
+// What is NOT compared, so a routine change still passes: whole-line comments outside block scalars, blank lines
+// outside block scalars, trailing spaces, and the Flutter version (the common rules tie it to the Blueprint pin).
+// What IS compared: every other character, including each action's 40-hex SHA and its version comment (owner ruling,
+// S7 round 5: an action upgrade changes the snapshot too), and inside a block scalar (`|`, `>`, `|-`, `>-` ...)
+// every line, blank lines and `#` lines included: there they are content of the script or list, not comments.
+// The files are plain (printable ASCII, tab and LF: workflow-rules.js plainProblems), so splitting on LF is the
+// whole story: no CR, NEL, LS or PS can hide a line.
 'use strict';
 
 const SNAPSHOT_DIR = 'tools/test/workflow-snapshots';
 const FLUTTER = '<flutter>';
+
+/** A line that opens a block scalar: `key: |`, `- run: >-`, `path: |+`, optionally followed by a comment. */
+const BLOCK_HEADER = /^\s*(?:- )?(?:[A-Za-z0-9_-]+:\s+)?[|>][1-9+-]*\s*(?:#.*)?$/;
+const BLOCK_MODIFIERS = /[|>]([1-9+-]*)\s*(?:#.*)?$/;
+
+const indentOf = (line) => /^( *)/.exec(line)[1].length;
 
 /**
  * The comparable lines of a workflow: [{ line, text }] with `line` the line number in the file.
@@ -20,17 +30,42 @@ function normalise(text) {
   const flutter = /--branch (\d+\.\d+\.\d+) https:\/\/github\.com\/flutter\/flutter\.git/.exec(
     text,
   );
+  const shape = (raw) => {
+    const line = raw.replace(/\s+$/, '');
+    return flutter ? line.split(flutter[1]).join(FLUTTER) : line;
+  };
   const out = [];
-  text.split(/\r?\n/).forEach((raw, i) => {
+  let block = null; // { keyIndent, keepTrailing, blanks: [line numbers] } while inside a block scalar
+  const flushBlanks = (keep) => {
+    if (keep) for (const line of block.blanks) out.push({ line, text: '' });
+    block.blanks = [];
+  };
+  text.split('\n').forEach((raw, i) => {
     const trimmed = raw.replace(/\s+$/, '');
+    if (block) {
+      if (trimmed === '') {
+        block.blanks.push(i + 1);
+        return;
+      }
+      if (indentOf(trimmed) > block.keyIndent) {
+        flushBlanks(true); // a blank line between two content lines changes the text
+        out.push({ line: i + 1, text: shape(raw) });
+        return;
+      }
+      flushBlanks(block.keepTrailing); // blank lines at the end of the block count only for |+ and >+
+      block = null;
+    }
     if (trimmed === '' || /^\s*#/.test(trimmed)) return;
-    let line = trimmed.replace(
-      /^(\s*(?:- )?uses: [A-Za-z0-9_./-]+)@[0-9a-f]{40} # v\d+\.\d+\.\d+$/,
-      '$1@<sha> # <version>',
-    );
-    if (flutter) line = line.split(flutter[1]).join(FLUTTER);
-    out.push({ line: i + 1, text: line });
+    out.push({ line: i + 1, text: shape(raw) });
+    if (BLOCK_HEADER.test(trimmed)) {
+      block = {
+        keyIndent: indentOf(trimmed) + (/^\s*- /.test(trimmed) ? 2 : 0),
+        keepTrailing: BLOCK_MODIFIERS.exec(trimmed)[1].includes('+'),
+        blanks: [],
+      };
+    }
   });
+  if (block) flushBlanks(block.keepTrailing);
   return out;
 }
 
@@ -53,19 +88,19 @@ function snapshotProblems(name, text, snapshot) {
     ];
   }
   const found = normalise(text);
-  const expected = snapshot.split(/\r?\n/); // a CRLF checkout of the snapshot must not differ
+  const expected = snapshot.split('\n');
   if (expected[expected.length - 1] === '') expected.pop();
   const length = Math.max(found.length, expected.length);
   for (let i = 0; i < length; i += 1) {
     if (found[i]?.text === expected[i]) continue;
-    const where = found[i] ? found[i].line : text.split(/\r?\n/).length;
+    const where = found[i] ? found[i].line : text.split('\n').length;
     const show = (s) =>
       s === undefined ? '(nothing: the file ends or the snapshot ends here)' : `"${s.trim()}"`;
     return [
       `${name}:${where}: the workflow text differs from ${SNAPSHOT_DIR}/${name}.snap at its comparable line ${i + 1}. ` +
         `The file has ${show(found[i]?.text)}; the snapshot has ${show(expected[i])}. ` +
         `If this edit is intended, edit ${SNAPSHOT_DIR}/${name}.snap in the same commit so that it holds the file's non-comment lines ` +
-        `(action SHAs shown as <sha> and the version comment as <version>, the Flutter version as ${FLUTTER}); a reviewer then reads the change twice. ` +
+        `(the Flutter version shown as ${FLUTTER}; blank lines inside a block scalar kept); a reviewer then reads the change twice. ` +
         `(file: ${found.length} comparable lines, snapshot: ${expected.length})`,
     ];
   }

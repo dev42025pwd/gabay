@@ -106,13 +106,35 @@ function jsFiles(dir) {
 
 /** A folder firebase-tools' HubExport exports into before moving it to .emulator-data: firebase-export-<ms><random>. */
 const EXPORT_LEFTOVER = /^firebase-export-.+$/;
+/**
+ * An export folder with anything modified more recently than this may still be written, or be a finished export its
+ * owner is about to move (HubExport removes .emulator-data first and moves the folder after): the repair leaves it
+ * alone (S7 round 5). The export of Gabay's seed is a few small files, written in well under a second.
+ */
+const EXPORT_SETTLE_MS = 2 * 60_000;
+/** The seed's emulator ports (hub and Auth): while either has a listener an export may be running. */
+const EXPORT_PORTS = [4400, 9099];
 
-/** True when the folder holds a usable emulator export: a firebase-export-metadata.json that parses to an object. */
+/** The newest modification time (ms) of a folder and everything inside it. */
+function newestMtime(folder) {
+  let newest = fs.lstatSync(folder).mtimeMs;
+  for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+    const full = path.join(folder, entry.name);
+    newest = Math.max(newest, entry.isDirectory() ? newestMtime(full) : fs.lstatSync(full).mtimeMs);
+  }
+  return newest;
+}
+
+/**
+ * True when the folder holds a usable emulator export: a firebase-export-metadata.json that parses to an object,
+ * and the auth_export/ folder it describes (a metadata file alone is not an export).
+ */
 function isValidExport(folder) {
   try {
     const text = fs.readFileSync(path.join(folder, 'firebase-export-metadata.json'), 'utf8');
     const meta = JSON.parse(text);
-    return meta !== null && typeof meta === 'object' && !Array.isArray(meta);
+    const isObject = meta !== null && typeof meta === 'object' && !Array.isArray(meta);
+    return isObject && fs.statSync(path.join(folder, 'auth_export')).isDirectory();
   } catch {
     return false;
   }
@@ -125,8 +147,17 @@ function isValidExport(folder) {
  * newest leftover with a valid firebase-export-metadata.json becomes .emulator-data; every other firebase-export-*
  * folder is deleted. Only direct subfolders of seedsDir with that name are touched. One line says what was done;
  * nothing is printed when there is nothing to do. Returns { restored: <folder name or null>, removed: [names] }.
+ *
+ * It never touches a live export (S7 round 5): it does nothing at all while a listener holds one of EXPORT_PORTS,
+ * and while any leftover has a file modified less than EXPORT_SETTLE_MS ago (the newest mtime INSIDE the folder, not
+ * the folder's own); then one line says it left them alone. The ports are only asked about when there is a leftover.
+ * @param {{ now?: number, listening?: (port: number) => number[] }} [options]  injectable for tests
  */
-function repairSeedExport(seedsDir, log = console.log) {
+function repairSeedExport(
+  seedsDir,
+  log = console.log,
+  { now = Date.now(), listening = listeners } = {},
+) {
   const none = { restored: null, removed: [] };
   let names;
   try {
@@ -138,9 +169,25 @@ function repairSeedExport(seedsDir, log = console.log) {
     .filter((n) => EXPORT_LEFTOVER.test(n))
     .map((name) => ({ name, folder: path.join(seedsDir, name) }))
     .filter((l) => fs.lstatSync(l.folder).isDirectory())
-    .map((l) => ({ ...l, mtime: fs.statSync(l.folder).mtimeMs }))
+    .map((l) => ({ ...l, mtime: newestMtime(l.folder) }))
     .sort((a, b) => b.mtime - a.mtime || (a.name < b.name ? 1 : -1)); // newest first
   if (leftovers.length === 0) return none;
+
+  const alone = `verify: left ${leftovers.length} firebase-export folder(s) in db/seeds alone`;
+  const busy = EXPORT_PORTS.flatMap((port) => listening(port).map((pid) => ({ port, pid })));
+  if (busy.length > 0) {
+    const [first] = busy;
+    log(
+      `${alone}: port ${first.port} (${ownerText(first.pid)}) has a listener, so an export may be running`,
+    );
+    return { ...none, skipped: 'listener' };
+  }
+  if (leftovers.some((l) => now - l.mtime < EXPORT_SETTLE_MS)) {
+    log(
+      `${alone}: one was modified less than ${EXPORT_SETTLE_MS / 1000} s ago, so an export may still be running`,
+    );
+    return { ...none, skipped: 'recent' };
+  }
 
   const target = path.join(seedsDir, '.emulator-data');
   let restored = null;
@@ -472,4 +519,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { CHECKS, jsFiles, repairSeedExport, AFTER_CHECK };
+module.exports = { CHECKS, jsFiles, repairSeedExport, AFTER_CHECK, EXPORT_SETTLE_MS };

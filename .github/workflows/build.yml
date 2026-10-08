@@ -1,7 +1,7 @@
 # build: after lint succeeds on main, build the admin web page and a debug APK and keep them as artifacts
 # (L133, plan S7). Artifacts only: no store upload, no Firebase deploy, nothing is published anywhere.
 #
-# Stamps (standard §4.8): APP_VERSION is each surface's committed fallback (tools/ci-build-info.js reads
+# Stamps (standard section 4.8): APP_VERSION is each surface's committed fallback (tools/ci-build-info.js reads
 # app/lib/core/config/app_version.dart), BUILD_NUMBER is `git rev-list --count HEAD` (so the checkout has
 # full history), GIT_COMMIT and BUILD_TIME. --build-name and --build-number carry the same numbers because
 # app/pubspec.yaml is never stamped (L129).

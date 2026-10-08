@@ -455,6 +455,45 @@ function buildProblems(text) {
   return problems;
 }
 
+/** Names for the characters most likely to be used: a line break the rules do not see. */
+const CHAR_NAMES = {
+  0x0d: 'CR',
+  0x0b: 'VT',
+  0x0c: 'FF',
+  0x85: 'NEL',
+  0x2028: 'LS',
+  0x2029: 'PS',
+  0xfeff: 'BOM',
+  0x7f: 'DEL',
+};
+const MAX_PLAIN_PROBLEMS = 5;
+
+/**
+ * Only printable ASCII, tab and LF may appear in a workflow file or a snapshot (S7 round 5). The rules read the
+ * text line by line on LF; a CR, NEL, LS or PS inside a comment line is invisible to them and a line break to
+ * YAML parsers (js-yaml, YamlDotNet in GitHub's runner), so a real line (a NODE_OPTIONS) can hide behind a
+ * comment. Reports the file, the line and the character code, at most five times.
+ * @param {string} label  the file's name in the messages
+ */
+function plainProblems(label, text) {
+  const problems = [];
+  let line = 1;
+  for (const ch of text) {
+    const code = ch.codePointAt(0);
+    if (ch === '\n') {
+      line += 1;
+    } else if (!(ch === '\t' || (code >= 0x20 && code <= 0x7e))) {
+      const hex = code.toString(16).toUpperCase().padStart(4, '0');
+      const name = CHAR_NAMES[code] ? ` (${CHAR_NAMES[code]})` : '';
+      problems.push(
+        `${label}:${line}: character U+${hex}${name} is not allowed: a workflow file and its snapshot may hold printable ASCII, tab and LF only (a CR, NEL, LS or PS can hide a line from these rules and still break a line for the runner)`,
+      );
+      if (problems.length >= MAX_PLAIN_PROBLEMS) break;
+    }
+  }
+  return problems;
+}
+
 /**
  * Every problem in one workflow file.
  * @param {string} name   lint.yml, e2e.yml or build.yml
@@ -465,6 +504,10 @@ function checkWorkflow(name, text, ctx) {
   const specific = { 'lint.yml': lintProblems, 'e2e.yml': e2eProblems, 'build.yml': buildProblems }[
     name
   ];
+  // A text with a character the rules cannot see is not read any further: they would be reading a different file
+  // from the one the runner parses.
+  const plain = plainProblems(name, text);
+  if (plain.length > 0) return plain;
   return [
     ...commonProblems(name, text, ctx),
     ...(specific ? specific(text, ctx) : []),
@@ -481,6 +524,7 @@ function flutterPinFromBlueprint(blueprint) {
 
 module.exports = {
   checkWorkflow,
+  plainProblems,
   flutterPinFromBlueprint,
   steps,
   runText,

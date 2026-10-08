@@ -17,22 +17,22 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Check out the commit that passed lint
-        uses: actions/checkout@<sha> # <version>
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0 # BUILD_NUMBER counts every commit
       - name: Set up Node.js (the version in .nvmrc)
-        uses: actions/setup-node@<sha> # <version>
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
       - name: Set up Java 17 for Gradle (the Android build)
-        uses: actions/setup-java@<sha> # <version>
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '17'
       - name: Cache Flutter
         id: flutter-cache
-        uses: actions/cache@<sha> # <version>
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/flutter
           key: flutter-android-<flutter>-${{ runner.os }}
@@ -42,13 +42,13 @@ jobs:
       - name: Put Flutter on the PATH
         run: echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
       - name: Cache the Dart and Flutter packages
-        uses: actions/cache@<sha> # <version>
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.pub-cache
           key: pub-${{ hashFiles('app/pubspec.lock') }}
           restore-keys: pub-
       - name: Cache Gradle
-        uses: actions/cache@<sha> # <version>
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.gradle/caches
@@ -91,14 +91,14 @@ jobs:
           --build-name="$VERSION"
           --build-number="$NUMBER"
       - name: Keep the admin web build
-        uses: actions/upload-artifact@<sha> # <version>
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: admin-web-${{ steps.info.outputs.admin_version }}-${{ steps.info.outputs.git_commit }}
           path: app/build/web
           if-no-files-found: error
           retention-days: 3
       - name: Keep the debug APK
-        uses: actions/upload-artifact@<sha> # <version>
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mobile-debug-apk-${{ steps.info.outputs.mobile_version }}-${{ steps.info.outputs.git_commit }}
           path: app/build/app/outputs/flutter-apk/app-debug.apk

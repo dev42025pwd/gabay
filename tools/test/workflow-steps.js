@@ -1,8 +1,8 @@
 // The ordered steps of the lint and e2e jobs, pinned (S7 round 3). The gate steps (verify, guards, migrations) are
 // pinned on their own in workflow-rules.js, but a step added BEFORE one can switch it off without ever naming it
 // (`sed -i '1i process.exit(0);' tools/v*.js`; a fake `node` first on $GITHUB_PATH). So the whole list is pinned:
-// every step's name, its own keys, the action it uses (its SHA is checked by the common rules and may move with a
-// bump), what it runs, its if: and its shell. Any step added, removed, reordered or rewritten fails the rules.
+// every step's name, its own keys, the action it uses (its SHA is pinned by the whole-text snapshot, workflow-snapshot.js, so
+// an upgrade changes it too), what it runs, its if: and its shell. Any step added, removed, reordered or rewritten fails the rules.
 // When a step here really changes, change this list in the same commit: that is the review the gate needs.
 'use strict';
 

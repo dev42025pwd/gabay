@@ -13,7 +13,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { CHECKS } = require('../verify');
-const { checkWorkflow, flutterPinFromBlueprint, BUILD_IF } = require('./workflow-rules');
+const {
+  checkWorkflow,
+  flutterPinFromBlueprint,
+  plainProblems,
+  BUILD_IF,
+} = require('./workflow-rules');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DIR = path.join(ROOT, '.github', 'workflows');
@@ -828,6 +833,90 @@ const MUTATIONS = [
     ),
     SNAPSHOT_MISMATCH,
   ],
+  // ---- S7 round 5, 1: a line break the rules do not see is still a line break to the runner ----
+  ...[
+    ['R5-1', 'a bare CR', '\r', /^lint\.yml:\d+: character U\+000D \(CR\)/],
+    ['R5-2', 'a NEL (U+0085)', '\u0085', /^lint\.yml:\d+: character U\+0085/],
+    ['R5-3', 'an LS (U+2028)', ' ', /^lint\.yml:\d+: character U\+2028/],
+    ['R5-4', 'a PS (U+2029)', ' ', /^lint\.yml:\d+: character U\+2029/],
+  ].map(([id, what, ch, expected]) => [
+    `${id} lint: ${what} inside a comment line hides a NODE_OPTIONS line from the rules, not from the runner`,
+    'lint.yml',
+    edit(
+      'lint.yml',
+      "      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'\n",
+      `      GABAY_VERIFY_CHECK_TIMEOUT_MS: '600000'\n      # a note about the cap${ch}      NODE_OPTIONS: --import data:text/javascript,process.exit(0)\n`,
+    ),
+    expected,
+  ]),
+  [
+    'R5-5 lint: the whole file with CRLF line ends',
+    'lint.yml',
+    { apply: (t) => t.replace(/\n/g, '\r\n') },
+    /^lint\.yml:\d+: character U\+000D \(CR\)/,
+  ],
+  [
+    'R5-6 e2e: a NEL inside a comment line',
+    'e2e.yml',
+    edit('e2e.yml', '# COST (L135', '# COST\u0085(L135'),
+    /^e2e\.yml:\d+: character U\+0085/,
+  ],
+  [
+    'R5-7 build: a PS inside a comment line',
+    'build.yml',
+    edit('build.yml', '\npermissions:', '\n# note permissions:\npermissions:'),
+    /^build\.yml:\d+: character U\+2029/,
+  ],
+  // ---- S7 round 5, 3: the action SHA is part of the snapshot ----
+  [
+    'R5-8 lint: the checkout SHA swapped for another 40-hex value (an action upgrade must change the snapshot)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+      `actions/checkout@${'a'.repeat(40)} # v7.0.1`,
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R5-9 lint: the version comment of an action changed (same SHA)',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.2',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  // ---- S7 round 5, 4a: inside a block scalar a blank line and a "#" line are content ----
+  [
+    'R5-10 lint: a blank line inside the folded verify command (it changes the folded text)',
+    'lint.yml',
+    edit('lint.yml', 'node tools/verify.js --only\n', 'node tools/verify.js --only\n\n'),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R5-11 e2e: a blank line inside the literal .env script',
+    'e2e.yml',
+    edit('e2e.yml', '          set -eu\n', '          set -eu\n\n'),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R5-12 lint: a "#" line inside the folded verify command is command text, not a comment',
+    'lint.yml',
+    edit(
+      'lint.yml',
+      'node tools/verify.js --only\n',
+      'node tools/verify.js --only\n          # node-version\n',
+    ),
+    SNAPSHOT_MISMATCH,
+  ],
+  [
+    'R5-13 lint: a blank line between two lines of a literal list (cache-dependency-path)',
+    'lint.yml',
+    edit('lint.yml', 'functions/package-lock.json\n', 'functions/package-lock.json\n\n'),
+    SNAPSHOT_MISMATCH,
+  ],
 ];
 
 for (const [label, file, mutation, expected] of MUTATIONS) {
@@ -888,16 +977,85 @@ test('the failure names the file and the first differing line, shows both texts 
 });
 
 for (const name of FILES) {
-  test(`${name}: a routine action SHA bump, a Flutter version bump and a comment edit are not snapshot failures`, () => {
-    let mutated = text(name)
-      .replace(
-        /(uses: actions\/[a-z-]+@)[0-9a-f]{40}( # v)\d+\.\d+\.\d+/g,
-        '$1' + 'a'.repeat(40) + '$2' + '9.9.9',
-      )
-      .replace(/^# .*$/m, '# an edited comment line');
+  test(`${name}: a Flutter version bump and a comment edit are not snapshot failures`, () => {
+    let mutated = text(name).replace(/^# .*$/m, '# an edited comment line');
     const flutter = /--branch (\d+\.\d+\.\d+) /.exec(mutated);
     if (flutter) mutated = mutated.split(flutter[1]).join('3.47.9');
     assert.notEqual(mutated, text(name));
     assert.deepEqual(checkWorkflow(name, mutated, CTX), []);
   });
+
+  // S7 round 5 (owner ruling): an action upgrade must change the snapshot too. Another well-formed 40-hex SHA with
+  // the same version comment passes every other rule, so only the snapshot can catch it.
+  test(`${name}: swapping the first action's SHA for another 40-hex value fails the snapshot of the real file`, () => {
+    const sha = /(uses: actions\/[a-z-]+@)([0-9a-f]{40})( # v\d+\.\d+\.\d+)/.exec(text(name));
+    const other = sha[2] === 'a'.repeat(40) ? 'b'.repeat(40) : 'a'.repeat(40);
+    const mutated = text(name).replace(sha[0], `${sha[1]}${other}${sha[3]}`);
+    const problems = checkWorkflow(name, mutated, CTX);
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], SNAPSHOT_MISMATCH, 'no other rule notices: the SHA is well formed');
+    assert.ok(problems[0].includes(other), 'the line found is shown');
+    assert.ok(problems[0].includes(sha[2]), 'the line the snapshot has is shown');
+  });
 }
+
+test('blank lines between steps and after a block scalar are not snapshot failures (only blank lines inside a block count)', () => {
+  const lint = text('lint.yml').replace(
+    '      - name: Cache Flutter\n',
+    '\n\n      - name: Cache Flutter\n',
+  );
+  const e2e = text('e2e.yml').replace('tee verify.log\n', 'tee verify.log\n\n\n');
+  assert.notEqual(lint, text('lint.yml'));
+  assert.notEqual(e2e, text('e2e.yml'));
+  assert.deepEqual(checkWorkflow('lint.yml', lint, CTX), []);
+  assert.deepEqual(checkWorkflow('e2e.yml', e2e, CTX), []);
+});
+
+// ---- S7 round 5: plain characters only -----------------------------------------------------------------------
+
+test('the workflow files and their snapshots hold printable ASCII, tab and LF only', () => {
+  for (const name of FILES) {
+    assert.deepEqual(plainProblems(name, text(name)), [], name);
+    assert.deepEqual(plainProblems(`${name}.snap`, snapshots[name] ?? ''), [], `${name}.snap`);
+  }
+});
+
+test('a tab in a comment is allowed, and the other rules are untouched by it', () => {
+  const mutated = text('lint.yml').replace('# COST', '#\tCOST');
+  assert.notEqual(mutated, text('lint.yml'));
+  assert.deepEqual(checkWorkflow('lint.yml', mutated, CTX), []);
+});
+
+test('plainProblems names the file, the line and the character code, and says why', () => {
+  const [p] = plainProblems('lint.yml', 'a: 1\nb: 2 # x\ry: 3\n');
+  assert.match(p, /^lint\.yml:2: character U\+000D \(CR\)/);
+  assert.match(p, /printable ASCII, tab and LF only/);
+  assert.ok(plainProblems('x', '\u0085'.repeat(20)).length <= 6, 'a flood is cut short');
+});
+
+for (const [label, ch, code] of [
+  ['CR', '\r', 'U+000D'],
+  ['NEL', '\u0085', 'U+0085'],
+  ['LS', ' ', 'U+2028'],
+  ['PS', ' ', 'U+2029'],
+  ['VT', '\u000b', 'U+000B'],
+  ['DEL', '\u007f', 'U+007F'],
+  ['a letter with an accent', 'é', 'U+00E9'],
+]) {
+  test(`a snapshot file with ${label} is reported (the .snap files are plain too)`, () => {
+    const mutated = snapshots['lint.yml'].replace('jobs:', `jobs:${ch}`);
+    const problems = plainProblems('lint.yml.snap', mutated);
+    assert.ok(
+      problems.some((p) => p.includes(code)),
+      problems.join('\n'),
+    );
+  });
+}
+
+test('a BOM at the start of a workflow is reported', () => {
+  const problems = checkWorkflow('lint.yml', `﻿${text('lint.yml')}`, CTX);
+  assert.ok(
+    problems.some((p) => /^lint\.yml:1: character U\+FEFF/.test(p)),
+    problems.join('\n'),
+  );
+});
