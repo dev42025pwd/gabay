@@ -4,7 +4,7 @@ Gabay: indoor wayfinding for Philippine malls (a Flutter shopper app, a Flutter 
 
 ## Commands (Node 22: in Git Bash `"$LOCALAPPDATA/Microsoft/WinGet/Links/fnm.exe" exec --using=22 -- npm.cmd run <script>`)
 - `npm run verify`: every check (linters and their tests, ESLint, Prettier, API and tool tests, `db/schema.sql` twice, the seed, the Functions emulator health, `flutter analyze`, `flutter test`). Healthy output ends `ALL GREEN`; the exit code is the number of failures. Run it before reporting any task complete and paste the output. If a test fails, fix the code, not the test.
-- Parts: `npm run lint:structural`, `lint:test`, `tools:test`, `api:test`, `api:lint`, `test:schema-forms`, `setup-db`, `migrate`, `seed`. In `app/`: `flutter analyze`, `flutter test`; screenshots with `flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<dir>`. Do not invent commands; add new ones here.
+- Parts: `npm run lint:structural`, `lint:test`, `tools:test`, `api:test`, `api:lint`, `test:schema-forms`, `setup-db`, `migrate`, `seed`, `ci:guards` (CI's secret and changelog-duplicate guards). `GABAY_VERIFY_CHECK_TIMEOUT_MS` caps each verify check (CI sets it). In `app/`: `flutter analyze`, `flutter test`; screenshots with `flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<dir>`. Do not invent commands; add new ones here.
 - Local database: PostgreSQL 18.6, `localhost:5432`, database `gabay_dev`; the password is in the local `.env` (never committed). The Auth emulator project is `demo-gabay`.
 - Once per clone: `git config core.hooksPath .githooks`. The hooks (pre-commit, post-commit, pre-push, and the Claude Code Stop, SessionStart and after-Dart-edit hooks) are listed in README and `WORKING_AGREEMENT.md` §6.
 
