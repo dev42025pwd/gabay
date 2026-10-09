@@ -1,5 +1,5 @@
 // no-bare-textfield (rule 7, standard §4.10): no code under app/lib builds a text field itself.
-// Forms are FieldSpec projections of the schema, built in app/lib/shared/forms/ (Phase 3); that
+// Forms are FieldSpec projections of the schema, built in app/lib/shared/forms/ (S9); that
 // folder is the one place a TextField / TextFormField / CupertinoTextField may be constructed.
 // Widened from features/**/views/ to all of app/lib by ruling L128. Caught: the constructor call,
 // with or without an import prefix (m.TextFormField(), a `.new` tear-off, and a typedef alias of
