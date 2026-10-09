@@ -8,6 +8,12 @@
 # the job from throwaway values: the database password is derived from the run id (the service container is only
 # reachable on the runner), and every SEED_PW_* is random per run and masked in the log. Nothing is echoed.
 #
+# The service image is pinned to postgres:18.6, the Blueprint's PostgreSQL pin (L147), so CI cannot drift to a
+# newer patch release unannounced. A move to another patch release is a one-line change to the image, the same
+# change to the log step's `ancestor=` filter (Docker's filter is <image-name>[:<tag>], and a name without a
+# tag means latest) and its message, and the matching edits to the rule, the pinned step and the snapshot
+# under tools/test.
+#
 # Java: not installed on purpose. firebase-tools 15.32.1 checks for Java 21 or newer only when an emulator
 # that runs on Java is started (controller.js: targets.some(requiresJava); commandUtils.js:
 # MIN_SUPPORTED_JAVA_MAJOR_VERSION = 21), and those are Firestore, Realtime Database and Storage
@@ -54,7 +60,7 @@ jobs:
       GABAY_VERIFY_CHECK_TIMEOUT_MS: '300000'
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18.6
         env:
           POSTGRES_PASSWORD: gabay-ci-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: gabay_dev
@@ -117,11 +123,11 @@ jobs:
         if: failure() || cancelled()
         shell: bash
         run: |
-          id="$(docker ps -aq --filter ancestor=postgres:18 | head -n 1)"
+          id="$(docker ps -aq --filter ancestor=postgres:18.6 | head -n 1)"
           if [ -n "$id" ]; then
             docker logs "$id" > postgres.log 2>&1
           else
-            echo "no postgres:18 container found: there is no service log to collect"
+            echo "no postgres:18.6 container found: there is no service log to collect"
           fi
 
       - name: Upload the server and emulator logs (on failure or cancel)

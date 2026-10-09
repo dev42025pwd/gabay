@@ -104,7 +104,7 @@ function e2eSteps(ctx) {
       keys: 'name,if,shell,run',
       if: 'failure() || cancelled()',
       shell: 'bash',
-      run: 'id="$(docker ps -aq --filter ancestor=postgres:18 | head -n 1)" if [ -n "$id" ]; then docker logs "$id" > postgres.log 2>&1 else echo "no postgres:18 container found: there is no service log to collect" fi',
+      run: 'id="$(docker ps -aq --filter ancestor=postgres:18.6 | head -n 1)" if [ -n "$id" ]; then docker logs "$id" > postgres.log 2>&1 else echo "no postgres:18.6 container found: there is no service log to collect" fi',
     },
     {
       name: 'Upload the server and emulator logs (on failure or cancel)',
