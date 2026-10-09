@@ -1,6 +1,6 @@
 # PH2-identity — Phase 2: identity, access, tenancy, audit
 
-> **Version**: 1.1 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-09 (L149), with §7's thirteen questions ruled one by one, all as recommended. Phase 2 starts after the coders' working copies (`plan/PH1-worktrees.md`) are built and merged (L146: Phase 2 starts on its approved plan) | **Decision rows**: L149 (this plan and its rulings), L41 (roles), L98 and E-08 (Firebase Auth), L109 (sign-in providers), L121 and DC28 (multi-tenant admins), L128 (two lints deferred to Phase 2), L146 (H2: a minimal FieldSpec in Phase 2), L148 (Phase 1 closed) | **Spec**: none. The standard's Appendix C Phase 2 is the specification, as Appendix C Phase 1 was for `plan/PH1-rails.md` (L123), read at Engineering Standards v1.0 lines 1285–1293 with the items it names | **Approver**: Genesis Perez, product owner
+> **Version**: 1.2 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-09 (L149; 1.2 adds the S1 and S9 review rulings, L151), with §7's thirteen questions ruled one by one, all as recommended. Phase 2 starts after the coders' working copies (`plan/PH1-worktrees.md`) are built and merged (L146: Phase 2 starts on its approved plan) | **Decision rows**: L149 (this plan and its rulings), L41 (roles), L98 and E-08 (Firebase Auth), L109 (sign-in providers), L121 and DC28 (multi-tenant admins), L128 (two lints deferred to Phase 2), L146 (H2: a minimal FieldSpec in Phase 2), L148 (Phase 1 closed) | **Spec**: none. The standard's Appendix C Phase 2 is the specification, as Appendix C Phase 1 was for `plan/PH1-rails.md` (L123), read at Engineering Standards v1.0 lines 1285–1293 with the items it names | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 2 delivers
 
@@ -128,6 +128,15 @@ Each question is kept as it was put, with its ruling first.
     - `UserRole` has two identical unique indexes (`db/schema.sql:296`, `:298`).
     - *Recommended:* in S3's migration `0001`, drop the duplicate and correct the header with `schema.sql`, per rule 4. This is a change to the signed schema, so it needs your yes.
     - Alternative: leave both, and note it in `SCHEMA_READING_GUIDE.md`.
+
+## 7a. Rulings from the S1 and S9 reviews (L151, 2026-10-09, the product owner, each as recommended)
+
+- **The emulator guard (S1).** `FIREBASE_AUTH_EMULATOR_HOST` is refused unless the environment explicitly says `NODE_ENV=development` or `test`; an unset `NODE_ENV` does not count (emulator mode accepts unsigned tokens).
+- **The token age (S1).** `auth.idTokenMaxAgeS` measures time since sign-in (`now − auth_time`), default 28,800 s (8 hours, the standard §3.3's session length). A token without `auth_time` is refused. The 401 is the client's sign-out (Q5).
+- **Test data (S1).** API tests may write real tables only inside an always-rolled-back transaction (WORKING_AGREEMENT §5).
+- **Per-user overrides (S6, S7).** `UserPermission` has no tenant, so an override applies in every tenant the user belongs to. It may be written only by SUPERADMIN or by an admin who is MALL_ADMIN in every tenant that user belongs to; enforced and tested in S6 and S7. No schema change.
+- **The FK picker (S9).** The async server-search picker (standard §4.10, P0) is built in S9; there is no load-all dropdown. Its options come from a fetch function the ViewModel supplies (the `/api/lookups/:name` controller stays in Phase 3).
+- **`UserRole` (S9, S11).** One row per role-and-tenant choice, each a single selection.
 
 ## 8. Scale
 
