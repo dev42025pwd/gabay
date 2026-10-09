@@ -143,6 +143,25 @@ const readLock = (dir) => JSON.parse(fs.readFileSync(lockFileOf(dir), 'utf8'));
 const lockExists = (dir) => fs.existsSync(lockFileOf(dir));
 const clean = (dir) => fs.rmSync(dir, { recursive: true, force: true });
 
+/**
+ * Test cleanup only (the owner's ruling L163, as for verify-lock-fix.test.js): deletes a scratch folder whose file a
+ * PowerShell helper held open. The helper's exit and the OS letting go of the handle are not the same instant under a
+ * full verify's load, so a delete that meets EBUSY or EPERM is retried every 50 ms, for at most `withinMs`, instead of
+ * failing the test after a fixed sleep.
+ */
+async function cleanWhenFree(folder, withinMs = 5_000) {
+  const until = Date.now() + withinMs;
+  for (;;) {
+    try {
+      clean(folder);
+      return;
+    } catch (err) {
+      if (!['EBUSY', 'EPERM'].includes(err.code) || Date.now() >= until) throw err;
+      await sleep(50);
+    }
+  }
+}
+
 /** A scratch path outside the scratch repo, for what a check wants to tell its test. */
 const seenFile = (name) =>
   path.join(os.tmpdir(), `gabay-lock-${name}-${process.pid}-${Date.now()}.json`);
@@ -182,6 +201,7 @@ module.exports = {
   readLock,
   lockExists,
   clean,
+  cleanWhenFree,
   seenFile,
   noteLockCheck,
   sleepingCheck,

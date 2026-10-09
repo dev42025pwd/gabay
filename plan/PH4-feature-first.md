@@ -118,6 +118,7 @@ A table in this plan, one row per feature route and admin screen, with columns f
 |---|---|---|---|---|---|---|---|---|
 | `GET /api/lookups/:name` | FF-0 | stub (`devStub`) | open | none | none | n/a (read-only) | open (query read leniently by `parsePaging`; no zod yet) | none (cases written in `E2E_Test_Cases_Manual.md` FF0.1–FF0.18, run by hand). The stub does not filter inactive tenants; R1 (S2) rules inactive-tenant behaviour (L155) |
 | `GET /api/lookups/:name/:id` | FF-0 | stub (`devStub`) | open | none | none | n/a (read-only) | open (the id is checked by pattern; no zod yet) | none (as above). The stub does not filter inactive tenants; R1 (S2) rules inactive-tenant behaviour (L155) |
+| Screen: the admin "Development build: no sign-in" banner (`DevStubBannerFrame`, every admin page) | FF-0 (client) | n/a (a screen; the client sends no `X-Tenant-Id` until R8's switcher) | n/a (no route) | n/a (no route) | n/a (no menu exists yet; R8 builds it from permissions) | n/a (no write) | n/a (no input) | none (manual cases `FF0-FE-01` to `FF0-FE-05` in `E2E_Frontend_Test_Cases_Manual.md`). R8 deletes the banner with its provider, config, ARB string and manual rows (sign-in replaces it) |
 
 "open" and "none" are what the retrofit closes; R13 fails while any cell in a row is open or none, other than an "n/a" with its reason.
 

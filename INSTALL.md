@@ -96,11 +96,13 @@ flutter run -t lib/main_mobile.dart
 # Admin web page (path URLs, no #)
 flutter run -d chrome -t lib/main_admin.dart
 
-# Test-rendered screenshots: both shells, light and dark, phone and tablet (8 PNGs)
+# Test-rendered screenshots: both shells, light and dark, phone and tablet, plus the About page, the message banners and the admin development banner (24 PNGs)
 flutter test test/screenshot_test.dart --dart-define=SHOTS_OUT=<an existing folder outside the repo>
 
 # Builds. A release build REQUIRES --dart-define=API_BASE=<https url>; without it the app refuses to start.
 flutter build web -t lib/main_admin.dart --dart-define=API_BASE=<https url>
+#   The admin page shows its "Development build: no sign-in" banner in every build that is not a release build,
+#   and in a release build only with --dart-define=DEV_STUB=true (E-20, until R8 brings sign-in).
 flutter build apk --debug -t lib/main_mobile.dart
 ```
 

@@ -9,6 +9,9 @@ The one place a form field is built (rule 7, standard 4.10, Appendix A.13). A vi
 | `field_validators.dart` | `validatorFor(spec, l10n)`: required, maxLength, integer and email checks derived from the spec |
 | `async_lookup_picker.dart` | the `fk` field: `LookupPickerField` and `showLookupPicker`, the async server-search picker (search with debounce, "Load more", the four states); `LookupFetcher`, the function the ViewModel supplies to fetch a page |
 | `select_option.dart` | `SelectOption`: a choice (value, label, `isActive`) |
+| `lookup_names.dart` | `LookupName`: the lookups the client may read (`building-types`, `amenity-types`, `transit-types`), one enum value per entry of the server allow-list; a call site never spells a name |
+| `lookup_service.dart` | `LookupService`: stateless, over `ApiClient`. `lookupFetcher(name)` gives the `LookupFetcher` for the picker (`GET /api/lookups/:name`, rows to `SelectOption`); `lookupOption(name, id)` gives the `currentOption` of a held value, inactive or not (`GET /api/lookups/:name/:id`). Errors are rethrown for `formatApiError`; a reply of the wrong shape is a `FormatException` |
+| `lookup_providers.dart` | `lookupServiceProvider`: a ViewModel reads it to build its field fetcher |
 | `debounced_search_field.dart` | the list's search box (350 ms debounce) |
 
 ## The schema decides

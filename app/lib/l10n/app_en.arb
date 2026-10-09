@@ -127,6 +127,9 @@
     "placeholders": { "label": { "type": "String", "example": "Platform support" } }
   },
 
+  "devStubBanner": "Development build: no sign-in",
+  "@devStubBanner": { "description": "Banner at the top of every admin page while the development stub stands in for sign-in (E-20). It tells a tester that anyone who opens the page acts as the development admin, so a screenshot or a demo of this build is never mistaken for the real one. Removed when sign-in arrives (R8). Also its screen-reader name." },
+
   "fieldAppUserEmail": "Email",
   "@fieldAppUserEmail": { "description": "Label of the email field on a user's form (AppUser.Email)." },
   "fieldAppUserDisplayName": "Display name",
@@ -139,5 +142,7 @@
   "changelogMobile_e001_a": "The Gabay shopper app now starts. It has no features yet.",
   "@changelogMobile_e001_a": { "description": "Shopper-app changelog, entry e001, first bullet. Plain language for shoppers." },
   "changelogAdmin_e001_a": "The Gabay admin page now starts. It has no features yet.",
-  "@changelogAdmin_e001_a": { "description": "Admin changelog, entry e001, first bullet. Plain language for mall staff." }
+  "@changelogAdmin_e001_a": { "description": "Admin changelog, entry e001, first bullet. Plain language for mall staff." },
+  "changelogAdmin_e002_a": "While the admin page runs without sign-in, a banner at the top now says so, so a test copy is never mistaken for the real one.",
+  "@changelogAdmin_e002_a": { "description": "Admin changelog, entry e002, first bullet. Plain language for mall staff: the development banner (FF-0)." }
 }
