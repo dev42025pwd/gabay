@@ -85,7 +85,7 @@ than presenting it as settled.
 
   Phase 1 declared 2026-10-07 (L122)
 
-  The declaration wakes the agents and approves no work: each Phase 1 task, the rails included, needs the product owner's approved plan, and every repository, push or deploy waits for their call.
+  The declaration wakes the agents and approves no work: each Phase 1 task, the rails included, needs the product owner's approved plan, and every repository, push or deploy waits for their call. Phase 2 and every later phase start when the product owner approves their plan; no further declaration (L146).
 - **Models (L62, L122; WORKING_AGREEMENT §8):** Sonnet 5.5 for well-defined coding; Opus 5.5 or Fable 5.1, by weight, for analysis and decisions. Every important scenario goes to the product owner first, including any move to Opus or Fable. Model IDs and library APIs come from a doc check, never from memory (L121).
 - **Pipeline:** intent → spec (spec-writer) → plan (main session; the product owner approves; it cites the spec revision) → diff (coders) → tests (test-verifier) → review (dod-reviewer) → the product owner's sign-off. Files are named by pipeline ID: `intent/<id>-<slug>.md`, `spec/<id>.md`, `plan/<id>.md`.
 - **Evidence:** paste command output; never write "should work". Tag an unchecked library, framework or API claim RECALLED; verify a load-bearing one (doc fetch or source check) or stop and ask.
