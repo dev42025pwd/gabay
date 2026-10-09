@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.15 | **Date**: 2026-10-09 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136; §1 amended by L139; §6 amended by L140; §6 amended for coder working copies, plan/PH1-worktrees.md 1.1 and 1.2, L147, L148, L150; §5 amended by L151; §6 amended by L152; §3 amended by L153) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.16 | **Date**: 2026-10-09 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136; §1 amended by L139; §6 amended by L140; §6 amended for coder working copies, plan/PH1-worktrees.md 1.1 and 1.2, L147, L148, L150; §5 amended by L151; §6 amended by L152; §3 amended by L153; §1 and §2 amended by L156) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -13,6 +13,16 @@ The product owner set these rules so they never have to be repeated. When the pr
 - **Record every ruling** as a `plan.html` decision-log row (append-only, with a version bump and a changelog row), and update the PRD, Blueprint, pipeline, schema, CLAUDE.md, this file and, for a product ruling, the `gabay-product-rulings` skill (`.claude/skills/`; every product agent preloads it, L131) as the ruling touches them, in the same turn. No document is edited before the product owner's go-ahead.
 - **Deploys and outward actions** (creating a repository, pushing, publishing a store build, deploying to Firebase) happen only on the product owner's call (L109).
 - **Every action is asked first (L139):** before any action (editing a file, starting an agent, a branch, a push, a pull request, a merge, a GitHub setting, publishing a page) the main session asks the product owner with AskUserQuestion, the recommended option first; read-only checks to prepare the question are allowed. A go covers only the actions it names; every merge needs its own go.
+- **The fast lane while E-20 is in force (L156; amends L139 for that period):**
+  1. **Standing go for routine steps.** Once dod-reviewer says "ready" and CI (lint + e2e) is green, the main session pushes, opens the pull request and merges without asking. Review findings (Important and nits) are fixed without asking, as long as no ruling of the product owner's is needed. Still asked: plans, rulings, anything failing or blocked, anything outside the approved plan, deletions or anything hard to undo.
+  2. **One consult per slice.** The coders' and reviewers' questions are collected and brought to the product owner in one batch, with the plan where possible, not one at a time.
+  3. **Coders in parallel**, each in its own working copy, on approved plans only.
+  4. **Plans in batches.** Several slices' intents, specs and plans are drafted together and approved in one sitting, so each slice starts as soon as the one before it merges.
+  5. **Lighter reviewer verify.** dod-reviewer runs the affected tests instead of a full `npm run verify`; the full verify still runs for the coder, at the pre-push hook and in CI.
+  6. **One `plan.html` row per slice,** holding all of that slice's rulings.
+  7. **A short status after each merge:** what merged, what the product owner can now see or use, what runs next.
+
+  Unchanged: tests first, dod-reviewer on every slice, CI's lint and e2e, the seven rules and every linter, E-20's hard rules, and the product owner's approval of every plan and every real decision.
 
 ## 2. Approvals (L121)
 
@@ -21,8 +31,8 @@ The product owner set these rules so they never have to be repeated. When the pr
 | Intent and spec | `intent/<id>-<slug>.md`, `spec/<id>.md` (spec-writer) | The product owner approves both together: scope, and anything the spec flags (schema changes above all) |
 | Plan | `plan/<id>.md` (names the spec revision, the §5 items it triggers, its DESIGN CHOICES) | The product owner |
 | Code and tests | the diff (coders), the tests (test-verifier) | Nobody yet: the agent that wrote it can never approve it (standard §14.2) |
-| Review | dod-reviewer: runs `npm run verify` in a fresh context, then `REVIEW.md` and §5 | An AI self-check, never a sign-off |
-| PR | with the evidence of §5.3; lint and e2e green on GitHub (required checks, L136) | The product owner approves the merge; nothing reaches `main` except through a pull request, for anyone (L136) |
+| Review | dod-reviewer: runs `npm run verify` in a fresh context (while E-20 is in force, the affected tests only: L156), then `REVIEW.md` and §5 | An AI self-check, never a sign-off |
+| PR | with the evidence of §5.3; lint and e2e green on GitHub (required checks, L136) | The product owner approves the merge; nothing reaches `main` except through a pull request, for anyone (L136). While E-20 is in force, the main session merges once dod-reviewer says ready and lint and e2e are green (L156) |
 
 **Phase setup work the standard itself defines** (Phase 1's rails, Appendix C) has no intent or spec: it runs as one plan, approved once, built in slices, each closed with pasted proof (L123). Product features always take the full chain above.
 

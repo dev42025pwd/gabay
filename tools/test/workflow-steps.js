@@ -91,7 +91,7 @@ function e2eSteps(ctx) {
       name: 'Write .env from throwaway values (no repository secrets, nothing echoed)',
       keys: 'name,shell,run',
       shell: 'bash',
-      run: `set -eu umask 077 { echo "PGHOST=localhost" echo "PGPORT=5432" echo "PGDATABASE=gabay_dev" echo "PGUSER=postgres" echo "PGPASSWORD=$DB_PASSWORD" } > .env for account in SUPERADMIN MALLADMIN EDITOR VIEWER MALLADMIN_DEMO SHOPPER; do value="$(openssl rand -hex 16)" echo "::add-mask::$value" echo "SEED_PW_$account=$value" >> .env done`,
+      run: `set -eu umask 077 { echo "NODE_ENV=development" echo "PGHOST=localhost" echo "PGPORT=5432" echo "PGDATABASE=gabay_dev" echo "PGUSER=postgres" echo "PGPASSWORD=$DB_PASSWORD" } > .env for account in SUPERADMIN MALLADMIN EDITOR VIEWER MALLADMIN_DEMO SHOPPER; do value="$(openssl rand -hex 16)" echo "::add-mask::$value" echo "SEED_PW_$account=$value" >> .env done`,
     },
     {
       name: 'verify, the database half',

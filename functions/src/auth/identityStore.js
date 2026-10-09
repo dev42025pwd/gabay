@@ -61,6 +61,34 @@ function createIdentityStore(db) {
       }
       return null;
     },
+
+    /**
+     * An AppUser by email, any letter case (AppUser.Email is UNIQUE). For the development stub only (E-20, FF-0), which
+     * acts as one named admin; R1 deletes the stub and this method with it. Inactive users are returned, flagged, as in
+     * findByFirebaseUid; a ShopperAccount is never returned.
+     * @returns {Promise<
+     *   {kind: 'admin', userId: number, email: string, displayName: string, isActive: boolean, firebaseUid: string}
+     *   | null>}
+     */
+    async findAdminByEmail(email) {
+      if (typeof email !== 'string' || email.length === 0) return null;
+      const admin = await db.query(
+        `SELECT UserId, Email, DisplayName, IsActive, FirebaseUid
+           FROM gabay.AppUser
+          WHERE LOWER(Email) = LOWER($1)`,
+        [email],
+      );
+      if (admin.rows.length === 0) return null;
+      const row = admin.rows[0];
+      return {
+        kind: 'admin',
+        userId: row.userid,
+        email: row.email,
+        displayName: row.displayname,
+        isActive: row.isactive,
+        firebaseUid: row.firebaseuid,
+      };
+    },
   };
 }
 

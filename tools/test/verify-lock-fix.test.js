@@ -247,6 +247,24 @@ test('a run clears a dead lock under the claim and leaves no claim, stale or tem
 // ---- 1. release retries ----------------------------------------------------------------------------------------
 
 /**
+ * Test cleanup only (the owner's ruling L155): deletes a scratch folder whose file a PowerShell helper held open. The
+ * helper's exit and the OS letting go of the handle are not the same instant under a full verify's load, so a delete
+ * that meets EBUSY or EPERM is retried briefly (bounded) instead of failing the test after a fixed sleep.
+ */
+async function cleanWhenFree(folder, withinMs = 5_000) {
+  const until = Date.now() + withinMs;
+  for (;;) {
+    try {
+      clean(folder);
+      return;
+    } catch (err) {
+      if (!['EBUSY', 'EPERM'].includes(err.code) || Date.now() >= until) throw err;
+      await sleep(50);
+    }
+  }
+}
+
+/**
  * Holds `file` open so that it cannot be deleted, for `holdMs` (Windows, PowerShell: Node's own handles always
  * share delete). `share` is 'Read' (the lock can still be read) or 'None' (it cannot even be read).
  */
@@ -262,11 +280,15 @@ async function holdOpen(file, share, holdMs) {
     ],
     { stdio: ['ignore', 'pipe', 'ignore'] },
   );
+  const exited = new Promise((resolve) => ps.once('exit', resolve));
   await new Promise((resolve, reject) => {
     ps.stdout.on('data', (d) => String(d).includes('held') && resolve());
     ps.on('exit', () => reject(new Error('powershell ended before it held the file')));
   });
-  return () => ps.kill();
+  return async () => {
+    ps.kill();
+    await exited;
+  };
 }
 
 for (const share of ['Read', 'None']) {
@@ -286,9 +308,8 @@ for (const share of ['Read', 'None']) {
       assert.equal(fs.existsSync(file), false, 'the lock is gone');
       assert.deepEqual(lines, [], 'nothing to say');
     } finally {
-      stop?.();
-      await sleep(300);
-      clean(folder);
+      await stop?.();
+      await cleanWhenFree(folder);
     }
   });
 }
@@ -311,9 +332,8 @@ test('release: a lock held open throughout stays, and one line names the file', 
     assert.ok(lines[0].includes(file), lines[0]);
     assert.match(lines[0], /could not remove its lock/);
   } finally {
-    stop?.();
-    await sleep(300);
-    clean(folder);
+    await stop?.();
+    await cleanWhenFree(folder);
   }
 });
 
