@@ -59,6 +59,8 @@ class SurfaceHomeScreen extends ConsumerWidget {
               ),
             ),
           ),
+          // S8 GATE PROBE: a deliberately bad change (a hardcoded colour); never merged.
+          Container(height: 4, color: const Color(0xFFE53935)),
           const SizedBox(height: 24),
           Wrap(
             spacing: 12,
