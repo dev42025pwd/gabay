@@ -44,6 +44,7 @@ Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through
 - A hook file loses its executable bit on a pathspec commit (`core.fileMode` is false): `git update-index --chmod=+x <file>`.
 - `plan.html` is edited by other sessions too: re-read its version and next L-row before editing; check `<tr>`/`<li>` balance after.
 - Never start `npm run verify` expecting the machine to be yours, and never kill another run's emulator or delete its lock to get in: the lock makes you wait and says who holds it. A lock left by a dead run is cleared by the next run.
+- A git hook exports `GIT_DIR` and friends (from a working copy, `GIT_DIR` points into the real repository): anything a hook starts that works in another repository or working tree runs after `unset $(git rev-parse --local-env-vars)`, and every `tools/**` test file loads `tools/test/timeout.js`, which clears them (INC-001, L152).
 - `npm run seed:db-only` (in `db/seeds`) deletes the test accounts; restore them with the full `npm run seed`.
 - Never print or commit `.env` values. Never copy code from `demo_app` or `gabay_spike` (L34); the penthouse data stays out of git (L48, L123).
 - The Blueprint's `<known_traps>` (Part 1) list the domain traps (global lookups `TenantId = $t OR TenantId IS NULL`, frozen rows, and more): read them before database or engine work.
