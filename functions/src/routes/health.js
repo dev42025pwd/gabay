@@ -18,6 +18,12 @@ function healthRoutes(db, logger) {
     }
   });
 
+  // S8 GATE PROBE: a deliberately bad change (a request value interpolated into SQL); never merged.
+  router.get('/probe', async (req, res) => {
+    const r = await db.query(`SELECT * FROM gabay.globalsetting WHERE settingkey = '${req.query.key}'`, []);
+    res.json(r.rows);
+  });
+
   return router;
 }
 
