@@ -57,7 +57,23 @@ const schema = z.object({
     .string()
     .regex(/^\d+\s?(b|kb|mb)$/i, 'must look like 5mb or 512kb')
     .default('5mb'),
+
+  // Firebase Auth (E-08). Both optional: the health check and the Functions emulator run without them.
+  // FIREBASE_PROJECT_ID empty: the Admin SDK finds the project itself (Cloud Functions), or, with an emulator
+  // host, this is the emulator's demo project.
+  FIREBASE_PROJECT_ID: z.string().min(1).optional(),
+  // host:port of the Auth emulator, development and tests ONLY. The Admin SDK then accepts UNSIGNED tokens, so
+  // production refuses to start with it set (see parseConfig).
+  FIREBASE_AUTH_EMULATOR_HOST: z
+    .string()
+    .regex(/^[A-Za-z0-9.-]+:\d{1,5}$/, 'must look like 127.0.0.1:9099')
+    .optional(),
 });
+
+/** The Auth emulator's project (CLAUDE.md: demo-gabay), used when an emulator host is set and no project ID is. */
+const EMULATOR_PROJECT_ID = 'demo-gabay';
+/** The only NODE_ENV values, as written in the raw environment, under which an Auth emulator host is accepted. */
+const EMULATOR_ALLOWED_ENVS = Object.freeze(['development', 'test']);
 
 /** Pure: validates an env-like object and returns the config, or throws ConfigError. */
 function parseConfig(env) {
@@ -70,6 +86,15 @@ function parseConfig(env) {
     );
   }
   const e = result.data;
+  // An emulator host makes the Admin SDK accept UNSIGNED tokens: one leaking into a deployed function would let anyone
+  // forge a sign-in. So it is allowed only when the RAW environment says NODE_ENV=development or NODE_ENV=test
+  // (owner's ruling, P2-S1 review I1). An unset NODE_ENV does not count: zod defaults it to development, and a
+  // deployed function that forgot NODE_ENV must not be mistaken for a developer's machine.
+  if (e.FIREBASE_AUTH_EMULATOR_HOST && !EMULATOR_ALLOWED_ENVS.includes(present.NODE_ENV)) {
+    throw new ConfigError([
+      'FIREBASE_AUTH_EMULATOR_HOST: set only with NODE_ENV=development or NODE_ENV=test written explicitly in the environment (the emulator accepts unsigned tokens)',
+    ]);
+  }
   return Object.freeze({
     env: e.NODE_ENV,
     isProduction: e.NODE_ENV === 'production',
@@ -92,6 +117,11 @@ function parseConfig(env) {
     ),
     trustProxyHops: e.TRUST_PROXY_HOPS,
     maxJsonBody: e.MAX_JSON_BODY,
+    firebase: Object.freeze({
+      projectId:
+        e.FIREBASE_PROJECT_ID ?? (e.FIREBASE_AUTH_EMULATOR_HOST ? EMULATOR_PROJECT_ID : null),
+      authEmulatorHost: e.FIREBASE_AUTH_EMULATOR_HOST ?? null,
+    }),
   });
 }
 

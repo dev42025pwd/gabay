@@ -8,6 +8,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { clearLocalGitEnv } = require('./clean-git-env');
+
+// A scratch repository is only scratch if its git commands do not inherit GIT_DIR and friends (see
+// clean-git-env.js). Cleared here as well as in timeout.js, so a file that uses this helper alone is safe.
+clearLocalGitEnv();
 
 const REAL = path.resolve(__dirname, '..', '..');
 

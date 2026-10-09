@@ -3,6 +3,13 @@
 'use strict';
 
 const baseTest = require('node:test');
+const { clearLocalGitEnv } = require('./clean-git-env');
+
+// Every test file under tools/ loads this wrapper (git-env.test.js fails, naming the file, when one does
+// not; functions/test and db/tools/test start no git and are outside it), so every child git a test starts
+// is clean: a run with GIT_DIR set (INC-001: a pre-push hook in a linked worktree, or by hand) must never
+// reach the repository GIT_DIR names.
+clearLocalGitEnv();
 
 const TEST_TIMEOUT_MS = 120_000;
 

@@ -1,6 +1,7 @@
 // Shared test helpers. Tests run against the copy's own database (PGDATABASE in its .env: gabay_dev in the main
-// folder; plan DC-6) and never write to real tables: anything they create is a TEMP table on a
-// single-connection pool, or a read.
+// folder; plan DC-6). A test may create a TEMP table on a single-connection pool, or read, or (owner's ruling L151,
+// P2-S1 review I5) write the real tables INSIDE A TRANSACTION THAT IS ALWAYS ROLLED BACK (authHelpers.js:
+// openRolledBackDb), so nothing is ever kept and no committed or seeded row is changed. It never COMMITs.
 'use strict';
 
 process.env.NODE_ENV = 'test';
