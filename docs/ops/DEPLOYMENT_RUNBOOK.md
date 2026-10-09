@@ -2,6 +2,8 @@
 
 > **Version**: 0.1 stub | **Date**: 2026-10-07 | **Status**: Phase 0 stub (standard §2; plan.html L115) | **Audience**: whoever deploys, on the product owner's call | **Scope**: reusable per environment; the per-release deploy plan is separate and dated
 
+**⚠️ No deploy of any kind while EXCEPTIONS E-20 is open (L153):** the feature-first build runs on a development stub with no sign-in, tenancy or audit until the retrofit's gates are signed.
+
 **⚠️ Nothing in this runbook is run until the product owner calls the first deploy (L109).** Until then everything is local (INSTALL.md). Every step that writes to a cloud resource carries a ⚠️ and needs the release approval named in the deploy plan.
 
 The standard's runbook phases assume a VM; Gabay runs on Firebase (L98), so the phases map as below.
