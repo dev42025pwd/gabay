@@ -1,5 +1,6 @@
 // Shared test helpers. Tests run against the copy's own database (PGDATABASE in its .env: gabay_dev in the main
-// folder; plan DC-6) and never write to real tables: anything they create is a TEMP table on a single-connection pool, or a read.
+// folder; plan DC-6) and never write to real tables: anything they create is a TEMP table on a
+// single-connection pool, or a read.
 'use strict';
 
 process.env.NODE_ENV = 'test';

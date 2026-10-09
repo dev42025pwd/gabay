@@ -7,6 +7,7 @@
 // without blocking.
 'use strict';
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
@@ -45,10 +46,9 @@ function nearestExisting(dir) {
 }
 
 /**
- * The repository a hook should check (plan/PH1-worktrees.md 1.1, point 8). An edit hook takes the edited file's own
- * repository (tool_input.file_path, resolved against the event's cwd when relative); a hook with no file (Stop,
- * SessionStart) takes the event's cwd, which is the root of the working copy Claude is in. With neither, or when
- * neither is inside a repository, it is ROOT, as before.
+ * The repository an EDIT hook checks (plan/PH1-worktrees.md 1.1, point 8): the edited file's own repository
+ * (tool_input.file_path, resolved against the event's cwd when relative); when the file is in no repository, the
+ * event's cwd's; with neither, ROOT, as before. The Stop and SessionStart hooks use stopRoots instead.
  */
 function hookRoot(event = {}) {
   const file = event.tool_input?.file_path ?? event.tool_response?.filePath;
@@ -65,6 +65,56 @@ function hookRoot(event = {}) {
   }
   return ROOT;
 }
+
+/** True when two paths are the same folder (case-insensitive on Windows; symbolic links and short names resolved). */
+function sameFolder(a, b) {
+  const norm = (p) => {
+    let full;
+    try {
+      full = fs.realpathSync.native(p);
+    } catch {
+      full = path.resolve(p);
+    }
+    return process.platform === 'win32' ? full.toLowerCase() : full;
+  };
+  return norm(a) === norm(b);
+}
+
+/** The git directory shared by every working copy of a repository (`git rev-parse --git-common-dir`), or null. */
+function commonGitDir(dir) {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      cwd: dir,
+      encoding: 'utf8',
+      timeout: 10_000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return out ? path.resolve(out) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The folders a Stop or SessionStart hook checks (owner ruling I-4, plan/PH1-worktrees.md 1.1): ALWAYS the main
+ * folder, ROOT, as before; and, when the event's cwd is in a different working copy of this same repository, that
+ * copy as well. Never only the copy: the main session's edits in the main folder are checked whatever folder its shell
+ * is in. A cwd in no repository, in an unrelated repository, or in ROOT adds nothing.
+ */
+function stopRoots(event = {}) {
+  const roots = [ROOT];
+  if (typeof event.cwd !== 'string' || !event.cwd) return roots;
+  const folder = nearestExisting(path.resolve(event.cwd));
+  const top = folder && topLevel(folder);
+  if (!top || sameFolder(top, ROOT)) return roots;
+  const common = commonGitDir(top);
+  const ours = commonGitDir(ROOT);
+  if (common && ours && sameFolder(common, ours)) roots.push(top);
+  return roots;
+}
+
+/** How a message names a folder when two are checked: the main folder, or a working copy with its path. */
+const folderLabel = (root) => (root === ROOT ? 'the main folder' : `the working copy ${root}`);
 
 /** The event JSON from stdin ({} when there is none or it is not JSON). */
 function readEvent() {
@@ -84,11 +134,30 @@ function readEvent() {
   });
 }
 
-/** The session baseline file (HEAD when the session began), under the gitignored .verify/. */
-const baselineFile = (id) =>
-  path.join(ROOT, '.verify', `session-${String(id).replace(/[^A-Za-z0-9_-]/g, '_')}.json`);
+/**
+ * The session baseline file (HEAD when the session began), under the main folder's gitignored .verify/. The main
+ * folder's is session-<id>.json; a working copy has its own, session-<id>.copy-<hash of its path>.json, because a
+ * copy's HEAD is not the main folder's.
+ */
+function baselineFile(id, root = ROOT) {
+  const name = String(id).replace(/[^A-Za-z0-9_-]/g, '_');
+  const suffix =
+    root === ROOT
+      ? ''
+      : `.copy-${crypto.createHash('sha1').update(path.resolve(root).toLowerCase()).digest('hex').slice(0, 10)}`;
+  return path.join(ROOT, '.verify', `session-${name}${suffix}.json`);
+}
 
 const block = (reason) => console.log(JSON.stringify({ decision: 'block', reason }));
 const notice = (systemMessage) => console.log(JSON.stringify({ systemMessage }));
 
-module.exports = { ROOT, hookRoot, readEvent, baselineFile, block, notice };
+module.exports = {
+  ROOT,
+  hookRoot,
+  stopRoots,
+  folderLabel,
+  readEvent,
+  baselineFile,
+  block,
+  notice,
+};

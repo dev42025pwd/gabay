@@ -4,6 +4,10 @@
 // last_assistant_message holds a line that starts "Changelog waived:" followed by a reason on that line
 // (the product owner reads the reason). stop_hook_active does NOT release it.
 //
+// WORKING COPIES (owner ruling I-4): the main folder is always checked, and the working copy of this repository the
+// event's cwd is in as well, each from its own baseline (session-baseline.js records one per folder); a waiver line
+// covers both.
+//
 // "Changed" is measured from the session's baseline (the HEAD recorded by session-baseline.js; HEAD
 // itself when there is none) to the working tree, so work committed during the session still counts.
 //   screens:   any file under app/lib/features/**, app/lib/shared/components|widgets|navigation/**, or
@@ -19,7 +23,7 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { hookRoot, readEvent, baselineFile, block, notice } = require('./lib');
+const { ROOT, stopRoots, readEvent, baselineFile, block, notice } = require('./lib');
 
 const ARB = 'app/lib/l10n/app_en.arb';
 const CHANGELOG = 'app/lib/core/config/changelog.dart';
@@ -67,9 +71,9 @@ const git = (root, args) =>
     stdio: ['ignore', 'pipe', 'ignore'],
   });
 
-function baselineHead(sessionId) {
+function baselineHead(sessionId, root) {
   try {
-    return JSON.parse(fs.readFileSync(baselineFile(sessionId), 'utf8')).head;
+    return JSON.parse(fs.readFileSync(baselineFile(sessionId, root), 'utf8')).head;
   } catch {
     return 'HEAD';
   }
@@ -147,10 +151,16 @@ function assess(root, base) {
 
 async function main() {
   const event = await readEvent();
-  let result;
+  // The main folder always, and the working copy the event's cwd is in as well (owner ruling I-4). Each folder is
+  // measured from its own baseline and judged on its own changelog entry; a copy's baseline is never the main folder's.
+  const screens = [];
   try {
-    // The repository of the event's cwd: the working copy Claude is in (plan/PH1-worktrees.md 1.1).
-    result = assess(hookRoot(event), baselineHead(event.session_id));
+    for (const root of stopRoots(event)) {
+      const result = assess(root, baselineHead(event.session_id, root));
+      if (result.screens.length === 0 || result.hasEntry) continue;
+      const where = root === ROOT ? '' : ` (in the working copy ${root})`;
+      screens.push(...result.screens.map((s) => `${s}${where}`));
+    }
   } catch (err) {
     // Fail closed, like stop-verify: when git cannot say what changed, do not finish on trust.
     block(
@@ -158,8 +168,8 @@ async function main() {
     );
     return;
   }
-  if (result.screens.length === 0 || result.hasEntry) return;
-  const list = result.screens.slice(0, 6).join(', ') + (result.screens.length > 6 ? ', ...' : '');
+  if (screens.length === 0) return;
+  const list = screens.slice(0, 6).join(', ') + (screens.length > 6 ? ', ...' : '');
   const waiver = waiverReason(event.last_assistant_message);
   if (waiver) {
     notice(`changelog waived for the screen changes (${list}): ${waiver}`);

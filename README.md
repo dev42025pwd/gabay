@@ -89,6 +89,8 @@ Run, test and the single verification command are added here in Phase 1 (standar
 ```sh
 psql -U postgres -h localhost -d gabay_dev -v ON_ERROR_STOP=1 -f db/schema.sql   # the schema (run twice; both exit 0)
 cd db/seeds && npm install && npm run seed                                       # the local test seed (L119, L120)
+npm run worktree:new -- <name> [<branch>]                                        # a coder's own working copy and database (INSTALL.md A.5)
+npm run worktree:remove -- <name> [--force]                                      # remove it and drop its database
 ```
 
 ## What does not exist (by decision)
