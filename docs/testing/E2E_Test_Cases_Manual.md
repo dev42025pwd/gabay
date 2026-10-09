@@ -62,6 +62,31 @@ Setup: the API running against the emulator (`FIREBASE_AUTH_EMULATOR_HOST=127.0.
 | 2.18 | Public routes stay public | `GET /api/health` with no token; `GET /api/nothing-here` with no token | 200 `{"status":"ok","db":"ok"}`; 404 `{"error":"Not found"}` | ☐ |
 | 2.19 | No secrets in the answer | read any 200 from 2.4 to 2.8 | no Firebase UID, token or password; no `X-Powered-By`; `Cache-Control: no-store` | ☐ |
 
+### FF-0 — Lookups, read-only (development stub, E-20)
+
+Setup: the API running locally with `NODE_ENV=development` written in `.env` (the stub refuses to exist otherwise), the seed loaded. **No token is needed**: until the retrofit's R1 the route runs as the user `DEV_STUB_USER_EMAIL` names (default `malladmin@gabay.test`). **Call:** `curl -i "<api>/api/lookups/<name>?search=&page=&pageSize="` and `curl -i "<api>/api/lookups/<name>/<id>"`. With no `X-Tenant-Id` the tenant is DEMO_MALLS (the user's first tenant by code). SPIKE_VENUES' id is in `GET /api/me` (call it with that account's token, as in Phase 2) or in `SELECT TenantId FROM gabay.Tenant`. The row is `{"id","code","label","isActive"}`; the list is `{"items","totalCount","page","pageSize"}`, ordered by `SortOrder`, then `Label`. These cases are written now and run by hand: the automated e2e for them is waived to R12 (`Waived: 9`).
+
+| TC# | Test Case | API or Steps | Expected | Pass |
+|---|---|---|---|---|
+| FF0.1 | Building types, default tenant | `GET /api/lookups/building-types` | 200; `totalCount` 7: Annex, Arena, Main building, Open-air wing, Parking, Station, Wing (the four platform rows and DEMO_MALLS' three own rows); `page` 1, `pageSize` 25 | ☐ |
+| FF0.2 | Another tenant's rows are not listed | `GET /api/lookups/building-types` with `X-Tenant-Id: <SPIKE_VENUES id>` | 200; `totalCount` 4 (Annex, Main building, Parking, Wing): no Arena, Open-air wing or Station | ☐ |
+| FF0.3 | A tenant the user does not hold | the same with `X-Tenant-Id: 999999` (and with `abc`) | 403 `{"error":"This account has no access to that tenant"}` | ☐ |
+| FF0.4 | Amenity types | `GET /api/lookups/amenity-types?pageSize=200` | 200; `totalCount` 11, including Restroom and Accessible restroom | ☐ |
+| FF0.5 | Transit types | `GET /api/lookups/transit-types` | 200; `totalCount` 6, including Jeepney bay | ☐ |
+| FF0.6 | Unknown name | `GET /api/lookups/nope`, `/api/lookups/constructor`, `/api/lookups/BuildingType` and `/api/lookups/occupant-categories` | each 404 `{"error":"Not found"}` | ☐ |
+| FF0.7 | Search, case-insensitive contains | `GET /api/lookups/building-types?search=wING` | 200; Open-air wing and Wing | ☐ |
+| FF0.8 | Search characters are literal | `?search=%25` (a percent), `?search=_`, `?search='` | 200 each with `items` `[]` and `totalCount` 0 (no label holds them); never an error, never every row | ☐ |
+| FF0.9 | Paging | `GET /api/lookups/building-types?pageSize=3&page=2`, then `pageSize=100000` | 200; page 2 holds the 4th to 6th rows by the order above and `totalCount` stays 7; the second call answers `pageSize` 200 (the cap) | ☐ |
+| FF0.10 | One row by id | take an `id` from FF0.1; `GET /api/lookups/building-types/<id>` | 200 with that row's `{id, code, label, isActive}` | ☐ |
+| FF0.11 | An inactive row: out of the list, kept by id | `UPDATE gabay.BuildingType SET IsActive = FALSE WHERE Code = 'ARENA'`; call FF0.1 and FF0.10 for its id; set it back to TRUE | the list has 6 rows without Arena; by id it is 200 with `"isActive": false` | ☐ |
+| FF0.12 | Another tenant's id is 404 | the id of Arena (DEMO_MALLS) with `X-Tenant-Id: <SPIKE_VENUES id>`; and the id of a platform row with the same header | 404 `{"error":"Not found"}`; the platform row is 200 | ☐ |
+| FF0.13 | A bad id is 404 | `GET /api/lookups/building-types/abc`, `/0`, `/99999999999999999999` | each 404 `{"error":"Not found"}` | ☐ |
+| FF0.14 | An id belongs to its own table | an `amenity-types` id used under `/api/lookups/transit-types/<id>` | the transit row with that number, or 404; never the amenity row | ☐ |
+| FF0.15 | Read-only | `POST`, `PUT`, `DELETE` on `/api/lookups/building-types` and `/api/lookups/building-types/<id>` | each 404; no row changes | ☐ |
+| FF0.16 | The stub does not open the real routes | `GET /api/me` with no token | 401 `{"error":"Authentication required"}` | ☐ |
+| FF0.17 | The stub's user is checked | set `DEV_STUB_USER_EMAIL=viewer-gone@gabay.test` (no such user) and restart; call FF0.1 | 500 whose message names `DEV_STUB_USER_EMAIL`; restore the value | ☐ |
+| FF0.18 | The stub refuses outside development or test | start the API with `NODE_ENV=production`, and with `NODE_ENV` unset or empty | the API does not start: the first request (or the function's start) fails with the E-20 message; nothing is served | ☐ |
+
 Planned closing sweeps (§7.3): an RBAC sweep over every route × role; a negative and boundary phase; a creator/updater stamping phase; tenant isolation (rule 2) on every tenant-scoped route.
 
 ## Running the automated suite

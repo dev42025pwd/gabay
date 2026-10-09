@@ -113,6 +113,13 @@ The paused Phase 2 slices, now applied to every route and screen the features bu
 
 A table in this plan, one row per feature route and admin screen, with columns for the stub-to-real tenant context, guard order, permission row, menu row, audit, validation and e2e. Each feature slice adds its rows; each R slice ticks them. It is the evidence for R13.
 
+| Route or screen | Slice | Tenant context: stub → real (R1) | Guard order (R1–R3; R7's lint) | Permission row (R2) | Menu row (R2) | Audit (R3) | Validation (R5) | E2E (R12) |
+|---|---|---|---|---|---|---|---|---|
+| `GET /api/lookups/:name` | FF-0 | stub (`devStub`) | open | none | none | n/a (read-only) | open (query read leniently by `parsePaging`; no zod yet) | none (cases written in `E2E_Test_Cases_Manual.md` FF0.1–FF0.18, run by hand) |
+| `GET /api/lookups/:name/:id` | FF-0 | stub (`devStub`) | open | none | none | n/a (read-only) | open (the id is checked by pattern; no zod yet) | none (as above) |
+
+"open" and "none" are what the retrofit closes; R13 fails while any cell in a row is open or none, other than an "n/a" with its reason.
+
 ## 8. Risks
 
 - **Rework.** HIGH by the standard's own account: Appendix C, "retrofitting any of them touches every route that exists at the time". The stub's real-shaped request fields and the ledger reduce it but do not remove it. Unmeasured.

@@ -35,6 +35,8 @@ class ConfigError extends Error {
 
 const positiveInt = (fallback, max) => z.coerce.number().int().min(1).max(max).default(fallback);
 
+const DEFAULT_DEV_STUB_USER_EMAIL = 'malladmin@gabay.test';
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -68,12 +70,20 @@ const schema = z.object({
     .string()
     .regex(/^[A-Za-z0-9.-]+:\d{1,5}$/, 'must look like 127.0.0.1:9099')
     .optional(),
+
+  // The development stub's one admin (E-20, FF-0): the AppUser, by email, that admin routes run as until the retrofit's
+  // R1. Read only when the stub runs (NODE_ENV=development or test). The default is the mall admin who holds both
+  // seeded tenants (L154).
+  DEV_STUB_USER_EMAIL: z.email().max(254).default(DEFAULT_DEV_STUB_USER_EMAIL),
 });
 
 /** The Auth emulator's project (CLAUDE.md: demo-gabay), used when an emulator host is set and no project ID is. */
 const EMULATOR_PROJECT_ID = 'demo-gabay';
-/** The only NODE_ENV values, as written in the raw environment, under which an Auth emulator host is accepted. */
-const EMULATOR_ALLOWED_ENVS = Object.freeze(['development', 'test']);
+/**
+ * The only NODE_ENV values, as written in the RAW environment, under which a dev-only feature is allowed: the Auth
+ * emulator host (S1) and the development stub (E-20, FF-0). One list for both guards (C2: the second use).
+ */
+const DEV_ONLY_ENVS = Object.freeze(['development', 'test']);
 
 /** Pure: validates an env-like object and returns the config, or throws ConfigError. */
 function parseConfig(env) {
@@ -90,7 +100,8 @@ function parseConfig(env) {
   // forge a sign-in. So it is allowed only when the RAW environment says NODE_ENV=development or NODE_ENV=test
   // (owner's ruling, P2-S1 review I1). An unset NODE_ENV does not count: zod defaults it to development, and a
   // deployed function that forgot NODE_ENV must not be mistaken for a developer's machine.
-  if (e.FIREBASE_AUTH_EMULATOR_HOST && !EMULATOR_ALLOWED_ENVS.includes(present.NODE_ENV)) {
+  const devOnlyAllowed = DEV_ONLY_ENVS.includes(present.NODE_ENV);
+  if (e.FIREBASE_AUTH_EMULATOR_HOST && !devOnlyAllowed) {
     throw new ConfigError([
       'FIREBASE_AUTH_EMULATOR_HOST: set only with NODE_ENV=development or NODE_ENV=test written explicitly in the environment (the emulator accepts unsigned tokens)',
     ]);
@@ -98,6 +109,9 @@ function parseConfig(env) {
   return Object.freeze({
     env: e.NODE_ENV,
     isProduction: e.NODE_ENV === 'production',
+    // True only when the RAW environment says development or test. An unset or empty NODE_ENV is false, although `env`
+    // above then reads development. Every dev-only feature asks this, never `env`.
+    devOnlyAllowed,
     logLevel: e.LOG_LEVEL,
     db: Object.freeze({
       host: e.PGHOST,
@@ -122,6 +136,7 @@ function parseConfig(env) {
         e.FIREBASE_PROJECT_ID ?? (e.FIREBASE_AUTH_EMULATOR_HOST ? EMULATOR_PROJECT_ID : null),
       authEmulatorHost: e.FIREBASE_AUTH_EMULATOR_HOST ?? null,
     }),
+    devStub: Object.freeze({ userEmail: e.DEV_STUB_USER_EMAIL }),
   });
 }
 
@@ -144,4 +159,4 @@ function getConfig() {
   return cached;
 }
 
-module.exports = { getConfig, parseConfig, loadEnvFile, ConfigError, ENV_FILE };
+module.exports = { getConfig, parseConfig, loadEnvFile, ConfigError, ENV_FILE, DEV_ONLY_ENVS };

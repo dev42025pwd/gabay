@@ -75,7 +75,7 @@ curl http://127.0.0.1:5001/demo-gabay/asia-southeast1/api/api/health     # {"sta
    ```sh
    git config core.hooksPath .githooks
    ```
-4. **The environment file:** copy `.env.example` to `.env` and fill it in: the `PG*` keys for your local PostgreSQL and every `SEED_PW_*` for the six test accounts. `.env` is never committed (the pre-commit hook refuses it).
+4. **The environment file:** copy `.env.example` to `.env` and fill it in: the `PG*` keys for your local PostgreSQL and every `SEED_PW_*` for the six test accounts. Keep `NODE_ENV=development` as `.env.example` has it: the Auth-emulator guard and the development stub (E-20, FF-0) refuse to run unless `NODE_ENV` is written explicitly as `development` or `test`, so the API will not start without it. `DEV_STUB_USER_EMAIL` (default `malladmin@gabay.test`) names the admin the stub acts as. `.env` is never committed (the pre-commit hook refuses it).
 5. **The Firebase Emulator Suite** comes with `firebase-tools` 15.32.1 in `db/seeds` (A.1b); there is no global install. Projects are local only (`demo-gabay`). RECALLED: how far the emulators cover SQL Connect and scheduled functions; checked when a feature first needs them (Blueprint §2.6).
 
 ### A.3 The Flutter app (`app/`, slice S3)
