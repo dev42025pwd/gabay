@@ -358,6 +358,12 @@ abstract class AppLocalizations {
   /// **'{label} (inactive)'**
   String pickerInactive(String label);
 
+  /// Banner at the top of every admin page while the development stub stands in for sign-in (E-20). It tells a tester that anyone who opens the page acts as the development admin, so a screenshot or a demo of this build is never mistaken for the real one. Removed when sign-in arrives (R8). Also its screen-reader name.
+  ///
+  /// In en, this message translates to:
+  /// **'Development build: no sign-in'**
+  String get devStubBanner;
+
   /// Label of the email field on a user's form (AppUser.Email).
   ///
   /// In en, this message translates to:
@@ -393,6 +399,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The Gabay admin page now starts. It has no features yet.'**
   String get changelogAdmin_e001_a;
+
+  /// Admin changelog, entry e002, first bullet. Plain language for mall staff: the development banner (FF-0).
+  ///
+  /// In en, this message translates to:
+  /// **'While the admin page runs without sign-in, a banner at the top now says so, so a test copy is never mistaken for the real one.'**
+  String get changelogAdmin_e002_a;
 }
 
 class _AppLocalizationsDelegate

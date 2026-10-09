@@ -113,6 +113,12 @@ The paused Phase 2 slices, now applied to every route and screen the features bu
 
 A table in this plan, one row per feature route and admin screen, with columns for the stub-to-real tenant context, guard order, permission row, menu row, audit, validation and e2e. Each feature slice adds its rows; each R slice ticks them. It is the evidence for R13.
 
+Columns: the tenant context (stub to real), the guard order (item 3), the permission row (item 4), the menu row (item 4), the audit row, validation, and the e2e (item 9). `n/a` says why in a word; `open` is an item an R slice still has to close, named in the last column.
+
+| Route or screen | Added by | Tenant context | Guard order | Permission row | Menu row | Audit | Validation | e2e | Closed by |
+|---|---|---|---|---|---|---|---|---|---|
+| Screen: the admin "Development build: no sign-in" banner (`DevStubBannerFrame`, every admin page) | FF-0 (client) | n/a: a screen; the client sends no `X-Tenant-Id` until R8's switcher | n/a: no route | n/a: no route | n/a: no menu exists yet (R8 builds it from permissions) | n/a: no write | n/a: no input | open: automated e2e waived (item 9); manual cases `FF0-FE-01` to `FF0-FE-05` written now | R8 deletes the banner with its provider, its config and its ARB string, and its manual rows (sign-in replaces it); R12 for e2e |
+
 ## 8. Risks
 
 - **Rework.** HIGH by the standard's own account: Appendix C, "retrofitting any of them touches every route that exists at the time". The stub's real-shaped request fields and the ledger reduce it but do not remove it. Unmeasured.

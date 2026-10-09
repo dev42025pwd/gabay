@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
+import '../components/dev_stub_banner.dart';
 import '../components/messaging/message_overlay.dart';
 import 'app_router.dart';
 
@@ -24,8 +25,11 @@ class GabayApp extends ConsumerWidget {
       darkTheme: gabayDarkTheme,
       themeMode: ThemeMode.system,
       routerConfig: ref.watch(routerProvider),
-      // The ONE messaging surface, above the Navigator (standard 4.6).
-      builder: (context, child) => MessageOverlay(child: child),
+      // The ONE messaging surface, above the Navigator (standard 4.6). The
+      // development-stub banner (E-20, admin only) sits inside it, above every
+      // page, so a message still floats over it.
+      builder: (context, child) =>
+          MessageOverlay(child: DevStubBannerFrame(child: child)),
     );
   }
 }

@@ -1,6 +1,6 @@
 # Gabay — Smoke Test Guide
 
-> **Version**: 0.2 | **Date**: 2026-10-09 | **Status**: Phase 1 (synced at the S8 gate); the module phases are written as each P0 entry lands (standard §2, §7.4; plan.html L115). Revised in place, never forked to `_v2` | **Audience**: whoever checks a fresh build end to end | **Estimated time**: about 2 hours once written
+> **Version**: 0.3 | **Date**: 2026-10-09 | **Status**: Phase 1 (synced at the S8 gate), plus FF-0's admin banner; the module phases are written as each P0 entry lands (standard §2, §7.4; plan.html L115). Revised in place, never forked to `_v2` | **Audience**: whoever checks a fresh build end to end | **Estimated time**: about 2 hours once written
 
 **Run the automated suite first:** `npm run verify` from the repository root must end `ALL GREEN` (exit 0; INSTALL.md A.4). This guide is the human pass from a fresh database to every module.
 
@@ -27,6 +27,10 @@ Per-table seed counts are added with P0-02.
 2. [ ] **Shopper shell.** `flutter run -t lib/main_mobile.dart` (in `app/`): the app opens in the terracotta theme, with its About page and build stamp. No feature exists yet.
 3. [ ] **Admin shell.** `flutter run -d chrome -t lib/main_admin.dart`: the admin page opens with path URLs (no `#`) and its About page.
 
+## FF-0 — The admin development banner (1 case; E-20)
+
+1. [ ] **Banner.** `flutter run -d chrome -t lib/main_admin.dart`: the page opens with "Development build: no sign-in" at the very top, above the app bar, on the home page and on About. `flutter run -t lib/main_mobile.dart` shows no such banner.
+
 ## Phases 2+ — one per module
 
 Written as each P0 entry lands: venue setup (P0-01), seeds (P0-02), publish (P0-03), shopper shell (P0-04), search (P0-05), routing (P0-06), and on through P0-14. Each has 1–8 cases with the count in its heading.
@@ -37,6 +41,7 @@ Written as each P0 entry lands: venue setup (P0-01), seeds (P0-02), publish (P0-
 |---|---|---|
 | 1 Database bootstrap | 3 + seed | ☐ |
 | 1b API and app shells | 3 | ☐ |
+| FF-0 Admin banner | 1 | ☐ |
 
 ## Troubleshooting
 

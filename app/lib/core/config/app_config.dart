@@ -20,6 +20,22 @@ abstract final class AppConfig {
   static String get apiBaseUrl =>
       resolveApiBaseUrl(define: _apiBaseDefine, releaseMode: kReleaseMode);
 
+  static const bool _devStubDefine = bool.fromEnvironment('DEV_STUB');
+
+  /// True when the build was made with `--dart-define=DEV_STUB=true`: the admin
+  /// build is talking to an API that runs the development stub (E-20), and says
+  /// so even as a release build. False when the define is absent.
+  static bool get devStubDefine => _devStubDefine;
+
+  /// Whether the admin page shows its "Development build: no sign-in" banner
+  /// (E-20, plan/FF0-dev-stub-lookups.md section 4). Any build that is not a
+  /// release build shows it; a release build shows it only when built with
+  /// `DEV_STUB=true`. Pure so it can be tested with both modes.
+  static bool showsDevStubBanner({
+    required bool releaseMode,
+    required bool devStubDefine,
+  }) => !releaseMode || devStubDefine;
+
   /// Pure so it can be tested with both modes (a test cannot change
   /// `kReleaseMode`).
   static String resolveApiBaseUrl({

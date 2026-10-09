@@ -169,6 +169,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get devStubBanner => 'Development build: no sign-in';
+
+  @override
   String get fieldAppUserEmail => 'Email';
 
   @override
@@ -187,4 +190,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get changelogAdmin_e001_a =>
       'The Gabay admin page now starts. It has no features yet.';
+
+  @override
+  String get changelogAdmin_e002_a =>
+      'While the admin page runs without sign-in, a banner at the top now says so, so a test copy is never mistaken for the real one.';
 }
