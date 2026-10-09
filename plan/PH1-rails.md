@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.10 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 and L132; S7 amended by L133, L135 and L136 | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.11 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 and L132; S7 amended by L133, L135 and L136; S7 closed by L145 (three first-push checks carried to S8) | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -122,7 +122,7 @@ Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error tex
 - The settled product rulings now in CLAUDE.md move to a project skill, `.claude/skills/gabay-product-rulings/`, which loads when work touches the shopper app (§8.4: "CLAUDE.md points; skills carry"). *Alternative:* a document CLAUDE.md links to; passed over because agents do not load it unless told.
 - REVIEW.md: drop the passes CI now enforces.
 
-### S7 — GitHub repository and CI
+### S7 — GitHub repository and CI — DONE 2026-10-09 (L145; report: `phase-reports/phase-1/S7.md`; first-push checks 3, 6 and 8 carried to S8)
 - **Stops for you:** you sign the GitHub CLI in as `dev42025pwd`. I then create `dev42025pwd/gabay` and push `main`. L135: **public**, as it is; commit emails rewritten to the GitHub noreply address before the first push (`phase-reports/commit-map.md` maps old hashes).
 - `.github/workflows/lint.yml` (every push and PR): verify's fast part (linters, ESLint, `flutter analyze`, tests that need no database), plus the secret guard and the changelog duplicate guard, which until then run only in the local pre-commit hook (S6 review; REVIEW.md checks them by hand meanwhile).
 - `e2e.yml` (nightly and on demand): a PostgreSQL service from `schema.sql`, the seed with the Auth emulator, the API tests, the server log uploaded on failure; its cost stated in a header comment.
@@ -132,6 +132,7 @@ Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error tex
 ### S8 — The gate
 - Three deliberately bad commits on a throwaway branch (a hardcoded colour, an unparameterized query, a `TextFormField` in a view): each blocked by pre-commit; each also failing `lint.yml` when pushed with `--no-verify` to a test PR (which is then closed, not merged).
 - dod-reviewer runs `npm run verify` in a fresh context.
+- L145: the gate report lists S7's three first-push checks not yet exercised (`S7.md` §5.1 items 3, 6 and 8: a run cancelled by a newer push, the PostgreSQL log after a red e2e, a fork's first pull request), each marked proven if it has happened by then, and the `build.yml` cache-comment correction as a follow-up after S8.
 - `phase-reports/phase-1.md`: each gate condition with its evidence; the documents synced (Blueprint pins and §2.3, pipeline, INSTALL, smoke guide, CLAUDE.md); the modules page republished. **You sign it.**
 
 **Slice reports (L126):** each slice's full evidence (the coder's pasted outputs, the main session's re-runs, dod-reviewer's findings and the fixes) is kept in `phase-reports/phase-1/S<n>.md`, which the gate report (S8) links.
