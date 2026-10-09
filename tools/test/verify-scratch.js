@@ -144,7 +144,7 @@ const lockExists = (dir) => fs.existsSync(lockFileOf(dir));
 const clean = (dir) => fs.rmSync(dir, { recursive: true, force: true });
 
 /**
- * Test cleanup only (the owner's ruling L155, as for verify-lock-fix.test.js): deletes a scratch folder whose file a
+ * Test cleanup only (the owner's ruling L163, as for verify-lock-fix.test.js): deletes a scratch folder whose file a
  * PowerShell helper held open. The helper's exit and the OS letting go of the handle are not the same instant under a
  * full verify's load, so a delete that meets EBUSY or EPERM is retried every 50 ms, for at most `withinMs`, instead of
  * failing the test after a fixed sleep.

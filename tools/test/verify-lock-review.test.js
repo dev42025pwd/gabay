@@ -66,7 +66,7 @@ async function undeletableLock(content) {
       ps.stdout.on('data', (d) => String(d).includes('held') && resolve());
       ps.on('exit', () => reject(new Error('powershell ended before it held the file')));
     });
-    // Awaiting the helper's real exit, not a fixed sleep (test cleanup only; the owner's ruling L155).
+    // Awaiting the helper's real exit, not a fixed sleep (test cleanup only; the owner's ruling L163).
     return {
       file,
       folder,

@@ -1,6 +1,6 @@
 # FF-0 (client half): the lookups fetcher and the admin development banner: slice report
 
-> **Plan**: `plan/FF0-dev-stub-lookups.md` 1.0 (APPROVED, L154), sections 4, 5 (client tests) and 6; parent `plan/PH4-feature-first.md` 1.0 | **Built by**: flutter-coder (Sonnet 5.5), in its working copy `Gabay-wt\flutter-coder`, branch `ff0-client` from `origin/main` | **Server half**: api-coder's branch `ff0-server`, not merged when this was built; the client is built against the contract in the hand-off, with fakes in the tests | **Status**: built; the product owner ruled the open questions (section 2) and the branch is green | **Reviewed by**: not yet (dod-reviewer)
+> **Plan**: `plan/FF0-dev-stub-lookups.md` 1.1 (APPROVED, L154), sections 4, 5 (client tests) and 6; parent `plan/PH4-feature-first.md` 1.0 | **Built by**: flutter-coder (Sonnet 5.5), in its working copy `Gabay-wt\flutter-coder`, branch `ff0-client` from `origin/main` | **Server half**: api-coder's branch `ff0-server`, not merged when this was built; the client is built against the contract in the hand-off, with fakes in the tests | **Status**: built; the product owner ruled the open questions (section 2) and the branch is green | **Reviewed by**: not yet (dod-reviewer)
 
 ## 1. What was built
 
@@ -20,7 +20,7 @@ All of it is in `app/`. There is no new screen route; the banner is on every adm
 
 ## 2. Existing tests changed, by the product owner's ruling
 
-Three existing-test changes, each ruled by the product owner on 2026-10-09 (recorded with FF-0's slice row), each setup or cleanup only, **no assertion changed**:
+Three existing-test changes, each ruled by the product owner on 2026-10-09 (L163), each setup or cleanup only, **no assertion changed**:
 
 | File | Change | Why |
 |---|---|---|
@@ -115,7 +115,9 @@ EXIT=0
 ```
 (all 15 checks `ok`; the others are omitted here for length)
 
-**Screenshots** (test-rendered, Roboto and the Material icons loaded from the SDK, outside the repository): `...\scratchpad\ff0-shots\admin_dev_stub_banner_{light,dark}_{phone,tablet}.png` in the session's scratchpad (`C:\Users\User\AppData\Local\Temp\claude\c--Users-User-FlutterProjects-Gabay\baccea26-212d-413f-81c4-d0b01ae88903\scratchpad\ff0-shots\`). 24 PNGs in all; the other 20 are the existing shell, About and message-banner shots, which now show the banner on the admin surface. I looked at light and dark on the phone and light on the tablet: a full-width tinted band with an icon and the text, above the app bar, readable in both modes.
+**Screenshots** (test-rendered from the committed state, Roboto and the Material icons loaded from the SDK, no private data), committed in `phase-reports/feature-first/shots/FF-0/`:
+[light phone](shots/FF-0/admin_dev_stub_banner_light_phone.png), [dark phone](shots/FF-0/admin_dev_stub_banner_dark_phone.png), [light tablet](shots/FF-0/admin_dev_stub_banner_light_tablet.png), [dark tablet](shots/FF-0/admin_dev_stub_banner_dark_tablet.png).
+The test renders 24 PNGs in all; the other 20 are the existing shell, About and message-banner shots, which now show the banner on the admin surface. I looked at light and dark on the phone and light on the tablet: a full-width tinted band with an icon and the text, above the app bar, readable in both modes.
 
 ## 5. DESIGN CHOICES (flutter-coder; each with its alternative)
 
@@ -149,7 +151,7 @@ EXIT=0
 | 14 Enumerable sets | Met for the client: no list is hardcoded; `LookupName` holds route names, not options |
 | 15 Inactive lookup value | `N/A for FF-0 — no record type references a lookup yet; FF-1's plan carries the full end-to-end item-15 test (L155)`. The client half is tested now: a held inactive value shows "(inactive)" via `lookupOption` and survives opening the picker |
 | G1 Traceability | Section 7 |
-| G2 | Screen-reader name, no overflow at x1.4 on 320 px: met. **Tagalog: not done.** No `app_tl.arb` exists until P0-14 (`l10n.yaml`, L109), as in S9's report, so the two new phrases (`devStubBanner`, `changelogAdmin_e002_a`) wait for your review. Raised as a question below |
+| G2 | Screen-reader name, no overflow at x1.4 on 320 px: met. Tagalog for `devStubBanner` and `changelogAdmin_e002_a` waits for P0-14 (owner's ruling, L163; no `app_tl.arb` exists until then, `l10n.yaml`, L109, as in S9's report) |
 | G3 | N/A: admin side |
 | G4 | No difference from the PRD or Blueprint |
 
@@ -161,7 +163,7 @@ EXIT=0
 | An API route | N/A for the client (the route, its tests, the API manual and Blueprint 4.15 are api-coder's) |
 | A screen or its wording | ARB with descriptions; changelog entry; screenshots; frontend manual; smoke guide. Tagalog waived to P0-14 |
 | A dependency | None added |
-| A setting, limit or option list | `DEV_STUB` (a build define) in `INSTALL.md`; no option list in the client. `DEV_STUB_USER_EMAIL` is the server's |
+| A setting, limit or option list | `DEV_STUB` (a build define) in `INSTALL.md` and, with the banner's visibility rule and `LookupService`/`LookupName`, in Blueprint Part 4 anchor 4.15 (one body line, client half); no option list in the client. `DEV_STUB_USER_EMAIL` is the server's |
 | A command or check | None added; `INSTALL.md`'s screenshot count corrected |
 | An owner ruling | None new |
 | A pipeline entry's state | FF-0 is not DONE: the server half and review remain. No marker |
@@ -183,4 +185,5 @@ EXIT=0
 ## 8. Suggestions (outside the slice)
 
 - The ledger table: main (PR #16) and this branch both added one; merged by hand into main's layout (nine columns, one table), with the banner row added under api-coder's two route rows.
+- Two things left as they are on purpose (dod-reviewer's nits): the four `admin_dev_stub_banner_*` scenarios duplicate what the existing admin shell scenarios already render (they add the explicit banner assertion); and `verify-lock-fix.test.js` keeps its own `cleanWhenFree` copy rather than importing the shared one from `verify-scratch.js`.
 - A Tagalog file could be started before P0-14 for the phrases already in the app, so each slice's wording is reviewed as it lands rather than all at once.

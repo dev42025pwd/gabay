@@ -509,7 +509,7 @@ async function holdOpen(file, holdSeconds = 120) {
     child.stdout.once('data', resolve);
     child.once('exit', () => reject(new Error('powershell ended before it held the file')));
   });
-  // Awaiting the helper's real exit, not a fixed sleep (test cleanup only; the owner's ruling L155).
+  // Awaiting the helper's real exit, not a fixed sleep (test cleanup only; the owner's ruling L163).
   return async () => {
     child.kill();
     await exited;
