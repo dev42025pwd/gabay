@@ -66,6 +66,8 @@ class SurfaceHomeScreen extends ConsumerWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
+              // S8 GATE PROBE: a deliberately bad change (a raw TextFormField in a view); never merged.
+              const SizedBox(width: 200, child: TextFormField()),
               FilledButton(
                 onPressed: () => context.go(SurfaceAboutScreen.path),
                 child: Text(l10n.aboutAction),
