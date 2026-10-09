@@ -236,12 +236,18 @@ void main() {
     await notifier.loadMore();
     expect(value().items, ['a', 'b']);
     expect(value().loadMoreFailed, isTrue);
+    expect(
+      value().loadMoreError,
+      isA<StateError>(),
+      reason: 'kept for the message',
+    );
     expect(value().isLoadingMore, isFalse);
 
     failNext = false;
     await notifier.loadMore();
     expect(value().items, ['a', 'b', 'c', 'd']);
     expect(value().loadMoreFailed, isFalse);
+    expect(value().loadMoreError, isNull);
   });
 
   test('reload after a failed search asks for the same search again', () async {

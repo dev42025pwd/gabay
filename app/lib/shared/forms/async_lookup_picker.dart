@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_error.dart';
@@ -93,6 +94,13 @@ class _LookupPickerFieldState extends State<LookupPickerField> {
         button: true,
         label: widget.label,
         value: lookupDisplayText(l10n, _shown, value),
+        // The error text sits under ExcludeSemantics (the decorator is drawn
+        // for the eye), so the same message goes here: a screen reader hears it
+        // as the hint with an invalid state, as it does for a text field.
+        hint: field.errorText,
+        validationResult: field.hasError
+            ? SemanticsValidationResult.invalid
+            : SemanticsValidationResult.none,
         onTap: () => _open(field),
         child: ExcludeSemantics(
           child: InkWell(
@@ -180,15 +188,18 @@ class _LookupPickerScreen extends ConsumerWidget {
       title: title,
       items: state.whenData((page) => page.items),
       itemBuilder: (context, option) => ListTile(
-        title: Text(option.label),
+        // Whatever the server returns is listed; an inactive row is marked.
+        title: Text(lookupDisplayText(l10n, option, option.value)),
         onTap: () => Navigator.of(context).pop(option),
       ),
       emptyLabel: l10n.pickerEmpty,
       retryLabel: l10n.pickerRetry,
       // The footer shows it too, when only the next page failed.
-      errorText: state.hasError
-          ? formatApiError(state.error!, l10n)
-          : l10n.errorGeneric,
+      errorText: switch ((state.error, list?.loadMoreError)) {
+        (final Object error, _) => formatApiError(error, l10n),
+        (_, final Object error) => formatApiError(error, l10n),
+        _ => l10n.errorGeneric,
+      },
       onRetry: notifier.reload,
       search: ListSearch(
         label: l10n.pickerSearchLabel,

@@ -24,6 +24,11 @@ import 'select_option.dart';
 /// | `flag` | `bool` | a switch |
 /// | `fk` | the chosen [SelectOption.value] | [LookupPickerField], the async server-search picker |
 ///
+/// **The ViewModel must echo [onChanged] back verbatim** as the next [value]
+/// (store what it was given, never a trimmed or normalised copy). A value that
+/// differs from what the box says is taken as a reset: the box is rebuilt with
+/// it and loses its focus and cursor.
+///
 /// An `integer` field keeps what the user typed while the value it reports is
 /// `null` (a lone minus sign), and shows the validator's message instead of
 /// clearing the text under their fingers.
@@ -31,14 +36,19 @@ import 'select_option.dart';
 /// A `readOnly` spec renders its value as plain text (a disabled switch for a
 /// flag), builds no input, and is never validated.
 class SpecFormField extends StatelessWidget {
-  const SpecFormField({
+  // Not const: the assert below reads the spec.
+  SpecFormField({
     required this.spec,
     required this.value,
     required this.onChanged,
     this.lookupFetcher,
     this.currentOption,
     super.key,
-  });
+  }) : assert(
+         spec.kind != ColKind.fk || spec.readOnly || lookupFetcher != null,
+         'an editable fk field needs a lookupFetcher: the ViewModel supplies '
+         'the function that fetches its choices',
+       );
 
   final FieldSpec spec;
   final Object? value;
@@ -118,7 +128,8 @@ class SpecFormField extends StatelessWidget {
 /// A `text` or `integer` field. It owns a controller so the value can change
 /// under it: when the ViewModel hands a [value] that is not what the box says,
 /// the box shows it. What the user typed is never undone when the ViewModel
-/// merely echoes it back.
+/// merely echoes it back verbatim; one that does not (trims, normalises, or
+/// drops it) makes the box reset and lose focus (see [SpecFormField]).
 class _SpecTextField extends StatefulWidget {
   const _SpecTextField({
     required this.label,

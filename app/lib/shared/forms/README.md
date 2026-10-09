@@ -24,4 +24,6 @@ The one place a form field is built (rule 7, standard 4.10, Appendix A.13). A vi
 | read-only rendering | audit-stamp display helpers |
 | a search box with debounce, paging by "Load more" (`ModuleListScaffold`, `PagedListNotifier`) | sort, filters, view modes, cascading pickers (`dependsOn`), refresh on return |
 
+The audit viewer formats its dates in its list `itemBuilder`: a list row is not a form field, and `ColKind` has no `datetime` until Phase 3.
+
 Wording comes from ARB: `FieldSpec.label` is a function of `AppLocalizations`, so a spec is a `final`, not a `const`.

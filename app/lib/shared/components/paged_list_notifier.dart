@@ -25,7 +25,7 @@ class PagedList<T> {
     required this.page,
     required this.totalCount,
     this.isLoadingMore = false,
-    this.loadMoreFailed = false,
+    this.loadMoreError,
   });
 
   final List<T> items;
@@ -41,8 +41,11 @@ class PagedList<T> {
   /// The next page is being fetched.
   final bool isLoadingMore;
 
-  /// The last attempt at the next page failed; the rows above are still good.
-  final bool loadMoreFailed;
+  /// Why the last attempt at the next page failed, or null; the rows above are
+  /// still good. The view words it with `formatApiError`.
+  final Object? loadMoreError;
+
+  bool get loadMoreFailed => loadMoreError != null;
 
   bool get hasMore => items.length < totalCount;
 
@@ -51,14 +54,17 @@ class PagedList<T> {
     int? page,
     int? totalCount,
     bool? isLoadingMore,
-    bool? loadMoreFailed,
+    Object? loadMoreError,
+    bool clearLoadMoreError = false,
   }) => PagedList(
     items: items ?? this.items,
     search: search,
     page: page ?? this.page,
     totalCount: totalCount ?? this.totalCount,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-    loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
+    loadMoreError: clearLoadMoreError
+        ? null
+        : (loadMoreError ?? this.loadMoreError),
   );
 }
 
@@ -139,14 +145,14 @@ abstract class PagedListNotifier<T> extends AsyncNotifier<PagedList<T>> {
   /// Appends the next page. Does nothing while the list itself is loading (a
   /// search or reload is pending: its answer replaces these rows), while a page
   /// is loading, or when there is no more. A failure keeps the rows and sets
-  /// `loadMoreFailed`.
+  /// `loadMoreError`.
   Future<void> loadMore() async {
     if (state.isLoading) return;
     final current = state.value;
     if (current == null || current.isLoadingMore || !current.hasMore) return;
     final ticket = ++_ticket;
     state = AsyncData(
-      current.copyWith(isLoadingMore: true, loadMoreFailed: false),
+      current.copyWith(isLoadingMore: true, clearLoadMoreError: true),
     );
     try {
       final result = await fetchPage(
@@ -160,13 +166,13 @@ abstract class PagedListNotifier<T> extends AsyncNotifier<PagedList<T>> {
           page: current.page + 1,
           totalCount: result.totalCount,
           isLoadingMore: false,
-          loadMoreFailed: false,
+          clearLoadMoreError: true,
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (ticket != _ticket) return;
       state = AsyncData(
-        current.copyWith(isLoadingMore: false, loadMoreFailed: true),
+        current.copyWith(isLoadingMore: false, loadMoreError: error),
       );
     }
   }

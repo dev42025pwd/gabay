@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gabay/l10n/app_localizations.dart';
 import 'package:gabay/shared/components/paged_list_notifier.dart';
@@ -138,7 +140,112 @@ void main() {
     });
   });
 
+  // Review (Important): the error text was inside ExcludeSemantics, so a screen
+  // reader never heard it. The text field reports it as the hint with an
+  // invalid validation state; the picker must too.
+  group('screen-reader view of a validation error', () {
+    testWidgets('a refused field reports the message and an invalid state', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester);
+      expect(formKey.currentState!.validate(), isFalse);
+      await tester.pump();
+      final data = find.semantics
+          .byLabel('Role')
+          .evaluate()
+          .single
+          .getSemanticsData();
+      expect(data.hint, l10n.validatorRequired('Role'));
+      expect(data.validationResult, SemanticsValidationResult.invalid);
+      handle.dispose();
+    });
+
+    testWidgets('a valid field reports no hint and no validation state', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, value: 3, current: roles[2]);
+      expect(formKey.currentState!.validate(), isTrue);
+      await tester.pump();
+      final data = find.semantics
+          .byLabel('Role')
+          .evaluate()
+          .single
+          .getSemanticsData();
+      expect(data.hint, isEmpty);
+      expect(data.validationResult, SemanticsValidationResult.none);
+      handle.dispose();
+    });
+  });
+
+  testWidgets('an editable fk field without a fetcher is refused at build', (
+    tester,
+  ) async {
+    expect(
+      () => SpecFormField(spec: spec(), value: null, onChanged: (_) {}),
+      throwsA(
+        isA<AssertionError>().having(
+          (e) => e.message,
+          'message',
+          contains('lookupFetcher'),
+        ),
+      ),
+    );
+    // Read-only needs no fetcher.
+    expect(
+      () => SpecFormField(
+        spec: spec(readOnly: true),
+        value: null,
+        onChanged: (_) {},
+      ),
+      returnsNormally,
+    );
+  });
+
   group('the picker', () {
+    testWidgets('a fetched row that is inactive is listed, marked inactive', (
+      tester,
+    ) async {
+      fetcher = ({required search, required page}) async => const PageResult(
+        items: [
+          SelectOption(value: 1, label: 'Mall admin'),
+          SelectOption(value: 4, label: 'Platform support', isActive: false),
+        ],
+        totalCount: 2,
+        page: 1,
+        pageSize: 25,
+      );
+      await pump(tester);
+      await openPicker(tester);
+      expect(find.text('Mall admin'), findsOneWidget);
+      expect(
+        find.text(l10n.pickerInactive('Platform support')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('when only Load more fails, the error says what went wrong', (
+      tester,
+    ) async {
+      final ok = fetcher;
+      fetcher = ({required search, required page}) {
+        if (page == 2) {
+          throw DioException(
+            requestOptions: RequestOptions(),
+            type: DioExceptionType.connectionError,
+          );
+        }
+        return ok(search: search, page: page);
+      };
+      await pump(tester);
+      await openPicker(tester);
+      await tester.tap(find.text(l10n.pickerLoadMore));
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.errorNoConnection), findsOneWidget);
+      expect(find.text('Mall admin'), findsOneWidget, reason: 'rows are kept');
+    });
+
     testWidgets('opens on the first page, with a search box and Load more', (
       tester,
     ) async {
