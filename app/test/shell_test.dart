@@ -58,6 +58,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
 
+        // The admin shell's development banner takes room at x1.4, so the
+        // button is below the fold: scroll to it (FF-0; the owner's ruling).
+        await tester.scrollUntilVisible(find.text(l10n.aboutAction), 100);
         await tester.tap(find.text(l10n.aboutAction));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);

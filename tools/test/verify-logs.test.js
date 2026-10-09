@@ -24,6 +24,7 @@ const {
   holderRecord,
   writeLock,
   clean,
+  cleanWhenFree,
 } = require('./verify-scratch');
 const { OUTPUT_CAP_CHARS, boundedOutput, capText, runCommand } = require('../lib/proc');
 const { logsDir, resetLogs, writeLog } = require('../lib/verify-logs');
@@ -503,11 +504,16 @@ async function holdOpen(file, holdSeconds = 120) {
     ],
     { stdio: ['ignore', 'pipe', 'ignore'] },
   );
+  const exited = new Promise((resolve) => child.once('exit', resolve));
   await new Promise((resolve, reject) => {
     child.stdout.once('data', resolve);
     child.once('exit', () => reject(new Error('powershell ended before it held the file')));
   });
-  return () => child.kill();
+  // Awaiting the helper's real exit, not a fixed sleep (test cleanup only; the owner's ruling L155).
+  return async () => {
+    child.kill();
+    await exited;
+  };
 }
 
 // Review I2: one log held open (an indexer, a viewer) stopped the whole reset, and all the old logs stayed.
@@ -537,9 +543,8 @@ test('one locked log does not stop the reset: the others are removed and the hel
     assert.match(line[0], /b-prettier\.log/);
     assert.deepEqual(logNames(dir), ['b-prettier.log']);
   } finally {
-    release();
-    await sleep(500); // the handle is released when powershell is gone
-    clean(dir);
+    await release();
+    await cleanWhenFree(dir);
   }
 });
 
@@ -558,9 +563,8 @@ test('a log that is held only for a moment is removed after a short retry', asyn
     assert.deepEqual(result, {}, 'removed after the retry');
     assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
   } finally {
-    release();
-    await sleep(500);
-    clean(root);
+    await release();
+    await cleanWhenFree(root);
   }
 });
 

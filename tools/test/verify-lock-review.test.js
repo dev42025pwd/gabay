@@ -32,6 +32,7 @@ const {
   readLock,
   lockExists,
   clean,
+  cleanWhenFree,
   seenFile,
   noteLockCheck,
   sleepingCheck,
@@ -60,11 +61,20 @@ async function undeletableLock(content) {
       ],
       { stdio: ['ignore', 'pipe', 'ignore'] },
     );
+    const exited = new Promise((resolve) => ps.once('exit', resolve));
     await new Promise((resolve, reject) => {
       ps.stdout.on('data', (d) => String(d).includes('held') && resolve());
       ps.on('exit', () => reject(new Error('powershell ended before it held the file')));
     });
-    return { file, folder, release: () => ps.kill() };
+    // Awaiting the helper's real exit, not a fixed sleep (test cleanup only; the owner's ruling L155).
+    return {
+      file,
+      folder,
+      release: async () => {
+        ps.kill();
+        await exited;
+      },
+    };
   }
   if (process.getuid?.() === 0) return null; // root ignores folder permissions
   fs.chmodSync(folder, 0o555);
@@ -105,10 +115,9 @@ for (const kind of ['dead process', 'unreadable content']) {
       assert.equal(r.state, null);
       assert.deepEqual(fs.readdirSync(stuck.folder), ['test.lock'], 'no temp or claimed file left');
     } finally {
-      stuck.release();
-      await sleep(300);
+      await stuck.release();
       fs.chmodSync(stuck.folder, 0o755);
-      clean(stuck.folder);
+      await cleanWhenFree(stuck.folder);
       clean(dir);
     }
   });

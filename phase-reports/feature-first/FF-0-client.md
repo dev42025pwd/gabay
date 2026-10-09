@@ -1,6 +1,6 @@
 # FF-0 (client half): the lookups fetcher and the admin development banner: slice report
 
-> **Plan**: `plan/FF0-dev-stub-lookups.md` 1.0 (APPROVED, L154), sections 4, 5 (client tests) and 6; parent `plan/PH4-feature-first.md` 1.0 | **Built by**: flutter-coder (Sonnet 5.5), in its working copy `Gabay-wt\flutter-coder`, branch `ff0-client` from `origin/main` | **Server half**: api-coder's branch `ff0-server`, not merged when this was built; the client is built against the contract in the hand-off, with fakes in the tests | **Status**: built; one open question (an existing test, section 2) | **Reviewed by**: not yet (dod-reviewer)
+> **Plan**: `plan/FF0-dev-stub-lookups.md` 1.0 (APPROVED, L154), sections 4, 5 (client tests) and 6; parent `plan/PH4-feature-first.md` 1.0 | **Built by**: flutter-coder (Sonnet 5.5), in its working copy `Gabay-wt\flutter-coder`, branch `ff0-client` from `origin/main` | **Server half**: api-coder's branch `ff0-server`, not merged when this was built; the client is built against the contract in the hand-off, with fakes in the tests | **Status**: built; the product owner ruled the open questions (section 2) and the branch is green | **Reviewed by**: not yet (dod-reviewer)
 
 ## 1. What was built
 
@@ -18,24 +18,23 @@ All of it is in `app/`. There is no new screen route; the banner is on every adm
 - **Changelog**: admin entry 2 (`changelog.dart`, ARB bullet). `adminFallbackVersion` is set to 0.1.4 by hand, equal to the new top entry, so `version_test.dart` holds before the commit; the pre-commit hook keeps a staged version above HEAD's.
 - **Docs**: the retrofit ledger (`plan/PH4-feature-first.md` section 7) now has its table with the banner row; five rows in the frontend manual (`FF0-FE-01` to `FF0-FE-05`); one case in the smoke guide (0.3); `INSTALL.md` notes `DEV_STUB` and the screenshot count (8 was stale; it is 24); `shared/forms/README.md` lists the three new files.
 
-## 2. Open: one existing test fails, and I did not change it
+## 2. Existing tests changed, by the product owner's ruling
 
-`app/test/shell_test.dart`, "admin shell nothing overflows at text size x1.4 on a small phone", fails on this branch:
+Three existing-test changes, each ruled by the product owner on 2026-10-09 (recorded with FF-0's slice row), each setup or cleanup only, **no assertion changed**:
 
-```
-The finder "Found 0 widgets with text "About this app": []" (used in a call to "tap()") could not
-find any matching widgets.   (shell_test.dart:61)
-```
+| File | Change | Why |
+|---|---|---|
+| `app/test/shell_test.dart`, "admin shell nothing overflows at text size x1.4 on a small phone" | `await tester.scrollUntilVisible(find.text(l10n.aboutAction), 100);` before the tap | The banner takes room: at 320 px and x1.4 it is two lines (three in the test's fixed-width font), so the "About this app" button is built lazily below the fold and `tester.tap` found nothing (`Found 0 widgets with text "About this app"`, shell_test.dart:61). Not a defect |
+| `tools/test/verify-lock-review.test.js`, "I1: a stale lock that cannot be removed ..." (both kinds) | The helper's `release` awaits the PowerShell process's real exit; the folder delete retries on EBUSY or EPERM | The flake of section 4 run 1: `EBUSY ... unlink ...\test.lock` after a fixed 300 ms sleep. Same fix as `a7cc993` made for `verify-lock-fix.test.js` |
+| `tools/test/verify-logs.test.js`, the two tests that use `holdOpen` | `holdOpen`'s release awaits the helper's exit; the folder delete retries (replacing a fixed 500 ms sleep) | The same fixed-sleep-then-delete pattern, found by checking every test under `tools/test/` that holds a file open from a helper process (only these three files do) |
 
-The cause is the banner, not a defect. At 320 px wide and text size x1.4 the banner is two lines (three in the test's fixed-width font); the placeholder home page's list then starts lower, and the "About this app" button is built lazily below the fold, so `tester.tap` finds nothing. Any visible banner on that page does this.
+The retry helper, `cleanWhenFree(folder, withinMs = 5000)` (every 50 ms, EBUSY or EPERM only, bounded), is in `tools/test/verify-scratch.js` beside `clean`, so the two files share one copy. `verify-lock-fix.test.js` keeps its own copy from `a7cc993`, untouched.
 
-The plan says no existing test changes, and "if one must, stop and ask". So the test is untouched and the branch is red on this one test. The fix I would make, once you rule: in that test, `await tester.scrollUntilVisible(find.text(l10n.aboutAction), 100);` before the tap. My own banner test already does this for the same page.
-
-Evidence the rest is green: with that one line applied temporarily, `npm run verify` ended ALL GREEN (section 4). I then removed the line.
+The three lock-holding test files (`verify-lock-review`, `verify-logs`, `verify-lock-fix`) passed five runs in a row, alone: each run `# tests 48  # pass 47  # fail 0  # skipped 1` (the one skip is the existing platform skip).
 
 ## 3. Tests, failing first
 
-**New files** (none edited except one addition to the screenshot test, below):
+**New files** (existing files touched only as section 2 lists, plus one addition to the screenshot test, below):
 
 | File | Tests | What it proves |
 |---|---|---|
@@ -64,11 +63,11 @@ That red is a compile failure, as the new names did not exist yet; it proves the
 
 `flutter analyze`: `No issues found!`.
 
-`flutter test` on the committed state: `+283 -1: Some tests failed.`, the one failure being the existing `shell_test.dart` test of section 2.
+`flutter test` on the first commit (`6e3abbf`, before the owner's ruling): `+283 -1: Some tests failed.`, the one failure being the `shell_test.dart` test of section 2. After the ruling it passes (run 4).
 
 `npm run verify` (`GABAY_VERIFY_OWNER=flutter-coder`), run twice on this working tree:
 
-- **Run 1** (with the one-line scroll applied to `shell_test.dart`): `1 FAILED: tools-tests` (351.7 s). The failing test was `tools/test/verify-lock-review.test.js`, "I1: a stale lock that cannot be removed...", with `EBUSY: resource busy or locked, unlink '...\gabay-lock-stuck-616TVl\test.lock'` on Windows, in the test's own temp-folder cleanup. I did not touch `tools/`. That file alone passes (9 pass, 0 fail) twice in a row. It looks like a Windows file-handle timing flake in that test's cleanup (not mine to fix here); see Suggestions.
+- **Run 1** (superseded; with the one-line scroll applied to `shell_test.dart`): `1 FAILED: tools-tests` (351.7 s). The failing test was `tools/test/verify-lock-review.test.js`, "I1: a stale lock that cannot be removed...", with `EBUSY: resource busy or locked, unlink '...\gabay-lock-stuck-616TVl\test.lock'` on Windows, in the test's own temp-folder cleanup. I did not touch `tools/`. That file alone passes (9 pass, 0 fail) twice in a row. It looks like a Windows file-handle timing flake in that test's cleanup (not mine to fix here); see Suggestions.
 - **Run 2** (same tree, same one-line scroll): every check `ok`, and
 
 ```
@@ -100,6 +99,21 @@ EXIT=1
 ```
 
 That ALL GREEN (run 2) needs the one-line change to an existing test. Without it, `flutter-test` fails by exactly that test and verify exits 1. Nothing is reported as passing beyond this.
+- **Run 4** (final, after the owner's rulings: the `shell_test.dart` scroll, the lock-test cleanups, and `origin/main` merged in, which brings FF-0's server half, PR #16). `flutter analyze`: `No issues found!`.
+
+```
+ok   tools-tests          (134.3 s)
+ok   eslint               (24.6 s)
+ok   prettier             (5.2 s)
+ok   api-tests            (14.3 s)
+ok   seed                 (63.1 s)
+ok   functions-health     (32.3 s)
+ok   flutter-analyze      (11.4 s)
+ok   flutter-test         (31.8 s)
+ALL GREEN   (337.7 s)
+EXIT=0
+```
+(all 15 checks `ok`; the others are omitted here for length)
 
 **Screenshots** (test-rendered, Roboto and the Material icons loaded from the SDK, outside the repository): `...\scratchpad\ff0-shots\admin_dev_stub_banner_{light,dark}_{phone,tablet}.png` in the session's scratchpad (`C:\Users\User\AppData\Local\Temp\claude\c--Users-User-FlutterProjects-Gabay\baccea26-212d-413f-81c4-d0b01ae88903\scratchpad\ff0-shots\`). 24 PNGs in all; the other 20 are the existing shell, About and message-banner shots, which now show the banner on the admin surface. I looked at light and dark on the phone and light on the tablet: a full-width tinted band with an icon and the text, above the app bar, readable in both modes.
 
@@ -164,10 +178,9 @@ That ALL GREEN (run 2) needs the one-line change to an existing test. Without it
 | The banner passes x1.4 at 320 px | `dev_stub_banner_test.dart`: "nothing overflows at text size x1.4 on a 320 px phone", "a much longer line wraps..."; the picker's own x1.4 test |
 | The banner shows only where it should | `dev_stub_banner_test.dart`: "where it shows" and `AppConfig.showsDevStubBanner` |
 | The screenshot test | `screenshot_test.dart`: `admin_dev_stub_banner_*` (4) |
-| Existing tests unchanged | `git diff` touches `screenshot_test.dart` only by additions; `shell_test.dart` is untouched and fails (section 2) |
+| Existing tests | Only the three owner-ruled changes of section 2 (no assertion changed); `screenshot_test.dart` gains scenarios only |
 
 ## 8. Suggestions (outside the slice)
 
-- The EBUSY flake in `tools/test/verify-lock-review.test.js` (section 4): its cleanup removes a lock file a child process may still hold on Windows. Worth a look by whoever owns the verify tooling; I did not touch it.
-- The retrofit ledger table is new here. api-coder's two route rows (`GET /api/lookups/:name`, `GET /api/lookups/:name/:id`) must go into the same table; if their branch also adds a table, the two merge by hand. The same goes for the smoke guide's version line.
+- The ledger table: main (PR #16) and this branch both added one; merged by hand into main's layout (nine columns, one table), with the banner row added under api-coder's two route rows.
 - A Tagalog file could be started before P0-14 for the phrases already in the app, so each slice's wording is reviewed as it lands rather than all at once.
