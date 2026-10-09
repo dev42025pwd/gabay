@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.14 | **Date**: 2026-10-09 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136; §1 amended by L139; §6 amended by L140; §6 amended for coder working copies, plan/PH1-worktrees.md 1.1 and 1.2, L147, L148, L150; §5 amended by L151; §6 amended by L152) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.15 | **Date**: 2026-10-09 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136; §1 amended by L139; §6 amended by L140; §6 amended for coder working copies, plan/PH1-worktrees.md 1.1 and 1.2, L147, L148, L150; §5 amended by L151; §6 amended by L152; §3 amended by L153) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -36,6 +36,7 @@ The product owner holds both the product-owner role and, under Raphael Mendoza's
   2. a gate report, `phase-reports/phase-<N>.md`, lists each gate condition with its evidence (pasted outputs, the DONE entries, screenshots);
   3. the documents are synced and the modules page republished;
   4. the product owner, who did not write the code, reads and signs it. A gate signed by whoever did the work is not a gate.
+- **Phase order:** the standard's order (Appendix C.1) changes only through an `EXCEPTIONS.md` entry with an expiry date and the product owner's sign-off, as E-20 does for feature-first (L153). Its gates still pass in full, later, on the system with its features.
 - **Quarterly** (standard Phase 6): the audit, the `EXCEPTIONS.md` expiry sweep (current entries expire 2027-04-02) and the version-floor review.
 
 ## 4. Evidence: no claim without proof (L121)

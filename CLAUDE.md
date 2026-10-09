@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Gabay: indoor wayfinding for Philippine malls (a Flutter shopper app, a Flutter Web admin page, one Express API as a Cloud Function, PostgreSQL). Phase 1 (rails) is done, its gate signed 2026-10-09 (L148, `phase-reports/phase-1.md`); Phase 2 starts when the product owner approves its plan (L146); no product feature exists yet. Local first (L109): everything runs on this machine until the product owner calls a deploy. Replies to the product owner: plain language, recommendation first, evidence pasted (WORKING_AGREEMENT §1, §4).
+Gabay: indoor wayfinding for Philippine malls (a Flutter shopper app, a Flutter Web admin page, one Express API as a Cloud Function, PostgreSQL). Phase 1 (rails) is done, its gate signed 2026-10-09 (L148, `phase-reports/phase-1.md`); Phase 2's S1 and S9 are merged. Feature-first under EXCEPTIONS E-20 (L153): the P0 features are built on localhost first (`plan/PH4-feature-first.md`), then Phases 2 and 3 are fitted to them (the retrofit, R1–R13); no deploy and no kept data until that is signed. Local first (L109): everything runs on this machine until the product owner calls a deploy. Replies to the product owner: plain language, recommendation first, evidence pasted (WORKING_AGREEMENT §1, §4).
 
 ## Commands (Node 22: in Git Bash `"$LOCALAPPDATA/Microsoft/WinGet/Links/fnm.exe" exec --using=22 -- npm.cmd run <script>`)
 - `npm run verify`: every check (linters and their tests, ESLint, Prettier, API and tool tests, `db/schema.sql` twice, the seed, the Functions emulator health, `flutter analyze`, `flutter test`). Healthy output ends `ALL GREEN`; the exit code is the number of failures. Run it before reporting any task complete and paste the output. If a test fails, fix the code, not the test. A failing check's whole output (the console shows its last 30 lines) is in `.verify/logs/<check>.log`, named on its FAIL line; each run empties that folder first, so it holds the latest run's failures only. One run at a time on this machine (each working copy has its own database; the emulator ports stay shared): a second run prints `verify is busy: held by <who> ...` and waits, up to `GABAY_VERIFY_LOCK_WAIT_MS` (default 15 minutes, then exit 2 and nothing recorded). Set `GABAY_VERIFY_OWNER` (for example `api-coder`) so the lock names you; CI takes no lock.
@@ -10,7 +10,7 @@ Gabay: indoor wayfinding for Philippine malls (a Flutter shopper app, a Flutter 
 - Once per clone: `git config core.hooksPath .githooks`. The hooks (pre-commit, post-commit, pre-push, and the Claude Code Stop, SessionStart and after-Dart-edit hooks) are listed in README and `WORKING_AGREEMENT.md` §6.
 
 ## Stack and the seven rules
-Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through one `ApiClient`, go_router with `usePathUrlStrategy()`; Node 22 + Express in one Cloud Function (`maxInstances = 1`, Singapore); PostgreSQL via `pg` with raw parameterized SQL, no ORM; Firebase Auth with roles in the database. Never Firestore or the Realtime Database; never React, Vue, Angular, Python or PHP backends, MySQL, MongoDB, an ORM, float money or `moment`. Pins: Blueprint Part 1 only. Any deviation from the standard's §1 needs written lead sign-off (the product owner, under Raphael Mendoza's delegation, L115) and an `EXCEPTIONS.md` entry with an expiry date; Gabay's are E-02 to E-18 (E-11 withdrawn).
+Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through one `ApiClient`, go_router with `usePathUrlStrategy()`; Node 22 + Express in one Cloud Function (`maxInstances = 1`, Singapore); PostgreSQL via `pg` with raw parameterized SQL, no ORM; Firebase Auth with roles in the database. Never Firestore or the Realtime Database; never React, Vue, Angular, Python or PHP backends, MySQL, MongoDB, an ORM, float money or `moment`. Pins: Blueprint Part 1 only. Any deviation from the standard's §1 needs written lead sign-off (the product owner, under Raphael Mendoza's delegation, L115) and an `EXCEPTIONS.md` entry with an expiry date; Gabay's are E-02 to E-20 (E-11 withdrawn; E-19 reserved for S10; E-20 the phase order, L153).
 1. Money is `decimal.js` and `DECIMAL(18,4)`; never a float. *(review)*
 2. Every tenant-scoped query binds its tenant from the request context (`req.tenantCompanyID`), never from the token's user object. *(`tenant-predicate` checks the binding; review checks the source)*
 3. Never interpolate a request value into SQL; allow-list maps for sort keys, filters and lookups. *(`sql-interpolation`)*
@@ -37,6 +37,7 @@ Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through
 | An owner ruling | a `plan.html` row (version bump, changelog row); every document it touches; this file, or the `gabay-product-rulings` skill for a product ruling; the modules page (https://claude.ai/artifact/QFDHQAvkiDL93hM76Kb9mt) |
 | A pipeline entry's state | `FEATURE_PIPELINE.md` (DONE marker, §6) |
 | A deploy or an incident | `docs/ops/DEPLOYMENT_RUNBOOK.md` / `docs/ops/INCIDENTS.md` |
+| A feature route or admin screen, while E-20 is in force | its retrofit-ledger row in `plan/PH4-feature-first.md` §7 |
 
 ## Things agents get wrong here
 - `fnm` is not on an agent's PATH in Git Bash: call `"$LOCALAPPDATA/Microsoft/WinGet/Links/fnm.exe"`; use `npm.cmd`, not `npm`; the default Node is 24.
@@ -45,6 +46,7 @@ Flutter + Riverpod (MVVM: View → ViewModel → stateless Service), dio through
 - `plan.html` is edited by other sessions too: re-read its version and next L-row before editing; check `<tr>`/`<li>` balance after.
 - Never start `npm run verify` expecting the machine to be yours, and never kill another run's emulator or delete its lock to get in: the lock makes you wait and says who holds it. A lock left by a dead run is cleared by the next run.
 - A git hook exports `GIT_DIR` and friends (from a working copy, `GIT_DIR` points into the real repository): anything a hook starts that works in another repository or working tree runs after `unset $(git rev-parse --local-env-vars)`, and every `tools/**` test file loads `tools/test/timeout.js`, which clears them (INC-001, L152).
+- Until the retrofit's R1 the admin side runs on `functions/src/middleware/devStub.js` (E-20): mount every admin route behind it, never around it; the tenant still comes only from `req.tenantCompanyID` (rule 2); every feature route and admin screen gets its row in `plan/PH4-feature-first.md` §7.
 - `npm run seed:db-only` (in `db/seeds`) deletes the test accounts; restore them with the full `npm run seed`.
 - Never print or commit `.env` values. Never copy code from `demo_app` or `gabay_spike` (L34); the penthouse data stays out of git (L48, L123).
 - The Blueprint's `<known_traps>` (Part 1) list the domain traps (global lookups `TenantId = $t OR TenantId IS NULL`, frozen rows, and more): read them before database or engine work.
@@ -88,6 +90,8 @@ than presenting it as settled.
   Phase 1 declared 2026-10-07 (L122)
 
   The declaration wakes the agents and approves no work: each Phase 1 task, the rails included, needs the product owner's approved plan, and every repository, push or deploy waits for their call. Phase 2 and every later phase start when the product owner approves their plan; no further declaration (L146).
+
+  While EXCEPTIONS E-20 is in force (L153): localhost only, no deploy, throwaway data only; the development stub never loads outside `NODE_ENV` development or test; definition-of-done items 3, 4 and 9 are waived only as `Waived: <item> — R<n>`.
 - **Models (L62, L122; WORKING_AGREEMENT §8):** Sonnet 5.5 for well-defined coding; Opus 5.5 or Fable 5.1, by weight, for analysis and decisions. Every important scenario goes to the product owner first, including any move to Opus or Fable. Model IDs and library APIs come from a doc check, never from memory (L121).
 - **Pipeline:** intent → spec (spec-writer) → plan (main session; the product owner approves; it cites the spec revision) → diff (coders) → tests (test-verifier) → review (dod-reviewer) → the product owner's sign-off. Files are named by pipeline ID: `intent/<id>-<slug>.md`, `spec/<id>.md`, `plan/<id>.md`.
 - **Evidence:** paste command output; never write "should work". Tag an unchecked library, framework or API claim RECALLED; verify a load-bearing one (doc fetch or source check) or stop and ask.
