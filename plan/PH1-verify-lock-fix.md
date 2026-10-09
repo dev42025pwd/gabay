@@ -1,12 +1,12 @@
 # Plan: the verify lock never goes to two runs at once (lock fix)
 
-> **Version**: 1.0 | **Date**: 2026-10-08 | **Status**: APPROVED by Genesis Perez, 2026-10-08 (plan.html L143) | **Spec**: none (tooling for Phase 1's rails, as `plan/PH1-rails.md`, L123; amends `plan/PH1-verify-lock.md`, L140) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
+> **Version**: 1.1 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-08 (plan.html L143); 1.1 adds the review fix and notes (L144) | **Spec**: none (tooling for Phase 1's rails, as `plan/PH1-rails.md`, L123; amends `plan/PH1-verify-lock.md`, L140) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
 
 ## Why
 
 The verify lock (`tools/lib/verify-lock.js`, merged in PR #3) can give the lock to two runs at once under heavy load. api-coder's stress harness (8 runs per round, CPU burners, 12 parallel copies) saw two holders at once in about 7 of 96 rounds, and one full verify went red on it: `tools/test/verify-lock-review.test.js` "S2a: eight runs released at the same moment never hold the lock together" (round 1: two holders at once). The verify logs (L141) named the test. Two causes:
 
-1. **A release can fail silently.** `releaseLock` swallows its `unlinkSync` error. On Windows another run reading the lock file at that moment can make the delete fail, so a finished run leaves a lock behind that the waiting runs then judge dead (api-coder's reading, not confirmed by a trace; an experiment with retries in `releaseLock` cut the bad rounds from about 9 to 1 in 96).
+1. **A release can fail silently.** `releaseLock` swallowed its `unlinkSync` error, so a finished run could leave a lock behind that the waiting runs then judged dead. What made the delete fail is not proven: api-coder read it as another run reading the lock, but dod-reviewer's probe (a holder taking and releasing the lock 150 times while 6 Node processes read it every 1 ms) never made the delete fail, since Node opens files with delete sharing; another program (an antivirus scan, the indexer) is the likely cause (1.1). The retry covers either.
 2. **Clearing a dead lock can remove a live one.** Several waiting runs judge the same dead lock; one clears it and a new run takes the lock; a waiter that judged earlier then renames that new, live lock aside (`clearStale`; its link-back fails when a third run has already created a lock). The code calls this a window of microseconds; under load it widens.
 
 ## What
@@ -22,6 +22,12 @@ The verify lock (`tools/lib/verify-lock.js`, merged in PR #3) can give the lock 
 | LF-1 | A short exclusive claim file for clearing | Keep rename-compare-link-back (VL-7): narrows the window but cannot close it, as the stress run showed |
 | LF-2 | Deterministic race tests through a test-only pause point between "judge" and "remove" | Only a large stress test: slow, and can still miss the race on a fast or idle machine |
 | LF-3 | A stale claim is removed after about 30 s | No expiry: a run killed while clearing would block every later run until the 15-minute limit |
+| LF-4 | The release retry is a hand-written loop (`unlinkSync` with `Atomics.wait`, `RELEASE_RETRIES` × `RELEASE_RETRY_DELAY_MS`) that also retries the read of the lock (1.1; built that way, recorded after review) | `rmSync` with `maxRetries` and `retryDelay`, as `resetLogs` does: retries only some error codes and not the read, and a lock held without read sharing made the old release return silently |
+| LF-5 | A stale claim is broken only when its process is gone; a claim whose process is alive is broken only after a much longer named age (about 10 minutes) (1.1, L144) | Age alone (1.0): a run paused over 30 s inside its clear (sleep, a debugger, the clock jumping) loses its claim, and two runs can then hold the lock (dod-reviewer showed it with a 32 s pause) |
+
+## Review fix (1.1; dod-reviewer's review of `1684323`, the product owner's ruling, L144)
+
+1. **A claim is stale only when its run is gone.** The claim already records its holder's process ID: a claim older than `CLAIM_STALE_MS` is broken only if that process no longer exists; a claim whose process is still alive is broken only after a much longer named age (about 10 minutes), with its line. Test (fails on `1684323`): the holder of a claim is paused past 30 s between its re-read and its delete while another run waits: the other run does not break the live claim, and the two never hold the lock together.
 
 ## Tests (tests first; each fails before its fix)
 
