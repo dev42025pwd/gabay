@@ -1,6 +1,6 @@
 # Plan: each coder in its own working copy and database
 
-> **Version**: 1.1 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez: 1.0 on 2026-10-09 (L147), 1.1 on 2026-10-09 (L148), which answers the S8 review's findings on this plan (I-5, I-6, nits 9 and 10) | **Decision rows**: L140 (part 2 deferred until after S8), L146, L147, L148 | **Spec**: none (tooling for Phase 1's rails, like `plan/PH1-verify-lock.md`) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
+> **Version**: 1.2 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez: 1.0 on 2026-10-09 (L147), 1.1 (L148), 1.2 (L150), which records the build review's rulings (test-verifier's default copy; the Stop checks) and the coder's three design choices | **Decision rows**: L140 (part 2 deferred until after S8), L146, L147, L148, L150 | **Spec**: none (tooling for Phase 1's rails, like `plan/PH1-verify-lock.md`) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
 
 ## Why
 
@@ -40,6 +40,9 @@ Phase 2 (L146) puts api-coder and flutter-coder to work at the same time, so thi
 | WT-3 | Database name `gabay_wt_<name>` with hyphens turned into underscores | One `gabay_test` database shared by the coders: it brings back the collision this plan removes. |
 | WT-4 | Sibling folder `Gabay-wt\` outside the repository | Inside the repository (for example `.worktrees\`): the linters, Prettier and Flutter would walk into the copies unless every tool ignores them. |
 | WT-5 | `.env` copied with only `PGDATABASE` changed | A shared `.env` with a per-copy override: every reader (`node --env-file`, `process.loadEnvFile()`) would need changing. |
+| WT-6 | `worktree:new` takes the verify lock around its `setup-db` step (the coder's choice, approved L150): the test seed starts the Auth emulator on the ports every verify run uses | No lock, as `npm run setup-db` always ran: it would collide with a running verify (S7 §6) |
+| WT-7 | A branch that already exists is reused: a local one checked out as it is, a remote-only one tracked; otherwise a new one is made from the fetched `origin/main`. The default `wt/<name>/<date>` follows the same rule (approved L150) | Always a new branch, failing if it exists: a same-day re-create after a remove would fail |
+| WT-8 | Both commands refuse to run inside a linked working copy (approved L150) | Allow it: run there, `Gabay-wt` would resolve beside the copy and read the copy's `.env` |
 
 ## Tests (tests first; each fails before its build)
 
@@ -64,10 +67,14 @@ Phase 2 (L146) puts api-coder and flutter-coder to work at the same time, so thi
 - **The Claude Code hooks** (point 8): `.claude/hooks/lib.js` and the hooks that use `ROOT`, with tests for an edit inside a copy.
 - **No schema, route, screen or dependency change.**
 
-## Open questions
+## Open questions (answered)
 
-1. Should `test-verifier` share the coder's working copy (it tests what the coder wrote) or have its own? Recommended: share the coder's copy, since it needs the coder's unpushed changes.
-2. Disk: each copy holds its own `node_modules` and Flutter build folders (size unmeasured; measured in the live run).
+1. **Ruled (L150): test-verifier works in the copy of the coder whose work it tests**, since it needs the unpushed changes; its own copy `Gabay-wt\test-verifier` only when a task says so.
+2. **Measured in the live run (2026-10-09): 458 MB a copy** (`db/seeds/node_modules` 248 MB, `functions/node_modules` 124 MB, `app/build` 80 MB, `db/tools/node_modules` 1 MB); the git object store is shared.
+
+## The Stop checks (L150, from the build review's I-4)
+
+The Stop hooks (`stop-verify`, `stop-screens`) run for the main session only (L129; no `SubagentStop`). They always check the main folder, as before, and also the working copy the session's shell is in when that is a different folder; never the copy alone, so main-folder edits cannot finish unchecked. Coders are covered by the drift check on every edit (it follows the edited copy) and by `npm run verify` before their pull request.
 
 ## Not in this plan
 
