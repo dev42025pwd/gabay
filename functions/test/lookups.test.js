@@ -262,7 +262,9 @@ test("lookups: a name's id is read from its own table (an amenity id is not a bu
     });
     const viaBuilding = await get(`/api/lookups/building-types/${amenity}`);
     // Ids are per table: the same number may exist in the other table, but it must be THAT table's row.
+    assert.ok([200, 404].includes(viaBuilding.status), String(viaBuilding.status));
     if (viaBuilding.status === 200) assert.notEqual(viaBuilding.body.label, `Amenity ${tag}`);
+    else assert.deepEqual(viaBuilding.body, { error: 'Not found' });
     assert.equal((await get(`/api/lookups/amenity-types/${amenity}`)).body.label, `Amenity ${tag}`);
     assert.equal(
       (await get(`/api/lookups/building-types/${building}`)).body.label,
@@ -321,8 +323,12 @@ test('lookups: an empty or blank search is no search', async () => {
   await withApp(async ({ get, row, tag, tenantA }) => {
     await row('building-types', { tenantId: tenantA.tenantId, label: `Alpha ${tag}` });
     const plain = await get('/api/lookups/building-types');
+    assert.equal(plain.status, 200);
+    assert.ok(plain.body.totalCount >= 1, "the plain list holds this test's row");
     for (const search of ['', '%20%20']) {
       const res = await get(`/api/lookups/building-types?search=${search}`);
+      assert.equal(res.status, 200, JSON.stringify(search));
+      assert.ok(res.body.totalCount >= 1, JSON.stringify(search));
       assert.equal(res.body.totalCount, plain.body.totalCount, JSON.stringify(search));
     }
   });
@@ -406,4 +412,42 @@ test('lookups: a platform row (TenantId NULL) is served for each of the three na
       );
     }
   });
+});
+
+test('lookups: the stub runs first, so a not-held X-Tenant-Id is 403 even for an unknown name or a non-GET method', async () => {
+  await withApp(async ({ call, tenantC }) => {
+    const headers = { 'X-Tenant-Id': String(tenantC.tenantId) };
+    for (const [path, method] of [
+      ['/api/lookups/nope', 'GET'],
+      ['/api/lookups/building-types/abc', 'GET'],
+      ['/api/lookups/building-types', 'POST'],
+      ['/api/lookups', 'GET'],
+    ]) {
+      const res = await call(path, { headers, method });
+      assert.equal(res.status, 403, `${method} ${path}`);
+    }
+  });
+});
+
+test('lookups: a misconfigured stub user makes every /api/lookups request a 500, a bare /api/lookups included', async () => {
+  const t = await openRolledBackDb();
+  const logger = fakeLogger();
+  const app = createApp({
+    config: testConfig({ DEV_STUB_USER_EMAIL: 'nobody-here@gabay.test' }),
+    db: t.db,
+    logger,
+    tokenVerifier: { verifyIdToken: async () => assert.fail('no token is read here') },
+    settings: createSettings((text, params) => t.db.query(text, params), logger),
+  });
+  const server = await listen(app);
+  try {
+    for (const path of ['/api/lookups', '/api/lookups/building-types', '/api/lookups/nope']) {
+      const res = await fetch(`${server.url}${path}`);
+      assert.equal(res.status, 500, path);
+      assert.match((await res.json()).error, /DEV_STUB_USER_EMAIL/, path);
+    }
+  } finally {
+    await server.close();
+    await t.close();
+  }
 });
