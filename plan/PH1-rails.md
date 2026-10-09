@@ -1,6 +1,6 @@
 # PH1-rails — Phase 1: rails and guardrails
 
-> **Version**: 1.11 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-07 (L123); building; §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 and L132; S7 amended by L133, L135 and L136; S7 closed by L145 (three first-push checks carried to S8) | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
+> **Version**: 1.12 | **Date**: 2026-10-09 | **Status**: DONE: the gate signed by Genesis Perez, 2026-10-09 (L148); APPROVED 2026-10-07 (L123); §3 amended by L125 (documents into `docs/`); S2, S5 and §6 amended by L126; S4 amended by L128; S5 amended by L129 and L130; S6 amended by L131 and L132; S7 amended by L133, L135 and L136; S7 closed by L145 (three first-push checks carried to S8) | **Decision rows**: L122 (Phase 1 declared), L123 (how Phase 1 is run), L125 (document layout) | **Spec**: none. The standard's Appendix C Phase 1 is the specification (L123), read at Engineering Standards v1.0, `src-order` §"Phase 1 — Rails & guardrails", with the checklist items it names. | **Approver**: Genesis Perez, product owner
 
 ## 1. What Phase 1 delivers
 
@@ -129,7 +129,7 @@ Deferred to Phase 2 (L128): the route-guard-order lint and the "no raw error tex
 - `build.yml` (after lint passes): builds the admin web and a debug APK, stamping `APP_VERSION`, `BUILD_NUMBER`, `GIT_COMMIT` and `BUILD_TIME`. Artifacts only: no store upload, no Firebase deploy.
 - ~~Branch protection on `main`: lint must pass before merge.~~ L133: not available for private repositories on GitHub Free. L135: the repository is public, so protection is available again. L136: every change reaches `main` through a branch and a pull request; lint and e2e are required checks; "Do not allow bypassing" is on; e2e also runs on every pull request to `main`. Applied right after the first push.
 
-### S8 — The gate
+### S8 — The gate — DONE 2026-10-09, signed (L148; report: `phase-reports/phase-1.md`)
 - Three deliberately bad commits on a throwaway branch (a hardcoded colour, an unparameterized query, a `TextFormField` in a view): each blocked by pre-commit; each also failing `lint.yml` when pushed with `--no-verify` to a test PR (which is then closed, not merged).
 - dod-reviewer runs `npm run verify` in a fresh context.
 - L145: the gate report lists S7's three first-push checks not yet exercised (`S7.md` §5.1 items 3, 6 and 8: a run cancelled by a newer push, the PostgreSQL log after a red e2e, a fork's first pull request), each marked proven if it has happened by then, and the `build.yml` cache-comment correction as a follow-up after S8.

@@ -1,6 +1,6 @@
 # Phase 1 — Rails and guardrails: gate report
 
-> **Version**: 1.0 | **Date**: 2026-10-09 | **Plan**: `plan/PH1-rails.md` 1.11, S8 | **Decision rows**: L122 (Phase 1 declared), L123 (plan approved), L124–L147 | **Written by**: the main session (Opus 5.5) | **Reviewed by**: dod-reviewer in a fresh context (AI self-check, not a sign-off; §6) | **Status**: READY FOR SIGNATURE; E-18 awaits your approval (§5) | **Signed**: not yet
+> **Version**: 1.0 | **Date**: 2026-10-09 | **Plan**: `plan/PH1-rails.md` 1.11, S8 | **Decision rows**: L122 (Phase 1 declared), L123 (plan approved), L124–L147 | **Written by**: the main session (Opus 5.5) | **Reviewed by**: dod-reviewer in a fresh context (AI self-check, not a sign-off; §6) | **Status**: SIGNED; Phase 1 closed (L148) | **Signed**: Genesis Perez, product owner, 2026-10-09 (L148)
 
 ## 1. The gate
 
@@ -146,7 +146,7 @@ Audited this session (a read-only search agent; the key lines re-read by the mai
   - It names the pre-commit hook's version and changelog stamp, and says a push takes two to five minutes.
 - **Smoke guide 0.2:** it names `npm run verify` and adds the seed's tenants and accounts, plus three cases: API health (including the 503 when the database is down) and the two app shells.
 - **EXCEPTIONS:**
-  - **E-18 (`globals`) is added as a request,** with the approval fields blank. **It is in force only once you approve it.**
+  - **E-18 (`globals`)** was added as a request and approved by the product owner on 2026-10-09 (L148).
   - ESLint, `@eslint/js` and Prettier are recorded as checked.
 - CLAUDE.md needed nothing.
 - **The modules page** (https://claude.ai/artifact/QFDHQAvkiDL93hM76Kb9mt) was republished on 2026-10-09: version 17 with L146, and again with L147 and this gate's state.
@@ -207,7 +207,7 @@ exit=0
 
 - **Clean-up:** a clone has no internal penthouse source (git-ignored, L48), so its seed reset the shared `gabay_dev` without the penthouse. `npm run seed` from the main folder restored it ("Spike Venues · Dynamiq penthouse (Major 1)", "Seed committed.", exit 0). The clone folder was deleted.
 
-**E-18 (`globals`)** waits for your approval (§5).
+**E-18 (`globals`)** approved 2026-10-09 (L148).
 
 ## 7. Open, outside the gate
 
@@ -217,4 +217,4 @@ exit=0
 
 ## 8. Signature
 
-Phase 1 gate met: ______________________ (Genesis Perez, product owner)   Date: __________
+Phase 1 gate met: **signed by Genesis Perez, product owner**, on 2026-10-09, given in the session and recorded by the main session (plan.html L148). The slice reports S2–S7 are signed with it.

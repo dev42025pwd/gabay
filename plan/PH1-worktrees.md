@@ -1,6 +1,6 @@
 # Plan: each coder in its own working copy and database
 
-> **Version**: 1.1 draft | **Date**: 2026-10-09 | **Status**: 1.0 APPROVED by Genesis Perez, 2026-10-09 (L147). 1.1 DRAFT answers the S8 review's findings on this plan (I-5, I-6, nits 9 and 10), awaiting approval (L147 ruling 5) | **Decision rows**: L140 (part 2 deferred until after S8), L146, L147 | **Spec**: none (tooling for Phase 1's rails, like `plan/PH1-verify-lock.md`) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
+> **Version**: 1.1 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez: 1.0 on 2026-10-09 (L147), 1.1 on 2026-10-09 (L148), which answers the S8 review's findings on this plan (I-5, I-6, nits 9 and 10) | **Decision rows**: L140 (part 2 deferred until after S8), L146, L147, L148 | **Spec**: none (tooling for Phase 1's rails, like `plan/PH1-verify-lock.md`) | **Approver**: Genesis Perez, product owner | **Builds**: api-coder (Sonnet 5.5), tests first | **Review**: dod-reviewer (AI self-check) | **Merge**: the product owner's go (L139)
 
 ## Why
 
