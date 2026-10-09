@@ -152,7 +152,7 @@
 | firebase-tools | 15.x | 15.32.1 (needs Node ≥ 20) | 2026-10-05 (L93); 2026-10-06 (L98) | None published. The deploy CLI for the admin page (E-05), the function and SQL Connect (L98); ships in no build |
 | better-sqlite3 | 13.x | 13.0.3 (major released 2026-07-21) | 2026-09-25 (D6); rechecked 2026-10-02 | None published; revisit when `node:sqlite` is Stable |
 | ~~SQL Server~~ | retired by L98 (E-06) | 2025 CU9 | 2026-09-24; retired 2026-10-06 | Replaced by Cloud SQL for PostgreSQL |
-| PostgreSQL (Cloud SQL, via SQL Connect; local for development, L109) | 18 (18.6) | — | 2026-10-07 (L115: Cloud SQL's default major, docs.cloud.google.com/sql/docs/db-versions; local install winget `PostgreSQL.PostgreSQL.18` 18.6). CI's e2e service uses the floating `postgres:18` image until it moves to `postgres:18.6` in the post-S8 workflow follow-up (the product owner's choice, L147) | Follows Cloud SQL's version policy; the instance must be in the SQL Connect service's location (asia-southeast1) |
+| PostgreSQL (Cloud SQL, via SQL Connect; local for development, L109) | 18 (18.6) | — | 2026-10-07 (L115: Cloud SQL's default major, docs.cloud.google.com/sql/docs/db-versions; local install winget `PostgreSQL.PostgreSQL.18` 18.6). CI's e2e service uses the `postgres:18.6` image (the product owner's choice, L147) | Follows Cloud SQL's version policy; the instance must be in the SQL Connect service's location (asia-southeast1) |
 
 ```xml
 <routing_and_auth_constraints>

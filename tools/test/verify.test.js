@@ -35,7 +35,7 @@ test('the checks are the fifteen of plan S5 (+ L126), cheap ones first, the sche
 });
 
 // S7 review I1: verify runs its checks in CHECKS order whatever the order of --only, and api-tests and
-// db-tools-tests used to come BEFORE schema-run-1/2. On a fresh database (CI's postgres:18) they failed with
+// db-tools-tests used to come BEFORE schema-run-1/2. On a fresh database (CI's PostgreSQL service) they failed with
 // 'relation "gabay.globalsetting" does not exist'. Anything that needs the schema in the database must come
 // after the run that applies it.
 test('I1: every check that needs the schema in the database runs after the two schema runs', () => {

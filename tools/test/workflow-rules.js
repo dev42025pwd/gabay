@@ -363,7 +363,7 @@ function e2eProblems(text, ctx) {
   if (!group || group[2] !== "${{ github.event_name == 'pull_request' }}") {
     add('superseded pull-request runs cancel; nightly and manual runs do not');
   }
-  if (!/image: postgres:18$/m.test(src)) add('PostgreSQL 18 service');
+  if (!/image: postgres:18\.6$/m.test(src)) add('PostgreSQL 18 service');
   if (!/openssl rand -hex 16/.test(src) || !/::add-mask::/.test(src))
     add('throwaway, masked seed passwords');
 

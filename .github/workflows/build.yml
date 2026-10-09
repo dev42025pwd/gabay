@@ -16,13 +16,20 @@
 # filter alone lets through), and the run's head repository is THIS repository. It has no secrets and
 # `contents: read`. The `if:` is pinned exactly by tools/test/workflows.test.js.
 #
-# CACHES: workflow_run is one of the triggers whose runs get read-only access to the default branch's caches
-# (docs.github.com, dependency caching, "Cache access for low-trust workflow triggers", fetched 2026-10-08:
-# "They can restore existing caches but cannot create or overwrite them"; the failed save is a warning, not a
-# failure). So the caches below are restored here and saved only by a run on a trusted trigger: a manual
-# workflow_dispatch run of this file on main. Until one has run, each build starts cold (more minutes, which
-# are free). The Flutter key is this file's own (flutter-android-...): lint's Flutter cache has no Android
-# artifacts, and keys are never overwritten, so sharing one key would keep the thinner cache for ever.
+# CACHES: what the docs say and what was seen differ, and this file relies on neither.
+#   - The docs (docs.github.com, dependency caching, "Cache access for low-trust workflow triggers", re-read
+#     2026-10-09) say a run from workflow_run "can restore existing caches but cannot create or overwrite them"
+#     in the default branch's scope; the failed save is a warning, not a failure.
+#   - Observed on this repository (`gh api repos/dev42025pwd/gabay/actions/caches`, 2026-10-09): the first
+#     build, run 37734604741 (a workflow_run run, 2026-10-08), saved gradle-Linux-a8b9c772... and
+#     flutter-android-3.47.5-Linux under refs/heads/main. Why the documented restriction did not apply then is
+#     unknown.
+#   - Safe either way: this job runs only after lint passed on a push to main of this repository (the `if:`
+#     below, pinned by tools/test/workflows.test.js), so any cache it saves comes from code already on main.
+#   - So a run may save the caches, or, if one does not, a manual workflow_dispatch run of this file on main
+#     will; a run that finds no cache is only slower (more minutes, which are free).
+# The Flutter key is this file's own (flutter-android-...): lint's Flutter cache has no Android artifacts, and
+# keys are never overwritten, so sharing one key would keep the thinner cache for ever.
 #
 # COST (L135: the repository is public): usage is free for public repositories that use standard GitHub-hosted
 # runners (docs.github.com, Actions billing, fetched 2026-10-08), so there is no monthly budget of minutes to
