@@ -1,6 +1,6 @@
 # FF0-dev-stub-lookups — FF-0: the development stub and the read-only lookups (E-20)
 
-> **Version**: 1.1 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-09 (L154), with §8's three questions ruled, all as recommended; 1.1 adds the server review's rulings (L155, §9) | **Parent**: `plan/PH4-feature-first.md` 1.0 §3 (L153, EXCEPTIONS E-20) | **Spec**: none. FF-0 is setup work that the parent plan defines, as Phase 2's slices are; the P0 entries from FF-1 on each get their own intent, spec and plan | **Approver**: Genesis Perez, product owner
+> **Version**: 1.2 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-09 (L154), with §8's three questions ruled, all as recommended; 1.1 adds the server review's rulings (L155, §9); 1.2 names the client half's owner-ruled existing-test changes (L163) | **Parent**: `plan/PH4-feature-first.md` 1.0 §3 (L153, EXCEPTIONS E-20) | **Spec**: none. FF-0 is setup work that the parent plan defines, as Phase 2's slices are; the P0 entries from FF-1 on each get their own intent, spec and plan | **Approver**: Genesis Perez, product owner
 
 ## 1. What FF-0 delivers
 
@@ -84,7 +84,7 @@ Two things the feature slices need before P0-01 (FF-1) can start, plus one visib
 - the banner has its name and passes the ×1.4 check at 320 px;
 - the screenshot test.
 
-**Existing tests:** none change, except two named by L155: `tools/test/workflow-steps.js` and `tools/test/workflow-snapshots/e2e.yml.snap`, which pin CI's e2e `.env` step and gain its `NODE_ENV=development` line. `routes/api.js` gains a group; S1's `me` tests stay as they are.
+**Existing tests:** none change, except those the product owner named: by L155, `tools/test/workflow-steps.js` and `tools/test/workflow-snapshots/e2e.yml.snap` (CI's e2e `.env` gains `NODE_ENV=development`) and `tools/test/verify-lock-fix.test.js` (test 177's cleanup); by L163, `app/test/shell_test.dart` (one `scrollUntilVisible` before the tap, because the banner pushes the button below the fold at ×1.4), and the cleanups of `tools/test/verify-lock-review.test.js` and `tools/test/verify-logs.test.js` with the shared `cleanWhenFree` in `tools/test/verify-scratch.js` (wait for the helper's exit, retry the delete for up to 5 s). No assertion changed in any of them. `routes/api.js` gains a group; S1's `me` tests stay as they are.
 
 ## 6. Definition of done for FF-0
 
