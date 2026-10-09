@@ -54,6 +54,7 @@ jobs:
           set -eu
           umask 077
           {
+            echo "NODE_ENV=development"
             echo "PGHOST=localhost"
             echo "PGPORT=5432"
             echo "PGDATABASE=gabay_dev"

@@ -94,12 +94,14 @@ jobs:
       - name: Install the seed's packages (firebase-tools lives here)
         run: npm ci --prefix db/seeds
 
+      # E-20 (FF-0): NODE_ENV=development is written explicitly because the development stub refuses to exist without it; the emulator health check starts the API from this file.
       - name: Write .env from throwaway values (no repository secrets, nothing echoed)
         shell: bash
         run: |
           set -eu
           umask 077
           {
+            echo "NODE_ENV=development"
             echo "PGHOST=localhost"
             echo "PGPORT=5432"
             echo "PGDATABASE=gabay_dev"

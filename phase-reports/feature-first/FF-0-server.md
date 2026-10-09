@@ -65,7 +65,7 @@ ALL GREEN   (173.0 s)
 
 **The verify order.** `api-tests` runs after the schema is recreated and before the seed, so the database has no seeded rows then. A first verify run failed two lookups tests that assumed seeded platform rows. The tests were fixed (they now write their own platform rows inside the rolled-back transaction), not the code; the localhost check of the seeded values is manual cases FF0.1 to FF0.5.
 
-**Existing tests:** none changed. S1's `app.test.js` counts `warn` log lines on a normal start, which is why the stub's startup line is `info` (DESIGN CHOICE 6).
+**Existing tests:** two changed, by the owner's ruling L155 (see §3 and §8); no other. S1's `app.test.js` counts `warn` log lines on a normal start, which is why the stub's startup line is `info` (DESIGN CHOICE 6).
 
 ## 3. Tests added
 
@@ -77,6 +77,13 @@ ALL GREEN   (173.0 s)
 | `functions/test/lookups.test.js` | unknown names (including `constructor`, `__proto__`, table names) 404; GET only; no token needed while `/api/me` still 401; the exact row and envelope for all three names; platform plus own rows, never another tenant's; the tenant is the stub's, not the request's; inactive out of the list, in by id; by id never another tenant's, bad ids 404; an id read from its own table; search is case-insensitive and `'`, `%`, `_`, `\` are literal; blank search is no search; paging cap at 200 and no overlap across 210 rows; order `SortOrder`, `Label` whatever `sortBy` or `sortOrder` is sent; a platform row served for each name |
 
 All database writes are inside the always-rolled-back transaction (WORKING_AGREEMENT §5, L151).
+
+**Existing tests changed (the owner's ruling L155, C1), each a one-line update:**
+
+- `tools/test/workflow-steps.js`: the pinned `run` of the e2e step "Write .env from throwaway values" gains `echo "NODE_ENV=development"` as its first line.
+- `tools/test/workflow-snapshots/e2e.yml.snap`: the same line is added to the snapshot.
+
+Reason: the stub refuses to exist unless `NODE_ENV` is written explicitly, so CI's `.env` must write it (`.env.example` has it). Failing first: with the two tests updated and `e2e.yml` not yet, `npm run tools:test` gave `# tests 414, # pass 408, # fail 4` (the e2e step rule, the snapshot cases). Then `e2e.yml` was changed and it gave `# pass 412, # fail 0, # skipped 2`. The comment explaining the line sits above the step in the workflow, because a comment inside the `run: |` block is part of the pinned run text.
 
 ## 4. DESIGN CHOICES (api-coder; each with its alternative)
 
@@ -121,7 +128,7 @@ All database writes are inside the always-rolled-back transaction (WORKING_AGREE
 | A dependency | none added |
 | A setting, limit or option list | `DEV_STUB_USER_EMAIL`: `.env.example`, `INSTALL.md`, Blueprint 4.15; no `GlobalSetting` row (it is an env value); the option lists come from the seeded tables |
 | An owner ruling | L154 is recorded by the main session in `plan.html`; nothing new ruled here |
-| A command or check | none added |
+| A command or check | none added. CI: `.github/workflows/e2e.yml` writes `NODE_ENV=development` into its `.env` (L155), with the two pinned tools tests updated (§3) |
 | A pipeline entry's state | not DONE: the client half and review remain; `FEATURE_PIPELINE.md` is untouched |
 | A deploy or an incident | none |
 
@@ -185,5 +192,5 @@ An inactive row is returned with `"isActive": false` (for the picker's `currentO
 
 ## 8. Open, outside this slice
 
-- **CI's e2e check will fail at `functions-health` as the branch stands.** The stub refuses to exist unless `NODE_ENV` is written explicitly, and `.github/workflows/e2e.yml` writes a `.env` with no `NODE_ENV` (the local `.env` and `.env.example` have it). Run here, with `NODE_ENV` removed from the copy's `.env`: `UNHEALTHY: HTTP 500 null`, `1 FAILED: functions-health`; restored, ALL GREEN. The fix is one line in `e2e.yml` (`echo "NODE_ENV=development"`), but `tools/test/workflow-steps.js` and `tools/test/workflow-snapshots/e2e.yml.snap` pin that step, so it changes two existing tools tests (a first try failed 4 of them). The plan does not name it, so it was reverted and not made: a ruling is needed (see the report's questions).
+- **CI's `functions-health` (closed by the owner's ruling L155).** The stub refuses to exist unless `NODE_ENV` is written explicitly, and `e2e.yml` wrote a `.env` with no `NODE_ENV`. Run here with `NODE_ENV` removed from the copy's `.env`: `UNHEALTHY: HTTP 500 null`, `1 FAILED: functions-health`. Fixed in a second commit: `echo "NODE_ENV=development"` in the `.env` step of `e2e.yml`, plus the two pinned tools tests (§3).
 - Pre-existing and unchanged: S1's `identityStore.findByFirebaseUid` and everything else in `auth/`.
