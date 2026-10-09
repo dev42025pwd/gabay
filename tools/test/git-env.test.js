@@ -1,4 +1,4 @@
-// Regression test for the pre-push incident of 2026-10-09: a push from a LINKED git worktree runs
+// Regression test for INC-001 (the pre-push incident of 2026-10-09): a push from a LINKED git worktree runs
 // .githooks/pre-push -> `npm run verify` with git's hook environment (GIT_DIR is exported as an absolute
 // path into .git/worktrees/<name>). verify's own tests build scratch repositories; their git commands
 // inherited GIT_DIR and hit the REAL repository instead: core.bare=true in its config, test commits on a
@@ -177,4 +177,65 @@ test('a hand run of the tests with GIT_DIR set cannot reach the repository GIT_D
     remove(outer);
     remove(outerWt);
   }
+});
+
+// ---- the helper is only as good as its use: every tools test must load the wrapper -----------------
+
+// Every `tools/**/*.test.js` (tools/test and tools/lint/test) must load tools/test/timeout.js, which clears
+// git's per-repository variables (INC-001). Loading scratch.js or verify-scratch.js does not count: they do
+// not load the wrapper. Out of scope: functions/test and db/tools/test. They start no git, and the
+// reviewer classified every file there, so a scratch repository cannot be built from them.
+const TOOLS = path.join(REAL, 'tools');
+const WRAPPER = path.join(TOOLS, 'test', 'timeout.js');
+
+/** The tools test files (absolute paths), node_modules skipped. */
+function toolsTestFiles(dir = TOOLS) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : toolsTestFiles(full);
+    return entry.name.endsWith('.test.js') ? [full] : [];
+  });
+}
+
+/** True when the source of `file` requires tools/test/timeout.js by any relative path. */
+function loadsWrapper(file, source) {
+  const requires = [...source.matchAll(/require\(\s*(['"])(\.{1,2}\/[^'"]*)\1\s*\)/g)];
+  return requires.some((m) => {
+    const target = path.resolve(path.dirname(file), m[2]);
+    return target === WRAPPER || `${target}.js` === WRAPPER;
+  });
+}
+
+/** The files among `files` ({ file: source }) that do not load the wrapper. */
+const withoutWrapper = (files) =>
+  Object.entries(files)
+    .filter(([file, source]) => !loadsWrapper(file, source))
+    .map(([file]) => path.relative(REAL, file).split(path.sep).join('/'));
+
+test('the wrapper check names a test file that does not load timeout.js', () => {
+  const t = (rel) => path.join(TOOLS, rel);
+  const found = withoutWrapper({
+    [t('test/ok-a.test.js')]: "const test = require('./timeout');",
+    [t('lint/test/ok-b.test.js')]: 'const test = require("../../test/timeout");',
+    [t('test/ok-c.test.js')]: "const test = require('./timeout.js');",
+    [t('test/bad-plain.test.js')]: "const test = require('node:test');",
+    [t('test/bad-scratch.test.js')]: "const { git } = require('./scratch');",
+    [t('lint/test/bad-wrong.test.js')]: "const test = require('./timeout');", // lint/test has no timeout.js
+  });
+  assert.deepEqual(found, [
+    'tools/test/bad-plain.test.js',
+    'tools/test/bad-scratch.test.js',
+    'tools/lint/test/bad-wrong.test.js',
+  ]);
+});
+
+test('every tools/**/*.test.js loads the timeout wrapper (so GIT_* is cleared)', () => {
+  const files = toolsTestFiles();
+  assert.ok(files.length > 20, 'the walk found the tools test files');
+  const sources = Object.fromEntries(files.map((f) => [f, fs.readFileSync(f, 'utf8')]));
+  assert.deepEqual(
+    withoutWrapper(sources),
+    [],
+    "these test files do not require('./timeout') (tools/test/timeout.js): add it",
+  );
 });

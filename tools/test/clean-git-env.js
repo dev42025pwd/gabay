@@ -1,6 +1,6 @@
 // Git's per-repository environment variables, and how the tests get rid of them.
 //
-// Incident (2026-10-09): `git push` from a linked worktree runs the pre-push hook with GIT_DIR set (an
+// Incident INC-001 (2026-10-09): `git push` from a linked worktree runs the pre-push hook with GIT_DIR set (an
 // absolute path into .git/worktrees/<name>). Everything the hook starts inherits it, including the tests
 // that build scratch repositories: their `git init`, `commit` and `config` then hit the REAL repository.
 // git's own documentation (`git help githooks`, "Environment variables ... should clear these environment
