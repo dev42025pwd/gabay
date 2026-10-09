@@ -1,6 +1,6 @@
 # Gabay — Working Agreement
 
-> **Version**: 1.14 (1.13, §5 amended by L151, arrives with S1's pull request) | **Date**: 2026-10-09 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136; §1 amended by L139; §6 amended by L140; §6 amended for coder working copies, plan/PH1-worktrees.md 1.1 and 1.2, L147, L148, L150; §6 amended by L152) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
+> **Version**: 1.14 | **Date**: 2026-10-09 | **Status**: in force (plan.html L121; §8 added by L122; §2 and §7 amended by L123, L124, L125; §6 amended by L129, L130; §1 amended by L131; §2 and §7 amended by L135, L136; §1 amended by L139; §6 amended by L140; §6 amended for coder working copies, plan/PH1-worktrees.md 1.1 and 1.2, L147, L148, L150; §5 amended by L151; §6 amended by L152) | **Audience**: Claude Code, every agent in `.claude/agents/`, and anyone working on Gabay | **Scope**: how work is decided, done, proven and recorded. What "done" means is `docs/product/FEATURE_PIPELINE.md` §5; the review passes are `REVIEW.md`; the engineering rules are the Dynamiq standard and `CLAUDE.md`.
 
 The product owner set these rules so they never have to be repeated. When the product owner rules something new about *how we work*, it goes here (or in `CLAUDE.md` if it is an absolute rule) in the same turn, with its L-row.
 
@@ -54,6 +54,7 @@ If something was not run, say so. If a step was skipped, say so. A partial resul
 - A flaky test is a failure: no retry until green, no skip.
 - A fixed bug gets a regression test where possible, and its header names the bug.
 - No coverage percentage: coverage is criterion-to-test traceability.
+- API tests may write real tables only inside a transaction that is always rolled back (real keys and constraints apply; nothing is kept; L151). Otherwise tests use TEMP tables, and no test leaves a row behind.
 
 ## 6. Hooks: what enforces this (L121; built in Phase 1)
 
