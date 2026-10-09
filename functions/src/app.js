@@ -1,8 +1,8 @@
 // The Express app, built in the standard's load-bearing order (§3.1; plan/PH1-rails.md S2):
 //
 //   trust proxy -> x-powered-by off -> helmet -> cors allow-list -> JSON body limit
-//   -> requestId -> actorContext (slot) -> audit logger (slot) -> /api no-store
-//   -> rate limiter (slot) -> routes -> 404 -> errors
+//   -> requestId -> actorContext -> audit logger (slot) -> /api no-store
+//   -> rate limiter (slot) -> routes (public first, then each group behind auth: routes/api.js) -> 404 -> errors
 //
 // Cloud Functions owns TLS, the server and listen(), so the standard's TLS options, static files,
 // SPA fallback and "connect, then listen" do not apply (plan §6). createApp() returns the app and
@@ -15,11 +15,16 @@ const cors = require('cors');
 
 const { getConfig } = require('./config');
 const { getDb } = require('./db');
+const { createSettings } = require('./config/settings');
 const { createLogger } = require('./utils/logger');
 const { createErrorHandler, notFound } = require('./utils/errors');
 const { createRequestId } = require('./middleware/requestId');
 const { actorContext } = require('./middleware/actorContext');
-const { healthRoutes } = require('./routes/health');
+const { createAuth } = require('./middleware/auth');
+const { createFirebaseVerifier } = require('./auth/firebaseVerifier');
+const { createIdentityStore } = require('./auth/identityStore');
+const { createAccessStore } = require('./auth/accessStore');
+const { apiRoutes } = require('./routes/api');
 
 /** Response headers a browser page may read: the request id, so a user can quote it in a report. */
 const EXPOSED_HEADERS = ['X-Request-Id'];
@@ -64,11 +69,17 @@ function rateLimiterSlot(req, res, next) {
  * @param {ReturnType<typeof getConfig>} [deps.config]
  * @param {ReturnType<typeof getDb>} [deps.db]
  * @param {ReturnType<typeof createLogger>} [deps.logger]
+ * @param {{verifyIdToken: Function}} [deps.tokenVerifier]  the Firebase ID-token check (tests inject a double)
+ * @param {{getSetting: Function}} [deps.settings]  runtime settings; by default over the same db
+ * @param {() => number} [deps.now]  clock in milliseconds, for the token-age check
  */
 function createApp({
   config = getConfig(),
   db = getDb(),
   logger = createLogger(config.logLevel),
+  tokenVerifier = createFirebaseVerifier(config.firebase), // lazy: no Firebase app until the first token
+  settings = createSettings((text, params) => db.query(text, params), logger),
+  now = Date.now,
 } = {}) {
   const app = express();
 
@@ -78,12 +89,18 @@ function createApp({
   app.use(corsMiddleware(config, logger));
   app.use(express.json({ limit: config.maxJsonBody })); // never a blanket 50 MB; big files go through multer
   app.use(createRequestId(logger));
-  app.use(actorContext); // the actor is null until Phase 2 sign-in (L126)
+  app.use(actorContext); // the actor is null until auth (below, per route group) binds the verified user (L126)
   app.use(auditLoggerSlot);
   app.use('/api', apiNoStore);
   app.use('/api', rateLimiterSlot);
 
-  app.use('/api', healthRoutes(db, logger));
+  const auth = createAuth({
+    verifier: tokenVerifier,
+    identities: createIdentityStore(db),
+    settings,
+    now,
+  });
+  app.use('/api', apiRoutes({ db, logger, auth, accessStore: createAccessStore(db) }));
 
   app.use(notFound);
   app.use(createErrorHandler(logger));

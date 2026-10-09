@@ -263,6 +263,10 @@
                                release builds strip the module.
         liveStatus.overlay     module gate, fail closed (L28, P1).
         auth.singleSession     behaviour toggle (standard §3.3).
+        auth.idTokenMaxAgeS    number of seconds, default 3600 (P2-S1; DESIGN CHOICE: Firebase's own ID-token
+                               lifetime, so the setting can only tighten). Read for the platform. Fails closed:
+                               a token older than this is refused with 401; a value that is not a positive
+                               number is ignored and the default applies.
 </cross_cutting_invariants>
 ```
 
@@ -648,6 +652,10 @@ The items below fill gaps that no ruling covered. Each is a **DESIGN CHOICE, not
   - **Range and reliability:** each night the model re-forecasts the last 4 weeks from their own past and measures the error (weighted absolute percentage error, WAPE). The range is the 10th to 90th percentile of those errors around the expected value. A metric is shown only once it has `forecast.minHistoryDays` (56) of history and its WAPE is within `forecast.maxErrorPct` (30, L109), always with the range, the error and "based on shoppers who opted in". Otherwise the card says it is still learning and why.
   - **Inputs:** `Holiday` (national rows by Gabay staff from the yearly proclamations, local rows by the mall), `MallEvent` (entered by the mall admin) and `FootfallCount` (CSV upload, format OQ18). Weather is dropped for now (L109). A store's forecast is withheld under the same `analytics.minGroupN` rule.
   - **Gate:** app-visit forecasts read the roll-up, so they wait for the L42 gate. The footfall forecast uses no shopper data and can run as soon as counts are uploaded.
+- **4.14 Identity and access (anchor; Phase 2, `plan/PH2-identity.md`, L149):** sign-in is Firebase Auth's (E-08); the API only verifies the ID token. Built so far (P2-S1):
+  - **`auth` middleware** (`functions/src/middleware/auth.js`; `src/auth/`): `Authorization: Bearer <ID token>`, verified with `firebase-admin` with revocation checked, in development against the Auth emulator (`FIREBASE_AUTH_EMULATOR_HOST`, refused in production). The UID resolves to an `AppUser` or a `ShopperAccount` (Q12); admin routes accept only an `AppUser` (`requireAdminUser`). Token age is `now − iat` against the setting `auth.idTokenMaxAgeS`. Refusals: 401 for no or bad header, a bad, expired or revoked token, a token that is too old, or an inactive `AppUser`; 403 for a valid identity with no Gabay account (or a shopper on an admin route); 503 when Firebase or the database cannot be reached. It binds the `AppUser` id as the actor (`runWithActor`); `req.user` carries no tenant (rule 2).
+  - **`GET /api/me`** (auth, admin only): `{ user: {userId, email, displayName}, isSuperAdmin, platformRoles: [code], tenants: [{tenantId, code, name, isActive, roles: [code], permissions: { <routeKey>: {create, read, update, delete} }}] }`. The tenants are the user's `UserRole` rows (L121). Permissions are merged per tenant by `src/auth/permissionMerge.js`: role rows OR-ed (platform roles apply in every tenant), a `UserPermission` row replaces the merged role row for its route, and a route with no row is absent (not granted). `isSuperAdmin` flags SUPERADMIN, which bypasses the rows (Q8). The `PermissionRoute` and default `RolePermission` rows arrive with migration `0001` (P2-S3).
+  - Still to come, in `PH2-identity.md`: tenant context (S2), guards (S3), audit (S4), rate limits (S5), validation (S6), the admin API (S7).
 
 ## Part 5 — MVP Development & Release Roadmap
 *Written in the P1 Founding Build step, identical to PRD §9 row for row.*
