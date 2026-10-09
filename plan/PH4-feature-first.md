@@ -62,6 +62,7 @@ Each slice runs the full pipeline in the coder's working copy and goes to you as
 
 | Slice | Pipeline entries (map step) | Coders | What you can run and see after it (localhost) |
 |---|---|---|---|
+| FF-SK | **P0-16** Role dashboards (L157), after FF-0 | flutter-coder (registry, shells, switcher, placeholders), api-coder (the act-as header) | Every role's dashboard on the admin page via the development switcher, and the shopper app's four tabs, with "Under development" pages for every module not yet built |
 | FF-1 | **P0-01** Venue, building and level setup (1) | api-coder (routes, service), flutter-coder (admin screens) | In the admin page in your browser: create a venue, its buildings and levels with real dimensions; lists with search and "Load more"; pick a building type from the seeded list |
 | FF-2 | **P0-02** Test venue seeds, finished (2) | api-coder | Demo Malls' four malls and the penthouse appear in the admin lists. Your spike exports when you provide them (L120) |
 | FF-S2 | **Spike 2** (the D7 measurement spike, throwaway; not a product slice) | engine-coder | A measurement report: package size, graph load and A* timing on a low-end Android phone. It sets P0-03's format choices and P0-06's latency target (Blueprint OQ6, L117) |
