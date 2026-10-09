@@ -52,6 +52,16 @@ if [ -n "$dirty" ]; then
   exit 1
 fi
 
+# Git exports its repository variables to a hook (GIT_DIR, GIT_PREFIX, GIT_COMMON_DIR, ...; in a linked
+# worktree GIT_DIR is an absolute path into .git/worktrees/<name>), and everything verify starts inherits
+# them. verify's tests build scratch repositories, and with GIT_DIR set their git commands hit THIS
+# repository instead (incident 2026-10-09: core.bare=true, test commits and branches in the real repo).
+# `git help githooks` says a hook that works with another repository or working tree should clear these
+# variables, and gives the idiom below; cwd is the working tree root, so git finds the repository itself,
+# exactly as in a hand-run `npm run verify`.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars)
+
 . "$root/.githooks/node.sh"
 gabay_node tools/verify.js </dev/null
 status=$?
