@@ -14,7 +14,13 @@ function meRoutes(accessStore) {
   router.get('/', async (req, res, next) => {
     try {
       const access = await accessStore.loadForUser(req.user.userId);
-      res.json(buildAccessProfile({ user: req.user, ...access }));
+      res.json(
+        buildAccessProfile({
+          user: req.user,
+          ...access,
+          warn: (fields, message) => req.log?.warn(fields, message),
+        }),
+      );
     } catch (err) {
       next(err);
     }

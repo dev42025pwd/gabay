@@ -1,16 +1,16 @@
 'use strict';
 
 // P2-S1: the setting the token-age check reads. Blueprint invariant 16: a key must be listed in DEFAULTS before it
-// is used. The default is a DESIGN CHOICE (the Blueprint names the setting but gives no value): 3600 s, the
-// lifetime Firebase gives every ID token, so the setting can only make the limit tighter, never looser.
+// is used. The owner ruled (P2-S1 review, I3): the setting is the time since sign-in (now minus auth_time), default
+// 28800 s (8 h, the session length of standard §3.3).
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { DEFAULTS, PUBLIC_FLAGS, createSettings } = require('../src/config/settings');
 const { fakeLogger } = require('./helpers');
 
-test('settings: auth.idTokenMaxAgeS is a known key with a default of 3600 seconds', () => {
-  assert.equal(DEFAULTS['auth.idTokenMaxAgeS'], 3600);
+test('settings: auth.idTokenMaxAgeS is a known key with a default of 28800 seconds', () => {
+  assert.equal(DEFAULTS['auth.idTokenMaxAgeS'], 28800);
   assert.equal(typeof DEFAULTS['auth.idTokenMaxAgeS'], 'number');
 });
 
@@ -25,5 +25,5 @@ test('settings: a platform row for auth.idTokenMaxAgeS is read as a number, and 
   const good = createSettings(async () => rows('900'), fakeLogger());
   assert.equal(await good.getSetting('auth.idTokenMaxAgeS', null), 900);
   const bad = createSettings(async () => rows('about an hour'), fakeLogger());
-  assert.equal(await bad.getSetting('auth.idTokenMaxAgeS', null), 3600);
+  assert.equal(await bad.getSetting('auth.idTokenMaxAgeS', null), 28800);
 });

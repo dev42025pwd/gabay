@@ -42,10 +42,13 @@ test('merge: role rows are OR-ed per route across the roles held', () => {
     ],
     userPermissions: [],
   });
-  assert.deepEqual(merged, {
-    venues: flags(true, true, false, false),
-    beacons: flags(false, true, false, false),
-  });
+  assert.deepEqual(
+    { ...merged },
+    {
+      venues: flags(true, true, false, false),
+      beacons: flags(false, true, false, false),
+    },
+  );
 });
 
 test('merge: only the roles named count (another role id is ignored)', () => {
@@ -57,7 +60,7 @@ test('merge: only the roles named count (another role id is ignored)', () => {
     ],
     userPermissions: [],
   });
-  assert.deepEqual(merged, { venues: flags(false, true, false, false) });
+  assert.deepEqual({ ...merged }, { venues: flags(false, true, false, false) });
 });
 
 test('merge: a user row replaces the merged role row, it is not OR-ed with it', () => {
@@ -84,19 +87,37 @@ test('merge: a user row can grant a route no role mentions', () => {
     rolePermissions: [],
     userPermissions: [up('settings', false, true, true, false)],
   });
-  assert.deepEqual(merged, { settings: flags(false, true, true, false) });
+  assert.deepEqual({ ...merged }, { settings: flags(false, true, true, false) });
 });
 
-test('merge: no rows at all is an empty object, and a route named __proto__ is an ordinary key', () => {
+test('merge: no rows at all is an empty map; the map has no prototype, so "constructor" and "toString" are not routes (N8)', () => {
   const merged = mergeRoutePermissions({ roleIds: [], rolePermissions: [], userPermissions: [] });
-  assert.deepEqual(merged, {});
-  const odd = mergeRoutePermissions({
+  assert.deepEqual({ ...merged }, {});
+  assert.equal(Object.getPrototypeOf(merged), null);
+  for (const name of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+    assert.equal(name in merged, false, name);
+    assert.equal(Object.hasOwn(merged, name), false, name);
+    assert.equal(merged[name], undefined, name);
+  }
+});
+
+test('merge: a route that really is named __proto__ or constructor is an ordinary own key, and nothing else is touched', () => {
+  const merged = mergeRoutePermissions({
     roleIds: [1],
-    rolePermissions: [rp(1, '__proto__', true, true, true, true)],
+    rolePermissions: [
+      rp(1, '__proto__', true, true, true, true),
+      rp(1, 'constructor', false, true, false, false),
+    ],
     userPermissions: [],
   });
-  assert.equal(Object.getPrototypeOf(odd), Object.prototype, 'the prototype is not replaced');
-  assert.deepEqual(Object.keys(odd), ['__proto__'], 'it is an ordinary own key');
+  assert.equal(Object.getPrototypeOf(merged), null);
+  assert.deepEqual(Object.keys(merged).sort(), ['__proto__', 'constructor']);
+  assert.deepEqual(merged.constructor, flags(false, true, false, false));
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(merged)).constructor,
+    flags(false, true, false, false),
+  );
+  assert.equal({}.polluted, undefined);
 });
 
 const USER = { userId: 7, email: 'a@x.test', displayName: 'A' };
@@ -107,6 +128,7 @@ const role = (roleId, roleCode, tenantId, extra = {}) => ({
   tenantCode: tenantId === null ? null : `T${tenantId}`,
   tenantName: tenantId === null ? null : `Tenant ${tenantId}`,
   tenantIsActive: tenantId === null ? null : true,
+  isPlatformRole: tenantId === null, // the normal shape: a NULL-tenant row holds a platform role
   ...extra,
 });
 
@@ -196,10 +218,13 @@ test('profile: platform role rows apply inside each tenant', () => {
     userPermissions: [],
   });
   assert.deepEqual(profile.platformRoles, ['AUDITOR']);
-  assert.deepEqual(profile.tenants[0].permissions, {
-    audit: flags(false, true, false, false),
-    venues: flags(false, true, false, false),
-  });
+  assert.deepEqual(
+    { ...profile.tenants[0].permissions },
+    {
+      audit: flags(false, true, false, false),
+      venues: flags(false, true, false, false),
+    },
+  );
 });
 
 test('profile: an inactive tenant is shown with isActive false (the client and tenantContext decide)', () => {
@@ -222,4 +247,68 @@ test('profile: a user with no roles has no tenants, no platform roles and is not
   assert.deepEqual(profile.tenants, []);
   assert.deepEqual(profile.platformRoles, []);
   assert.equal(profile.isSuperAdmin, false);
+});
+
+const collect = () => {
+  const warnings = [];
+  return { warnings, warn: (fields, message) => warnings.push([fields, message]) };
+};
+
+test('profile (I2): a NULL-tenant row counts as platform only when the role is flagged IsPlatformRole', () => {
+  const profile = buildAccessProfile({
+    user: USER,
+    roles: [role(1, SUPERADMIN_ROLE_CODE, null, { isPlatformRole: true })],
+    rolePermissions: [],
+    userPermissions: [],
+  });
+  assert.equal(profile.isSuperAdmin, true);
+  assert.deepEqual(profile.platformRoles, [SUPERADMIN_ROLE_CODE]);
+});
+
+test('profile (I2): the code SUPERADMIN on a NULL-tenant row whose role is NOT flagged platform is no super admin; ignored and warned', () => {
+  const log = collect();
+  const profile = buildAccessProfile({
+    user: USER,
+    roles: [role(1, SUPERADMIN_ROLE_CODE, null, { isPlatformRole: false })],
+    rolePermissions: [],
+    userPermissions: [],
+    warn: log.warn,
+  });
+  assert.equal(profile.isSuperAdmin, false);
+  assert.deepEqual(profile.platformRoles, []);
+  assert.deepEqual(profile.tenants, []);
+  assert.equal(log.warnings.length, 1);
+  assert.deepEqual(log.warnings[0][0], { userId: 7, roleId: 1, roleCode: SUPERADMIN_ROLE_CODE });
+});
+
+test('profile (I2): a non-platform role on a NULL-tenant row is ignored everywhere (not a platform role, not in a tenant) and warned with ids only', () => {
+  const log = collect();
+  const profile = buildAccessProfile({
+    user: USER,
+    roles: [role(3, 'VIEWER', null, { isPlatformRole: false }), role(2, 'MALL_ADMIN', 1)],
+    rolePermissions: [
+      rp(3, 'audit', true, true, true, true),
+      rp(2, 'venues', false, true, false, false),
+    ],
+    userPermissions: [],
+    warn: log.warn,
+  });
+  assert.deepEqual(profile.platformRoles, []);
+  assert.deepEqual(
+    { ...profile.tenants[0].permissions },
+    { venues: flags(false, true, false, false) },
+  );
+  assert.equal(log.warnings.length, 1);
+  const logged = JSON.stringify(log.warnings);
+  assert.doesNotMatch(logged, /a@x.test|"A"/, 'no email or name in the warning');
+});
+
+test('profile (I2): with no warn function the bad row is still ignored (no crash)', () => {
+  const profile = buildAccessProfile({
+    user: USER,
+    roles: [role(3, 'VIEWER', null, { isPlatformRole: false })],
+    rolePermissions: [],
+    userPermissions: [],
+  });
+  assert.deepEqual(profile.platformRoles, []);
 });

@@ -5,6 +5,12 @@
 // are platform-scoped), so these queries carry no tenant predicate and the tenant-predicate lint has nothing to check.
 'use strict';
 
+// DESIGN CHOICE (for the product owner to rule): when a UID is in AppUser, that wins and ShopperAccount is not
+// consulted. The UID is unique within each table, but Firebase could in principle issue one person both kinds of
+// account; AppUser first means a staff identity is never downgraded to a shopper one. Alternative: refuse the
+// sign-in when both exist. ShopperAccount.DeletionRequestedAt (a shopper who asked for deletion) is not looked at
+// here: it belongs to the shopper sign-in and deletion path of P0-10.
+
 /** Longest Firebase UID (the SDK itself refuses longer; db/schema.sql: VARCHAR(128)). */
 const MAX_UID_LENGTH = 128;
 

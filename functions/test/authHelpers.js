@@ -145,12 +145,16 @@ function createSeeder(db, tag = uniqueTag()) {
         name: `Tenant ${label} ${tag}`,
       };
     },
-    /** The role with this code: the seeded one if the database has it, else created here (rolled back at the end). */
+    /**
+     * The role with this code: the seeded one if the database has it (read only, so no seeded row is locked), else
+     * created here (rolled back at the end). isActive and isPlatformRole apply only when it is created.
+     */
     async role(code, { isActive = true, isPlatformRole = false } = {}) {
+      const found = await first(db, `SELECT RoleId FROM gabay.Role WHERE Code = $1`, [code]);
+      if (found) return found.roleid;
       const row = await first(
         db,
-        `INSERT INTO gabay.Role (Code, Label, IsPlatformRole, IsActive) VALUES ($1, $1, $2, $3)
-         ON CONFLICT (Code) DO UPDATE SET IsActive = EXCLUDED.IsActive RETURNING RoleId`,
+        `INSERT INTO gabay.Role (Code, Label, IsPlatformRole, IsActive) VALUES ($1, $1, $2, $3) RETURNING RoleId`,
         [code, isPlatformRole, isActive],
       );
       return row.roleid;
@@ -208,7 +212,30 @@ function createSeeder(db, tag = uniqueTag()) {
   };
 }
 
+/**
+ * Everything a fakeLogger recorded as one string, with Error objects opened up (name, message, stack, own fields,
+ * cause), because JSON.stringify shows an Error as {} and a leak inside one would go unseen.
+ */
+function loggedText(calls) {
+  const seen = new WeakSet();
+  return JSON.stringify(calls, function open(_key, value) {
+    if (value instanceof Error) {
+      if (seen.has(value)) return '[circular]';
+      seen.add(value);
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack,
+        ...value,
+        cause: value.cause,
+      };
+    }
+    return value;
+  });
+}
+
 module.exports = {
+  loggedText,
   EMULATOR_PROJECT,
   nowSeconds,
   unsignedIdToken,

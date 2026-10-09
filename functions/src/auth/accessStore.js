@@ -15,7 +15,7 @@ function createAccessStore(db) {
       // chosen for a request (tenantContext, S2, checks the chosen tenant against these same rows).
       const roles = await db.query(
         // tenant-scope: reads the user's own UserRole rows by UserId; a user's tenants are those rows (L121), no tenant is chosen yet
-        `SELECT ur.RoleId, r.Code AS RoleCode, ur.TenantId,
+        `SELECT ur.RoleId, r.Code AS RoleCode, r.IsPlatformRole, ur.TenantId,
                 t.Code AS TenantCode, t.Name AS TenantName, t.IsActive AS TenantIsActive
            FROM gabay.UserRole ur
            JOIN gabay.Role r ON r.RoleId = ur.RoleId
@@ -28,6 +28,7 @@ function createAccessStore(db) {
       const roleRows = roles.rows.map((row) => ({
         roleId: row.roleid,
         roleCode: row.rolecode,
+        isPlatformRole: row.isplatformrole,
         tenantId: row.tenantid,
         tenantCode: row.tenantcode,
         tenantName: row.tenantname,

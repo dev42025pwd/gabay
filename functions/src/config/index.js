@@ -72,6 +72,8 @@ const schema = z.object({
 
 /** The Auth emulator's project (CLAUDE.md: demo-gabay), used when an emulator host is set and no project ID is. */
 const EMULATOR_PROJECT_ID = 'demo-gabay';
+/** The only NODE_ENV values, as written in the raw environment, under which an Auth emulator host is accepted. */
+const EMULATOR_ALLOWED_ENVS = Object.freeze(['development', 'test']);
 
 /** Pure: validates an env-like object and returns the config, or throws ConfigError. */
 function parseConfig(env) {
@@ -84,11 +86,13 @@ function parseConfig(env) {
     );
   }
   const e = result.data;
-  // An emulator host makes the Admin SDK accept UNSIGNED tokens: one leaking into production would let anyone
-  // forge a sign-in. Refuse to start rather than rely on a person noticing.
-  if (e.NODE_ENV === 'production' && e.FIREBASE_AUTH_EMULATOR_HOST) {
+  // An emulator host makes the Admin SDK accept UNSIGNED tokens: one leaking into a deployed function would let anyone
+  // forge a sign-in. So it is allowed only when the RAW environment says NODE_ENV=development or NODE_ENV=test
+  // (owner's ruling, P2-S1 review I1). An unset NODE_ENV does not count: zod defaults it to development, and a
+  // deployed function that forgot NODE_ENV must not be mistaken for a developer's machine.
+  if (e.FIREBASE_AUTH_EMULATOR_HOST && !EMULATOR_ALLOWED_ENVS.includes(present.NODE_ENV)) {
     throw new ConfigError([
-      'FIREBASE_AUTH_EMULATOR_HOST: must not be set when NODE_ENV is production (the emulator accepts unsigned tokens)',
+      'FIREBASE_AUTH_EMULATOR_HOST: set only with NODE_ENV=development or NODE_ENV=test written explicitly in the environment (the emulator accepts unsigned tokens)',
     ]);
   }
   return Object.freeze({

@@ -20,14 +20,16 @@ const { createErrorHandler, httpError } = require('../src/utils/errors');
 const { getActorId, getTenantId } = require('../src/utils/requestContext');
 const { DEFAULTS } = require('../src/config/settings');
 const { listen, fakeLogger } = require('./helpers');
-const { fakeTokenVerifier } = require('./authHelpers');
+const { fakeTokenVerifier, loggedText } = require('./authHelpers');
+const { classifyVerifyError } = require('../src/auth/firebaseVerifier');
 
 const NOW_MS = 1_800_000_000_000;
 const NOW_S = NOW_MS / 1000;
 const MAX_AGE = DEFAULTS['auth.idTokenMaxAgeS'];
 
 const ADMIN = { kind: 'admin', userId: 11, email: 'a@x.test', displayName: 'Ann', isActive: true };
-const claimsAged = (uid, ageS) => ({ uid, iat: NOW_S - ageS, auth_time: NOW_S - ageS });
+// Age is measured from auth_time (sign-in), so iat is made recent on purpose: it must not matter.
+const claimsAged = (uid, ageS) => ({ uid, iat: NOW_S - 5, auth_time: NOW_S - ageS });
 
 function fakeIdentities(byUid = {}) {
   const asked = [];
@@ -213,11 +215,11 @@ test('auth: a setting that is not a positive number falls back to the default (n
   }
 });
 
-test('auth: a token with no usable iat is 401 "Invalid session"', async () => {
+test('auth: a token with no usable auth_time is 401 "Invalid session"', async () => {
   const verifier = fakeTokenVerifier({
-    none: { uid: 'uid-a' },
-    text: { uid: 'uid-a', iat: 'yesterday' },
-    nan: { uid: 'uid-a', iat: NaN },
+    none: { uid: 'uid-a', iat: NOW_S },
+    text: { uid: 'uid-a', iat: NOW_S, auth_time: 'yesterday' },
+    nan: { uid: 'uid-a', iat: NOW_S, auth_time: NaN },
   });
   const s = await mount({ verifier, identities: fakeIdentities({ 'uid-a': ADMIN }) });
   try {
@@ -232,7 +234,9 @@ test('auth: a token with no usable iat is 401 "Invalid session"', async () => {
 });
 
 test('auth: a token issued in the future (clock skew) is not refused for its age', async () => {
-  const verifier = fakeTokenVerifier({ skew: { uid: 'uid-a', iat: NOW_S + 30 } });
+  const verifier = fakeTokenVerifier({
+    skew: { uid: 'uid-a', iat: NOW_S + 30, auth_time: NOW_S + 30 },
+  });
   const s = await mount({ verifier, identities: fakeIdentities({ 'uid-a': ADMIN }) });
   try {
     assert.equal((await get(s, 'skew')).status, 200);
@@ -398,17 +402,48 @@ test('auth: a database that is down is 503, and any other lookup failure is a ge
   }
 });
 
-test('auth: the bearer token is never written to a log line', async () => {
+test('auth: the bearer token is never written to a log line, on the 200, 401 and 503 paths (errors and their causes included)', async () => {
   const secret = 'SECRET-TOKEN-VALUE-123';
   const verifier = fakeTokenVerifier({
     [secret]: claimsAged('uid-a', 5),
     'bad-SECRET-TOKEN-VALUE-123': httpError(401, 'Invalid session'),
+    // What the real verifier throws when Firebase is unreachable: a 503 that keeps the SDK's error as `cause`,
+    // and the error handler logs the whole error.
+    'down-SECRET-TOKEN-VALUE-123': classifyVerifyError(
+      Object.assign(new Error('Error while making request: connect ECONNREFUSED 127.0.0.1:9099'), {
+        code: 'app/network-error',
+      }),
+    ),
   });
   const s = await mount({ verifier, identities: fakeIdentities({ 'uid-a': ADMIN }) });
   try {
-    await get(s, secret);
-    await get(s, 'bad-SECRET-TOKEN-VALUE-123');
-    assert.doesNotMatch(JSON.stringify(s.logger.calls), /SECRET-TOKEN-VALUE/);
+    assert.equal((await get(s, secret)).status, 200);
+    assert.equal((await get(s, 'bad-SECRET-TOKEN-VALUE-123')).status, 401);
+    assert.equal((await get(s, 'down-SECRET-TOKEN-VALUE-123')).status, 503);
+    assert.ok(s.logger.calls.error.length > 0, 'the 503 path really did log an error');
+    const logged = loggedText(s.logger.calls);
+    assert.match(
+      logged,
+      /ECONNREFUSED/,
+      'the cause is in what was serialised, so the check is not vacuous',
+    );
+    assert.doesNotMatch(logged, /SECRET-TOKEN-VALUE/);
+  } finally {
+    await s.close();
+  }
+});
+
+test('auth: age counts from sign-in (auth_time): a refreshed token (old sign-in is fine, new iat) is accepted, an old sign-in is not', async () => {
+  const verifier = fakeTokenVerifier({
+    refreshed: { uid: 'uid-a', iat: NOW_S - 1, auth_time: NOW_S - (MAX_AGE - 60) },
+    stale: { uid: 'uid-a', iat: NOW_S - 1, auth_time: NOW_S - (MAX_AGE + 60) },
+  });
+  const s = await mount({ verifier, identities: fakeIdentities({ 'uid-a': ADMIN }) });
+  try {
+    assert.equal((await get(s, 'refreshed')).status, 200);
+    const stale = await get(s, 'stale');
+    assert.equal(stale.status, 401);
+    assert.deepEqual(await stale.json(), { error: 'Session expired' });
   } finally {
     await s.close();
   }

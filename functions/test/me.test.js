@@ -15,7 +15,15 @@ const { createApp } = require('../src/app');
 const { createSettings } = require('../src/config/settings');
 const { httpError } = require('../src/utils/errors');
 const { testConfig, fakeLogger, listen } = require('./helpers');
-const { fakeTokenVerifier, openRolledBackDb, createSeeder } = require('./authHelpers');
+const {
+  fakeTokenVerifier,
+  fakeIdentityToolkit,
+  unsignedIdToken,
+  loggedText,
+  nowSeconds,
+  openRolledBackDb,
+  createSeeder,
+} = require('./authHelpers');
 
 const NOW_MS = 1_800_000_000_000;
 const NOW_S = NOW_MS / 1000;
@@ -69,17 +77,16 @@ test('GET /api/me: no token is 401, a bad token is 401, both in the { error } sh
   });
 });
 
-test('GET /api/me: a revoked token (the verifier refuses it) is 401 even though the user is fine', async () => {
-  await withApp(
-    async (ctx) => {
-      const user = await ctx.seed.user();
-      ctx.verify.revoked = httpError(401, 'Invalid session');
-      const res = await ctx.call('/api/me', { token: 'revoked' });
-      assert.equal(res.status, 401);
-      assert.ok(user.userId);
-    },
-    { verify: {} },
-  );
+test('GET /api/me: a refusal by the verifier alone decides: the same token is 401 while it is refused and 200 once it is not, for an active user', async () => {
+  await withApp(async (ctx) => {
+    const user = await ctx.seed.user();
+    ctx.verify.tok = httpError(401, 'Invalid session'); // what the real verifier throws for a revoked token
+    const refused = await ctx.call('/api/me', { token: 'tok' });
+    assert.equal(refused.status, 401);
+    assert.deepEqual(await refused.json(), { error: 'Invalid session' });
+    ctx.verify.tok = fresh(user.uid);
+    assert.equal((await ctx.call('/api/me', { token: 'tok' })).status, 200);
+  });
 });
 
 test('GET /api/me: an inactive user is 401 "Account is not active"', async () => {
@@ -305,31 +312,31 @@ test('GET /api/me: the token age limit is read from GlobalSetting auth.idTokenMa
       'INSERT INTO gabay.GlobalSetting (TenantId, SettingKey, SettingValue) VALUES (NULL, $1, $2)',
       ['auth.idTokenMaxAgeS', '120'],
     );
-    const user = await signedInAdmin(ctx); // iat is 60 s old: inside 120
+    const user = await signedInAdmin(ctx); // auth_time is 60 s old: inside 120
     assert.equal((await ctx.call('/api/me', { token: user.token })).status, 200);
-    ctx.verify[user.token] = { uid: user.uid, iat: NOW_S - 121 }; // just outside
+    ctx.verify[user.token] = { uid: user.uid, iat: NOW_S - 5, auth_time: NOW_S - 121 }; // just outside
     const res = await ctx.call('/api/me', { token: user.token });
     assert.equal(res.status, 401);
     assert.deepEqual(await res.json(), { error: 'Session expired' });
   });
 });
 
-test('GET /api/me: the default limit (3600 s) applies when no row exists', async () => {
+test('GET /api/me: the default limit (28800 s, 8 h) applies when no row exists', async () => {
   await withApp(async (ctx) => {
     await ctx.db.query(
       'DELETE FROM gabay.GlobalSetting WHERE TenantId IS NULL AND SettingKey = $1',
       ['auth.idTokenMaxAgeS'],
     );
     const user = await signedInAdmin(ctx);
-    ctx.verify[user.token] = { uid: user.uid, iat: NOW_S - 3600 };
+    ctx.verify[user.token] = { uid: user.uid, iat: NOW_S - 5, auth_time: NOW_S - 28800 };
     assert.equal((await ctx.call('/api/me', { token: user.token })).status, 200);
-    ctx.verify[user.token] = { uid: user.uid, iat: NOW_S - 3601 };
+    ctx.verify[user.token] = { uid: user.uid, iat: NOW_S - 5, auth_time: NOW_S - 28801 };
     assert.equal((await ctx.call('/api/me', { token: user.token })).status, 401);
   });
 });
 
 test('GET /api/me: a database that is down is 503, a broken query is a generic 500 (no driver text)', async () => {
-  const claims = { uid: 'uid-x', iat: NOW_S - 5 };
+  const claims = { uid: 'uid-x', iat: NOW_S - 5, auth_time: NOW_S - 5 };
   const down = {
     query: async () => {
       throw Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), {
@@ -392,4 +399,74 @@ test('an unauthenticated /api/health still works when the verifier would refuse 
     assert.equal(res.status, 200);
     assert.deepEqual(tokenVerifier.seen, [], 'the public route never reaches the verifier');
   });
+});
+
+test('GET /api/me (I2): a non-platform role on a NULL-tenant row grants nothing and is logged as a warning with ids only', async () => {
+  await withApp(async (ctx) => {
+    const { seed } = ctx;
+    const viewer = await seed.role('VIEWER');
+    const venues = await seed.route('venues');
+    await seed.rolePermission(viewer, venues, [true, true, true, true]);
+    const user = await signedInAdmin(ctx, { name: 'Ned Nobody' });
+    await seed.userRole(user.userId, viewer, null); // bad data: VIEWER is not a platform role
+    const body = await (await ctx.call('/api/me', { token: user.token })).json();
+    assert.deepEqual([body.isSuperAdmin, body.platformRoles, body.tenants], [false, [], []]);
+    const warned = ctx.logger.calls.warn.filter(([fields]) => fields.roleId === viewer);
+    assert.equal(warned.length, 1);
+    assert.equal(warned[0][0].userId, user.userId);
+    assert.doesNotMatch(loggedText(ctx.logger.calls), /Ned Nobody|gabay.test/);
+  });
+});
+
+test('GET /api/me (I4): the production wiring end to end: real firebase-admin (emulator mode) -> auth -> database -> /api/me', async () => {
+  const t = await openRolledBackDb();
+  const seed = createSeeder(t.db);
+  const user = await seed.user({ name: 'Wired Admin' });
+  const tenant = await seed.tenant('WIRED');
+  await seed.userRole(user.userId, await seed.role('VIEWER'), tenant.tenantId);
+  const toolkit = await fakeIdentityToolkit({ [user.uid]: {} });
+  const logger = fakeLogger();
+  // No tokenVerifier, settings or now injected: createApp builds its own, from the config alone.
+  const app = createApp({
+    config: testConfig({ FIREBASE_AUTH_EMULATOR_HOST: toolkit.host, NODE_ENV: 'test' }),
+    db: t.db,
+    logger,
+  });
+  const server = await listen(app);
+  const token = unsignedIdToken({ uid: user.uid, iat: nowSeconds() - 20 });
+  try {
+    const ok = await fetch(`${server.url}/api/me`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.deepEqual(body.user, {
+      userId: user.userId,
+      email: user.email,
+      displayName: 'Wired Admin',
+    });
+    assert.deepEqual(
+      body.tenants.map((x) => [x.tenantId, x.roles]),
+      [[tenant.tenantId, ['VIEWER']]],
+    );
+    assert.equal(
+      toolkit.requests.length,
+      1,
+      'the SDK asked Firebase about the user (revocation check)',
+    );
+
+    // The same wiring with Firebase gone: 503, and neither the token nor anything of the SDK error leaks.
+    await toolkit.close();
+    const down = await fetch(`${server.url}/api/me`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(down.status, 503);
+    assert.deepEqual(await down.json(), { error: 'Authentication service unavailable' });
+    assert.ok(logger.calls.error.length > 0, 'the failure was logged');
+    assert.doesNotMatch(loggedText(logger.calls), new RegExp(token.split('.')[1].slice(0, 30)));
+  } finally {
+    await server.close();
+    await toolkit.close().catch(() => {});
+    await t.close();
+  }
 });

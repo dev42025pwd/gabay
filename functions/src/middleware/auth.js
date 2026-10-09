@@ -35,7 +35,7 @@ async function maxTokenAgeS(settings) {
 
 /**
  * @param {object} deps
- * @param {{verifyIdToken: (token: string) => Promise<{uid: string, iat?: number}>}} deps.verifier
+ * @param {{verifyIdToken: (token: string) => Promise<{uid: string, auth_time?: number}>}} deps.verifier
  * @param {{findByFirebaseUid: (uid: string) => Promise<object|null>}} deps.identities
  * @param {{getSetting: (key: string, tenantId: null) => Promise<unknown>}} deps.settings
  * @param {() => number} [deps.now]  milliseconds, injected so a test fixes the clock
@@ -48,12 +48,13 @@ function createAuth({ verifier, identities, settings, now = Date.now }) {
 
       const claims = await verifier.verifyIdToken(match[1]); // throws 401 (token) or 503 (Firebase unreachable)
 
-      // Age: when THIS token was issued (iat), not when the user first signed in (auth_time), so a refreshed
-      // token is fine. A token from the future (clock skew) has a negative age and passes.
-      if (typeof claims.iat !== 'number' || !Number.isFinite(claims.iat)) {
+      // Age is the time since SIGN-IN (auth_time, which a token refresh does not change), not since this token was
+      // issued (iat): the setting is the session length (owner's ruling I3). A token with no auth_time is refused
+      // (fail closed). One from the future (clock skew) has a negative age and passes.
+      if (typeof claims.auth_time !== 'number' || !Number.isFinite(claims.auth_time)) {
         throw httpError(401, MSG.invalid);
       }
-      const ageS = now() / 1000 - claims.iat;
+      const ageS = now() / 1000 - claims.auth_time;
       if (ageS > (await maxTokenAgeS(settings))) throw httpError(401, MSG.expired);
 
       const identity = await identities.findByFirebaseUid(claims.uid);

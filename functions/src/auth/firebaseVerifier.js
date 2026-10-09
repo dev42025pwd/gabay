@@ -55,7 +55,10 @@ function createFirebaseVerifier({ projectId, authEmulatorHost }) {
 
   function service() {
     if (!auth) {
-      // The SDK reads the emulator host from the environment, at getAuth() time (see the header).
+      // The SDK reads the emulator host ONLY from this process-wide environment variable, at getAuth() time (see the
+      // header), so setting it affects the whole process, not just this verifier. That is safe here because config
+      // only ever gives a host under an explicit NODE_ENV of development or test (config/index.js, ruling I1), and
+      // every verifier in a process shares one config. It is left set: later Auth calls read it too.
       if (authEmulatorHost) process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
       appCounter += 1; // one named app per verifier: two verifiers in one process (tests) never share state
       app = initializeApp(projectId ? { projectId } : {}, `gabay-auth-${appCounter}`);

@@ -28,11 +28,11 @@ const DEFAULTS = Object.freeze({
   'analytics.sessionIdleS': 300,
   // Widest place, in metres, that counts for calibration (Blueprint 4.3, DC18).
   'calibration.maxPlaceM': 6,
-  // Oldest a Firebase ID token may be (now minus its iat, in seconds) before the API asks for a fresh one (Blueprint
-  // Part 1 routing_and_auth_constraints; P2-S1). DESIGN CHOICE: 3600 = the lifetime Firebase gives every ID token, so
-  // by default nothing extra is refused and the setting can only tighten the limit. Read for the platform (no tenant):
-  // auth runs before any tenant is chosen.
-  'auth.idTokenMaxAgeS': 3600,
+  // Longest a sign-in may last, in seconds: now minus the token's auth_time (the moment the user signed in, which a
+  // token refresh does not change). Older than this, the API answers 401 and the client signs the user out (Blueprint
+  // Part 1 routing_and_auth_constraints; P2-S1; owner's ruling I3). Default 28800 = 8 h, the session length of standard
+  // §3.3. Read for the platform (no tenant): auth runs before any tenant is chosen.
+  'auth.idTokenMaxAgeS': 28800,
 });
 
 /**
