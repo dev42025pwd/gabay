@@ -54,6 +54,13 @@ const RELEASE_RETRY_DELAY_MS = 20;
  * milliseconds, so 30 s is far past any live one, and short enough that a crashed clear blocks later runs briefly.
  */
 const CLAIM_STALE_MS = 30_000;
+/**
+ * ...but only when the run that holds the claim is gone (its pid is in the claim). A run that is alive may merely be
+ * paused between its re-read and its delete (a sleep, a debugger, a clock jump): breaking its claim would let another
+ * run clear the lock and take it, and the paused run would then delete that live lock (review N1, plan 1.1). A claim
+ * whose run is alive is broken only after this much longer age, for a run that is hung for good.
+ */
+const CLAIM_LIVE_STALE_MS = 10 * 60_000;
 
 /** Where the lock lives: GABAY_VERIFY_LOCK_FILE (a test seam), else the temp folder. */
 function lockFilePath(env = process.env) {
@@ -182,13 +189,18 @@ const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),
 
 /**
  * Takes the claim to clear a dead lock (plan/PH1-verify-lock-fix.md): created exclusively (a complete file hard-linked
- * into place, as the lock is), so only one run holds it. A claim older than CLAIM_STALE_MS belongs to a run that died
- * while clearing: it is removed with one line (rename to a name only this run uses, compare, delete; a claim that
+ * into place, as the lock is), so only one run holds it. A claim whose run is gone (its pid is in the claim) and that
+ * is older than CLAIM_STALE_MS, or whose run is alive and older than CLAIM_LIVE_STALE_MS, is removed with one line (rename to a name only this run uses, compare, delete; a claim that
  * turns out to be a fresh one of another run is linked back), and the caller tries again at once.
  * Returns { held: true }, { held: false } (another run is clearing: wait and judge afresh), { removedStale: true }
  * or { error } (the claim cannot be created: a folder this run cannot write).
  */
-function takeClaim(file, token, log) {
+function takeClaim(
+  file,
+  token,
+  log,
+  { staleMs = CLAIM_STALE_MS, liveStaleMs = CLAIM_LIVE_STALE_MS } = {},
+) {
   const claim = claimPath(file);
   try {
     const record = { token, pid: process.pid, startedAt: new Date().toISOString() };
@@ -204,7 +216,14 @@ function takeClaim(file, token, log) {
   } catch {
     return { held: false }; // gone, or in use this instant: look again next time
   }
-  if (ageMs < CLAIM_STALE_MS) return { held: false };
+  let holderPid;
+  try {
+    holderPid = JSON.parse(text).pid;
+  } catch {
+    // not a claim record: nobody can be waited for, so it counts as a run that is gone
+  }
+  const holderGone = !Number.isInteger(holderPid) || !pidExists(holderPid);
+  if (ageMs < (holderGone ? staleMs : liveStaleMs)) return { held: false };
   const moved = `${claim}.old.${process.pid}.${crypto.randomBytes(4).toString('hex')}`;
   try {
     fs.renameSync(claim, moved);
@@ -217,6 +236,12 @@ function takeClaim(file, token, log) {
   } catch {
     // unreadable now: treated as "not the claim that was judged"
   }
+  // N2 (reviewer): if the rename moved a FRESH claim of another run (it was created between the judgement and the
+  // rename) and a third run has created a claim since, the link-back below fails and two runs hold a claim. That needs
+  // a claim left by a dead run (rare), several runs judging it in the same milliseconds, and two more arriving in the
+  // microseconds around the rename. Even then each holder re-reads and judges the lock before removing it, so the
+  // harm is one more clearer, not a live lock removed unless a third run takes the lock in the same instants. Left as
+  // it is (closing it needs a claim on the claim); a stale claim is rare and this path rarer.
   if (movedText !== text) {
     try {
       fs.linkSync(moved, claim); // a fresh claim of another run: put it back
@@ -227,9 +252,10 @@ function takeClaim(file, token, log) {
     return { held: false };
   }
   fs.rmSync(moved, { force: true });
-  log(
-    `verify: removed a stale clearing claim (${Math.round(ageMs / 1000)} s old): the run that held it is gone`,
-  );
+  const why = holderGone
+    ? 'the run that held it is gone'
+    : `the run that held it is still running but has not finished in ${CLAIM_LIVE_STALE_MS / 60_000} min`;
+  log(`verify: removed a stale clearing claim (${Math.round(ageMs / 1000)} s old): ${why}`);
   return { removedStale: true };
 }
 
@@ -253,11 +279,12 @@ const isDead = (read) =>
  * rename-compare-link-back could remove it for an instant, and lose it when a third run created one in that instant).
  * Returns { cleared: true }, { changed: true } (it was not the lock judged; nothing was removed) or { error }.
  */
-function clearUnderClaim(file, judgedText) {
+async function clearUnderClaim(file, judgedText, afterReread) {
   const again = readLock(file);
   if (again.missing || again.error || again.text !== judgedText || !isDead(again)) {
     return { changed: true };
   }
+  await afterReread?.();
   try {
     fs.unlinkSync(file);
   } catch (err) {
@@ -274,7 +301,10 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * that waits only READS the lock until it is gone (no temp file at every poll).
  * `afterJudge` is a TEST SEAM: an async function called once a run has judged a lock dead and before it acts on it,
  * so a test can hold that run still while others act (the forced race in tools/test/verify-lock-fix.test.js).
- * @param {{ file: string, root: string, waitMs: number, reportMs?: number, pollMs?: number, owner?: string, log?: (line: string) => void, afterJudge?: (judgedText: string) => Promise<void> }} options
+ * `afterReread` is the same for a run that holds the claim: called after its second read, before its delete (a paused
+ * run). `claimStaleMs` and `claimLiveStaleMs` replace CLAIM_STALE_MS and CLAIM_LIVE_STALE_MS, so a test need not wait
+ * 30 s. None of the four is used outside tools/test.
+ * @param {{ file: string, root: string, waitMs: number, reportMs?: number, pollMs?: number, owner?: string, log?: (line: string) => void, afterJudge?: (judgedText: string) => Promise<void>, afterReread?: () => Promise<void>, claimStaleMs?: number, claimLiveStaleMs?: number }} options
  */
 async function acquireLock({
   file,
@@ -285,6 +315,9 @@ async function acquireLock({
   owner = ownerName(root),
   log = console.log,
   afterJudge,
+  afterReread,
+  claimStaleMs,
+  claimLiveStaleMs,
 }) {
   const record = {
     version: LOCK_VERSION,
@@ -314,13 +347,16 @@ async function acquireLock({
         ? `a stale lock held by ${holderText(current.record)}: that process no longer exists`
         : 'a stale lock (unreadable): its content is not a verify lock';
       await afterJudge?.(current.text);
-      const claim = takeClaim(file, record.token, log);
+      const claim = takeClaim(file, record.token, log, {
+        staleMs: claimStaleMs,
+        liveStaleMs: claimLiveStaleMs,
+      });
       if (claim.removedStale) continue; // a dead run's claim is gone: try for it again
       // Without the claim another run is clearing: wait, and judge afresh next time (never on what was read now).
       let result = claim.held ? undefined : { error: claim.error };
       if (claim.held) {
         try {
-          result = clearUnderClaim(file, current.text);
+          result = await clearUnderClaim(file, current.text, afterReread);
         } finally {
           releaseClaim(file, record.token);
         }

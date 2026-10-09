@@ -115,7 +115,7 @@ test('a clearing claim older than the limit (its run gone) is removed with one l
   const file = path.join(folder, 'old-claim.lock');
   try {
     fs.writeFileSync(file, JSON.stringify(holderRecord(await deadPid())));
-    fs.writeFileSync(claimOf(file), JSON.stringify({ token: 'crashed-run', pid: 1 }));
+    fs.writeFileSync(claimOf(file), JSON.stringify({ token: 'crashed-run', pid: await deadPid() }));
     const old = new Date(Date.now() - 120_000);
     fs.utimesSync(claimOf(file), old, old);
     const lines = [];
@@ -131,6 +131,83 @@ test('a clearing claim older than the limit (its run gone) is removed with one l
       lines.join('\n'),
     );
     assert.equal(fs.existsSync(claimOf(file)), false, 'its own claim is gone too');
+    releaseLock(got.handle, () => {});
+  } finally {
+    clean(folder);
+  }
+});
+
+// Review N1 (plan 1.1): the age alone broke a claim whose run was only PAUSED (a sleep, a debugger, a clock jump)
+// between its re-read and its delete; the waiter then cleared the lock and took it, and the paused run deleted
+// that new live lock. A claim is stale when its run is gone; a live run's claim only after a much longer age.
+test('a claim whose run is alive but paused past the stale age is not broken: the waiter waits, and the two never hold the lock together', async () => {
+  const folder = tempFolder();
+  const file = path.join(folder, 'paused.lock');
+  try {
+    fs.writeFileSync(file, JSON.stringify(holderRecord(await deadPid())));
+    const events = [];
+    let holding = 0;
+    let most = 0;
+    const entered = (who) => (got) => {
+      holding += 1;
+      most = Math.max(most, holding);
+      events.push(`in ${who}`);
+      return got;
+    };
+    const leave = (who, got) => {
+      holding -= 1;
+      events.push(`out ${who}`);
+      releaseLock(got.handle, () => {});
+    };
+    let reread;
+    const hasReread = new Promise((resolve) => (reread = resolve));
+    let resume;
+    const gate = new Promise((resolve) => (resume = resolve));
+    // X takes the claim, re-reads the dead lock and is held still, just before its delete. "30 s" is 150 ms here.
+    const x = acquireLock(
+      run(file, {
+        owner: 'X',
+        claimStaleMs: 150,
+        afterReread: async () => {
+          reread();
+          await gate;
+        },
+      }),
+    ).then(entered('X'));
+    await hasReread;
+    await sleep(400); // X's claim is now older than the stale age, and its run (this process) is alive
+    const lines = [];
+    const w = acquireLock(
+      run(file, { owner: 'W', claimStaleMs: 150, log: (l) => lines.push(l) }),
+    ).then(entered('W'));
+    await sleep(400); // W polls every 20 ms: plenty of chances to break the claim
+    assert.ok(fs.existsSync(claimOf(file)), "X's claim is still there");
+    assert.ok(!lines.some((l) => /stale clearing claim/.test(l)), lines.join('\n'));
+    assert.deepEqual(events, [], 'nobody holds the lock while X is paused');
+    resume();
+    leave('X', await x);
+    leave('W', await w);
+    assert.deepEqual(events, ['in X', 'out X', 'in W', 'out W']);
+    assert.equal(most, 1, 'never two holders');
+  } finally {
+    clean(folder);
+  }
+});
+
+test('a claim whose run is alive is broken after the much longer age (a hung run), with its line', async () => {
+  const folder = tempFolder();
+  const file = path.join(folder, 'hung.lock');
+  try {
+    fs.writeFileSync(file, JSON.stringify(holderRecord(await deadPid())));
+    fs.writeFileSync(claimOf(file), JSON.stringify({ token: 'hung-run', pid: process.pid }));
+    const old = new Date(Date.now() - 11 * 60_000);
+    fs.utimesSync(claimOf(file), old, old);
+    const lines = [];
+    const got = await acquireLock(run(file, { log: (l) => lines.push(l) }));
+    assert.ok(got.handle, 'the run takes the lock');
+    const broken = lines.filter((l) => /removed a stale clearing claim/.test(l));
+    assert.equal(broken.length, 1, lines.join('\n'));
+    assert.match(broken[0], /still running|alive/);
     releaseLock(got.handle, () => {});
   } finally {
     clean(folder);
