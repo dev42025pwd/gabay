@@ -1,6 +1,6 @@
 # Phase 1 — Rails and guardrails: gate report
 
-> **Version**: 0.2 draft | **Date**: 2026-10-09 | **Plan**: `plan/PH1-rails.md` 1.11, S8 | **Decision rows**: L122 (Phase 1 declared), L123 (plan approved), L124–L147 | **Written by**: the main session (Opus 5.5) | **Reviewed by**: dod-reviewer in a fresh context (AI self-check, not a sign-off; §6) | **Status**: DRAFT; the clean-clone run (§6) is pasted before you sign; E-18 awaits your approval | **Signed**: not yet
+> **Version**: 1.0 | **Date**: 2026-10-09 | **Plan**: `plan/PH1-rails.md` 1.11, S8 | **Decision rows**: L122 (Phase 1 declared), L123 (plan approved), L124–L147 | **Written by**: the main session (Opus 5.5) | **Reviewed by**: dod-reviewer in a fresh context (AI self-check, not a sign-off; §6) | **Status**: READY FOR SIGNATURE; E-18 awaits your approval (§5) | **Signed**: not yet
 
 ## 1. The gate
 
@@ -178,7 +178,34 @@ EXIT=0
 
 **`npm run verify` on a clean clone** (`plan/PH1-rails.md` §9; your choice of a fresh clone):
 
-*(The run's output is pasted here once it is done: a fresh clone of the pushed commit in a temporary folder outside the repository, with `.env` copied in, never printed.)*
+Run 2026-10-09 on `c80a2c7` (this report's commit before this paste):
+- `git clone --branch phase-order-rulings https://github.com/dev42025pwd/gabay.git` into a temporary folder outside the repository; `git status -s`: 0 lines.
+- `.env` copied in from the main folder (48 lines, not printed).
+- `npm ci` in `functions/` (373 packages), `db/tools/` (14) and `db/seeds/` (671), and `flutter pub get` in `app/`.
+- Then `GABAY_VERIFY_OWNER=main-session-clean-clone npm run verify`:
+
+```
+ok   node-version         (0.0 s)
+ok   node-check           (1.2 s)
+ok   structural-linters   (0.4 s)
+ok   linter-tests         (2.1 s)
+ok   tools-tests          (78.4 s)
+ok   eslint               (1.8 s)
+ok   prettier             (1.4 s)
+ok   schema-run-1         (1.8 s)
+ok   schema-run-2         (1.3 s)
+ok   api-tests            (2.4 s)
+ok   db-tools-tests       (0.8 s)
+ok   seed                 (9.2 s)
+ok   functions-health     (8.4 s)
+ok   flutter-analyze      (6.0 s)
+ok   flutter-test         (19.6 s)
+
+ALL GREEN   (140.0 s)
+exit=0
+```
+
+- **Clean-up:** a clone has no internal penthouse source (git-ignored, L48), so its seed reset the shared `gabay_dev` without the penthouse. `npm run seed` from the main folder restored it ("Spike Venues · Dynamiq penthouse (Major 1)", "Seed committed.", exit 0). The clone folder was deleted.
 
 **E-18 (`globals`)** waits for your approval (§5).
 
