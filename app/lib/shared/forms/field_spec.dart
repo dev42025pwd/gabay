@@ -5,7 +5,8 @@ import '../../l10n/app_localizations.dart';
 /// The names are the ones the `schema-forms` linter checks against the
 /// column's type in `db/schema.sql`, so they are not free to rename:
 /// `flag` is a BOOLEAN column (a switch, never a Yes/No dropdown), `fk` a
-/// foreign-key column (a single select). An email is not a kind: it is a
+/// foreign-key column (the async server-search picker, never a load-all
+/// dropdown). An email is not a kind: it is a
 /// `text` column with [FieldFormat.email].
 ///
 /// Only the kinds the Phase 2 maintenance screens use exist today. Phase 3
@@ -38,7 +39,6 @@ class FieldSpec {
     this.required = false,
     this.maxLength,
     this.scale,
-    this.lookup,
     this.readOnly = false,
     this.format = FieldFormat.plain,
   });
@@ -63,11 +63,6 @@ class FieldSpec {
   /// Mirrors DECIMAL(p, s). Carried so the spec has the linter's shape; no
   /// Phase 2 kind uses it.
   final int? scale;
-
-  /// The `/api/lookups/:name` route an `fk` field's options come from. The
-  /// resolver does not fetch it: the ViewModel loads the options and passes
-  /// them to the field (Phase 3 adds the async picker that fetches).
-  final String? lookup;
 
   /// Displayed, never typed: identity, audit stamps, computed columns.
   final bool readOnly;

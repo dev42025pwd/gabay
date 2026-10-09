@@ -51,5 +51,4 @@ FieldSpec testSpec({
   maxLength: maxLength,
   readOnly: readOnly,
   format: format,
-  lookup: kind == ColKind.fk ? 'roles' : null,
 );

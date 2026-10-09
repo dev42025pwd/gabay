@@ -4,10 +4,11 @@ The one place a form field is built (rule 7, standard 4.10, Appendix A.13). A vi
 
 | File | What it is |
 |---|---|
-| `field_spec.dart` | `FieldSpec` (`table`, `name`, `label`, `kind`, `required`, `maxLength`, `scale`, `lookup`, `readOnly`, `format`) and `ColKind` |
+| `field_spec.dart` | `FieldSpec` (`table`, `name`, `label`, `kind`, `required`, `maxLength`, `scale`, `readOnly`, `format`) and `ColKind` |
 | `spec_form_field.dart` | `SpecFormField`: the resolver, one spec in, one widget and its validators out |
 | `field_validators.dart` | `validatorFor(spec, l10n)`: required, maxLength, integer and email checks derived from the spec |
-| `select_option.dart` | `SelectOption`: a choice of an `fk` field, loaded by the ViewModel from `/api/lookups/:name` |
+| `async_lookup_picker.dart` | the `fk` field: `LookupPickerField` and `showLookupPicker`, the async server-search picker (search with debounce, "Load more", the four states); `LookupFetcher`, the function the ViewModel supplies to fetch a page |
+| `select_option.dart` | `SelectOption`: a choice (value, label, `isActive`) |
 | `debounced_search_field.dart` | the list's search box (350 ms debounce) |
 
 ## The schema decides
@@ -18,9 +19,9 @@ The one place a form field is built (rule 7, standard 4.10, Appendix A.13). A vi
 
 | Now | Phase 3 |
 |---|---|
-| `ColKind.text`, `integer`, `flag`, `fk` (a dropdown over options the caller passes in) | `memo`, `decimal`, `money`, `date`, `datetime`, `fkMulti` |
+| `ColKind.text`, `integer`, `flag`, `fk` (the async picker over a fetch function the caller passes in; the current value is shown, marked inactive when it is, and never cleared) | `memo`, `decimal`, `money`, `date`, `datetime`, `fkMulti`; the `lookup` argument and `/api/lookups/:name` (the options controller) |
 | required, maxLength, integer and email validators | decimal scale and CHECK ranges |
 | read-only rendering | audit-stamp display helpers |
-| a search box with debounce, paging by "Load more" (`ModuleListScaffold`, `PagedListNotifier`) | sort, filters, view modes, async server-search picker, cascading pickers, inactive lookup values, refresh on return |
+| a search box with debounce, paging by "Load more" (`ModuleListScaffold`, `PagedListNotifier`) | sort, filters, view modes, cascading pickers (`dependsOn`), refresh on return |
 
 Wording comes from ARB: `FieldSpec.label` is a function of `AppLocalizations`, so a spec is a `final`, not a `const`.

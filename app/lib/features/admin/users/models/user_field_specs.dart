@@ -1,4 +1,4 @@
-import '../../../shared/forms/field_spec.dart';
+import '../../../../shared/forms/field_spec.dart';
 
 // The users form's fields, one FieldSpec per column (rule 7). The `schema-forms`
 // linter checks each against db/schema.sql: change a column there and this file
@@ -34,12 +34,14 @@ final FieldSpec appUserIsActive = FieldSpec(
 );
 
 /// UserRole.RoleId: INT NOT NULL, a foreign key to Role. A user holds several
-/// roles through UserRole rows, so S11's form adds one row per choice.
+/// roles through UserRole rows, one row per role-and-tenant choice, each a
+/// single selection (L151); S11's form adds one row per choice, each with its
+/// own picker. The picker's choices come from a fetch function the screen's
+/// ViewModel supplies (no lookups route in Phase 2).
 final FieldSpec userRoleRole = FieldSpec(
   table: 'UserRole',
   name: 'RoleId',
   label: (l10n) => l10n.fieldUserRoleRole,
   kind: ColKind.fk,
   required: true,
-  lookup: 'roles',
 );

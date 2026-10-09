@@ -111,6 +111,22 @@
     "placeholders": { "label": { "type": "String", "example": "Email" } }
   },
 
+  "loadingLabel": "Loading",
+  "@loadingLabel": { "description": "Screen-reader name of a progress spinner, so a blind user hears that something is loading." },
+  "pickerSearchLabel": "Search",
+  "@pickerSearchLabel": { "description": "Label of the search box in the list a user picks a value from (a role, a venue)." },
+  "pickerLoadMore": "Load more",
+  "@pickerLoadMore": { "description": "Button at the end of a picker list that fetches the next page of choices." },
+  "pickerEmpty": "Nothing matches your search.",
+  "@pickerEmpty": { "description": "Shown in a picker when no choice matches the search." },
+  "pickerRetry": "Try again",
+  "@pickerRetry": { "description": "Button in a picker after the choices could not be loaded." },
+  "pickerInactive": "{label} (inactive)",
+  "@pickerInactive": {
+    "description": "A field's current choice that has since been switched off. It is kept and shown so saving the record never drops it.",
+    "placeholders": { "label": { "type": "String", "example": "Platform support" } }
+  },
+
   "fieldAppUserEmail": "Email",
   "@fieldAppUserEmail": { "description": "Label of the email field on a user's form (AppUser.Email)." },
   "fieldAppUserDisplayName": "Display name",

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gabay/features/users/models/user_field_specs.dart';
+import 'package:gabay/features/admin/users/models/user_field_specs.dart';
 import 'package:gabay/l10n/app_localizations.dart';
+import 'package:gabay/shared/components/paged_list_notifier.dart';
 import 'package:gabay/shared/components/routed_form_scaffold.dart';
 import 'package:gabay/shared/forms/select_option.dart';
 import 'package:gabay/shared/forms/spec_form_field.dart';
@@ -53,7 +54,13 @@ void main() {
               spec: userRoleRole,
               value: null,
               onChanged: (_) {},
-              options: const [SelectOption(value: 1, label: 'Viewer')],
+              lookupFetcher: ({required search, required page}) async =>
+                  const PageResult(
+                    items: [SelectOption(value: 1, label: 'Viewer')],
+                    totalCount: 1,
+                    page: 1,
+                    pageSize: 25,
+                  ),
             ),
           ],
         ),

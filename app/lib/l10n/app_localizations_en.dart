@@ -149,6 +149,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get loadingLabel => 'Loading';
+
+  @override
+  String get pickerSearchLabel => 'Search';
+
+  @override
+  String get pickerLoadMore => 'Load more';
+
+  @override
+  String get pickerEmpty => 'Nothing matches your search.';
+
+  @override
+  String get pickerRetry => 'Try again';
+
+  @override
+  String pickerInactive(String label) {
+    return '$label (inactive)';
+  }
+
+  @override
   String get fieldAppUserEmail => 'Email';
 
   @override

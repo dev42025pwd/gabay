@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gabay/l10n/app_localizations.dart';
 import 'package:gabay/shared/components/module_list_scaffold.dart';
 import 'package:gabay/shared/forms/debounced_search_field.dart';
 
@@ -11,6 +12,9 @@ import '../support/shell_harness.dart';
 /// four states around them. The Phase 1 contract (no search, no paging) stays
 /// pinned by `scaffolds_test.dart`, which is unchanged.
 void main() {
+  late AppLocalizations l10n;
+  setUpAll(() async => l10n = await loadEnglish());
+
   final searches = <String>[];
   var loadMores = 0;
   var retries = 0;
@@ -174,6 +178,30 @@ void main() {
         list(const AsyncData<List<String>>([]), paging: paging()),
       );
       expect(find.text('Load more'), findsNothing);
+    });
+  });
+
+  // Review finding 7: a progress ring with no name is silent for a screen reader.
+  group('screen-reader names', () {
+    testWidgets('the loading spinner is named', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(list(const AsyncLoading<List<String>>()));
+      expect(find.bySemanticsLabel(l10n.loadingLabel), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('the loading-more spinner in the footer is named', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        list(
+          const AsyncData<List<String>>(['A']),
+          paging: paging(isLoadingMore: true),
+        ),
+      );
+      expect(find.bySemanticsLabel(l10n.loadingLabel), findsOneWidget);
+      handle.dispose();
     });
   });
 

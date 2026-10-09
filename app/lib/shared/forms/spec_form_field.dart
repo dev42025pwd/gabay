@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../utils/validators.dart';
+import 'async_lookup_picker.dart';
 import 'field_spec.dart';
 import 'field_validators.dart';
 import 'select_option.dart';
@@ -12,14 +13,20 @@ import 'select_option.dart';
 /// built (rule 7, `no-bare-textfield`); a view declares specs and places this.
 ///
 /// The value is held by the caller's ViewModel, not here: it goes in through
-/// [value] and comes out through [onChanged], typed by kind:
+/// [value] and comes out through [onChanged], typed by kind, and a later
+/// [value] from the ViewModel (a reset, a record loaded after the first frame)
+/// is shown:
 ///
 /// | kind | value | widget |
 /// |---|---|---|
 /// | `text` | `String` | single-line text (email keyboard for `FieldFormat.email`) |
-/// | `integer` | `int?` (`null` when blank) | digits-only text, number keyboard |
+/// | `integer` | `int?` (`null` when blank or malformed) | digits-only text, number keyboard |
 /// | `flag` | `bool` | a switch |
-/// | `fk` | the chosen [SelectOption.value] | a dropdown over [options] |
+/// | `fk` | the chosen [SelectOption.value] | [LookupPickerField], the async server-search picker |
+///
+/// An `integer` field keeps what the user typed while the value it reports is
+/// `null` (a lone minus sign), and shows the validator's message instead of
+/// clearing the text under their fingers.
 ///
 /// A `readOnly` spec renders its value as plain text (a disabled switch for a
 /// flag), builds no input, and is never validated.
@@ -28,7 +35,8 @@ class SpecFormField extends StatelessWidget {
     required this.spec,
     required this.value,
     required this.onChanged,
-    this.options = const [],
+    this.lookupFetcher,
+    this.currentOption,
     super.key,
   });
 
@@ -36,9 +44,15 @@ class SpecFormField extends StatelessWidget {
   final Object? value;
   final ValueChanged<Object?> onChanged;
 
-  /// The choices of an `fk` field, loaded by the ViewModel from
-  /// `/api/lookups/:name`.
-  final List<SelectOption> options;
+  /// An `fk` field's source of choices, supplied by the ViewModel from its
+  /// service: one page of active rows for a search. Required unless the spec
+  /// is read-only.
+  final LookupFetcher? lookupFetcher;
+
+  /// An `fk` field's current choice as the record holds it (its label, and
+  /// whether it is still active), so it is shown even when the fetched rows
+  /// do not contain it, marked inactive when it is, and never cleared.
+  final SelectOption? currentOption;
 
   @override
   Widget build(BuildContext context) {
@@ -49,10 +63,23 @@ class SpecFormField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: switch (spec.kind) {
         ColKind.flag => _flag(label),
-        _ when spec.readOnly => _readOnly(label),
-        ColKind.text => _text(label, validator),
-        ColKind.integer => _integer(label, validator),
-        ColKind.fk => _select(label, validator),
+        _ when spec.readOnly => _readOnly(context, label),
+        ColKind.text || ColKind.integer => _SpecTextField(
+          label: label,
+          value: value,
+          integer: spec.kind == ColKind.integer,
+          email: spec.format == FieldFormat.email,
+          validator: validator,
+          onChanged: onChanged,
+        ),
+        ColKind.fk => LookupPickerField(
+          label: label,
+          value: value,
+          current: currentOption,
+          fetcher: lookupFetcher!,
+          validator: validator,
+          onChanged: onChanged,
+        ),
       },
     );
   }
@@ -65,54 +92,14 @@ class SpecFormField extends StatelessWidget {
     onChanged: spec.readOnly ? null : onChanged,
   );
 
-  Widget _text(String label, FieldValidator validator) => TextFormField(
-    initialValue: value?.toString(),
-    decoration: InputDecoration(labelText: label),
-    keyboardType: spec.format == FieldFormat.email
-        ? TextInputType.emailAddress
-        : TextInputType.text,
-    autovalidateMode: AutovalidateMode.onUserInteraction,
-    validator: validator,
-    onChanged: onChanged,
-  );
-
-  /// Digits and a minus sign only, and a blank or malformed text reports
-  /// `null`: nothing here can throw on what the user typed (standard 4.10).
-  Widget _integer(String label, FieldValidator validator) => TextFormField(
-    initialValue: value?.toString(),
-    decoration: InputDecoration(labelText: label),
-    keyboardType: const TextInputType.numberWithOptions(signed: true),
-    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[0-9-]'))],
-    autovalidateMode: AutovalidateMode.onUserInteraction,
-    validator: validator,
-    onChanged: (text) => onChanged(int.tryParse(text.trim())),
-  );
-
-  Widget _select(String label, FieldValidator validator) {
-    // A value the options do not list is left unselected, never asserted on.
-    final listed = options.any((o) => o.value == value);
-    return DropdownButtonFormField<Object>(
-      initialValue: listed ? value : null,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      autovalidateMode: AutovalidateMode.onUserInteraction,
-      validator: (chosen) => validator(chosen?.toString()),
-      items: [
-        for (final option in options)
-          DropdownMenuItem<Object>(
-            value: option.value,
-            child: Text(option.label, overflow: TextOverflow.ellipsis),
-          ),
-      ],
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _readOnly(String label) {
-    final shown = spec.kind == ColKind.fk
-        ? options.where((o) => o.value == value).firstOrNull?.label
-        : null;
-    final text = shown ?? value?.toString() ?? '';
+  Widget _readOnly(BuildContext context, String label) {
+    final text = spec.kind == ColKind.fk
+        ? lookupDisplayText(
+            AppLocalizations.of(context),
+            currentOption?.value == value ? currentOption : null,
+            value,
+          )
+        : value?.toString() ?? '';
     return Semantics(
       container: true,
       readOnly: true,
@@ -126,4 +113,91 @@ class SpecFormField extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A `text` or `integer` field. It owns a controller so the value can change
+/// under it: when the ViewModel hands a [value] that is not what the box says,
+/// the box shows it. What the user typed is never undone when the ViewModel
+/// merely echoes it back.
+class _SpecTextField extends StatefulWidget {
+  const _SpecTextField({
+    required this.label,
+    required this.value,
+    required this.integer,
+    required this.email,
+    required this.validator,
+    required this.onChanged,
+  });
+
+  final String label;
+  final Object? value;
+  final bool integer;
+  final bool email;
+  final FieldValidator validator;
+  final ValueChanged<Object?> onChanged;
+
+  @override
+  State<_SpecTextField> createState() => _SpecTextFieldState();
+}
+
+class _SpecTextFieldState extends State<_SpecTextField> {
+  late TextEditingController _controller = _controllerFor(widget.value);
+
+  /// Bumped when the box is rebuilt around a new controller.
+  int _revision = 0;
+
+  TextEditingController _controllerFor(Object? value) {
+    final text = value?.toString() ?? '';
+    return TextEditingController.fromValue(
+      TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      ),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_SpecTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final typed = _controller.text;
+    // An integer box holding "-" reports null: that is the same value as null,
+    // so the text stays.
+    final sameValue = widget.integer
+        ? int.tryParse(typed.trim()) == widget.value
+        : typed == (widget.value?.toString() ?? '');
+    if (!sameValue) {
+      // Not `_controller.text = ...`: that notifies the field while the tree
+      // is building. A new controller under a new key is built with the value.
+      final old = _controller;
+      _controller = _controllerFor(widget.value);
+      _revision++;
+      WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+    key: ValueKey(_revision),
+    controller: _controller,
+    decoration: InputDecoration(labelText: widget.label),
+    keyboardType: widget.integer
+        ? const TextInputType.numberWithOptions(signed: true)
+        : widget.email
+        ? TextInputType.emailAddress
+        : TextInputType.text,
+    // Digits and a minus sign only: nothing can throw on what the user types.
+    inputFormatters: widget.integer
+        ? [FilteringTextInputFormatter.allow(RegExp('[0-9-]'))]
+        : null,
+    autovalidateMode: AutovalidateMode.onUserInteraction,
+    validator: widget.validator,
+    onChanged: (text) =>
+        widget.onChanged(widget.integer ? int.tryParse(text.trim()) : text),
+  );
 }

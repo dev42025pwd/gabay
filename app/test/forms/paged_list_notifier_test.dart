@@ -122,6 +122,62 @@ void main() {
     expect(value().search, 'new');
   });
 
+  // Regression test: loadMore used to run while a search was pending (the
+  // loading state still carried the old rows), bumped the fetch ticket, and so
+  // made the search's own answer be dropped: the old rows stayed on screen
+  // (review finding 1).
+  test('loadMore while a search is pending does nothing; the search answer is shown', () async {
+    fourRows();
+    await container.read(_provider.future);
+    final slow = Completer<PageResult<String>>();
+    _Names.handler = (search, page) {
+      calls.add((search, page));
+      return slow.future;
+    };
+    final notifier = container.read(_provider.notifier);
+    final pending = notifier.setSearch('x');
+    expect(container.read(_provider).isLoading, isTrue);
+
+    await notifier.loadMore();
+    expect(calls, [('', 1), ('x', 1)], reason: 'no page 2 was asked for');
+
+    slow.complete(_page(['x1'], 1, 1));
+    await pending;
+    expect(value().items, ['x1']);
+    expect(value().search, 'x');
+  });
+
+  test(
+    'after that, the same search is not fetched again but another is',
+    () async {
+      fourRows();
+      await container.read(_provider.future);
+      _Names.handler = (search, page) async {
+        calls.add((search, page));
+        return _page(['$search-row'], 1, 1);
+      };
+      final notifier = container.read(_provider.notifier);
+      await notifier.setSearch('x');
+      await notifier.setSearch('x');
+      expect(calls.where((c) => c.$1 == 'x').length, 1);
+      await notifier.setSearch('y');
+      expect(value().items, ['y-row']);
+    },
+  );
+
+  test('the same search again after an error fetches again', () async {
+    fourRows();
+    await container.read(_provider.future);
+    _Names.handler = (_, _) async => throw StateError('down');
+    final notifier = container.read(_provider.notifier);
+    await notifier.setSearch('x');
+    expect(container.read(_provider).hasError, isTrue);
+
+    _Names.handler = (search, page) async => _page(['x-row'], 1, 1);
+    await notifier.setSearch('x');
+    expect(value().items, ['x-row']);
+  });
+
   test('a page that arrives after a new search is dropped (ticket)', () async {
     final slowSecond = Completer<PageResult<String>>();
     _Names.handler = (search, page) {

@@ -14,7 +14,7 @@ const { findFieldSpecs } = require('../schema-forms');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const SCHEMA_FILE = 'db/schema.sql';
-const SPEC_FILE = 'app/lib/features/users/models/user_field_specs.dart';
+const SPEC_FILE = 'app/lib/features/admin/users/models/user_field_specs.dart';
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 /** The real schema and the real spec file, with `edit` applied to the spec source. */

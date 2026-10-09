@@ -113,7 +113,9 @@ abstract class PagedListNotifier<T> extends AsyncNotifier<PagedList<T>> {
   /// Starts again at page 1 for [search], showing the loading state. The same
   /// search as the one shown does nothing.
   Future<void> setSearch(String search) async {
-    if (state.hasValue && _search == search) return;
+    final shown = state.value;
+    final settled = !state.isLoading && !state.hasError;
+    if (settled && shown != null && shown.search == search) return;
     await _reloadFor(search);
   }
 
@@ -134,9 +136,12 @@ abstract class PagedListNotifier<T> extends AsyncNotifier<PagedList<T>> {
     }
   }
 
-  /// Appends the next page. Does nothing while one is loading or when there
-  /// is no more. A failure keeps the rows and sets `loadMoreFailed`.
+  /// Appends the next page. Does nothing while the list itself is loading (a
+  /// search or reload is pending: its answer replaces these rows), while a page
+  /// is loading, or when there is no more. A failure keeps the rows and sets
+  /// `loadMoreFailed`.
   Future<void> loadMore() async {
+    if (state.isLoading) return;
     final current = state.value;
     if (current == null || current.isLoadingMore || !current.hasMore) return;
     final ticket = ++_ticket;

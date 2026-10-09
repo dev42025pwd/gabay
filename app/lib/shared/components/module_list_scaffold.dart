@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../forms/debounced_search_field.dart';
 
 /// The search box of a list: [label] names it (ARB), [onChanged] gets the
@@ -45,7 +46,9 @@ class ListPaging {
 /// Phase 3 adds what the standard lists beyond this: sort, filters, view
 /// modes, a skeleton shimmer and refresh when the user comes back.
 ///
-/// It takes its wording from the caller, so it holds none of its own.
+/// It takes its wording from the caller, so it holds none of its own, except
+/// the screen-reader name of its two progress spinners, which it reads from
+/// ARB when the app has localisation (a bare MaterialApp in a test does not).
 class ModuleListScaffold<T> extends StatelessWidget {
   const ModuleListScaffold({
     required this.title,
@@ -98,7 +101,7 @@ class ModuleListScaffold<T> extends StatelessWidget {
   }
 
   Widget _states() => items.when(
-    loading: () => const Center(child: CircularProgressIndicator()),
+    loading: () => const Center(child: _Spinner()),
     error: (_, _) => _Centered(
       icon: Icons.error_outline,
       text: errorText,
@@ -144,7 +147,7 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget child;
     if (paging.isLoadingMore) {
-      child = const CircularProgressIndicator();
+      child = const _Spinner();
     } else if (paging.loadMoreFailed) {
       child = Column(
         mainAxisSize: MainAxisSize.min,
@@ -165,6 +168,19 @@ class _Footer extends StatelessWidget {
       child: Center(child: child),
     );
   }
+}
+
+/// A progress ring that a screen reader announces as "Loading".
+class _Spinner extends StatelessWidget {
+  const _Spinner();
+
+  @override
+  Widget build(BuildContext context) => CircularProgressIndicator(
+    semanticsLabel: Localizations.of<AppLocalizations>(
+      context,
+      AppLocalizations,
+    )?.loadingLabel,
+  );
 }
 
 class _Centered extends StatelessWidget {

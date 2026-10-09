@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gabay/l10n/app_localizations.dart';
+import 'package:gabay/shared/components/paged_list_notifier.dart';
+import 'package:gabay/shared/forms/async_lookup_picker.dart';
 import 'package:gabay/shared/forms/field_spec.dart';
 import 'package:gabay/shared/forms/select_option.dart';
 import 'package:gabay/shared/forms/spec_form_field.dart';
@@ -14,17 +16,14 @@ void main() {
   setUpAll(() async => l10n = await loadEnglish());
 
   final formKey = GlobalKey<FormState>();
-  const roles = [
-    SelectOption(value: 1, label: 'Mall admin'),
-    SelectOption(value: 2, label: 'Viewer'),
-  ];
+  const viewer = SelectOption(value: 2, label: 'Viewer');
 
   Future<void> pump(
     WidgetTester tester,
     FieldSpec spec, {
     Object? value,
     ValueChanged<Object?>? onChanged,
-    List<SelectOption> options = const [],
+    SelectOption? current,
     double textScale = 1,
   }) => tester.pumpWidget(
     formHarness(
@@ -35,7 +34,9 @@ void main() {
           spec: spec,
           value: value,
           onChanged: onChanged ?? (_) {},
-          options: options,
+          currentOption: current,
+          lookupFetcher: ({required search, required page}) async =>
+              const PageResult(items: [], totalCount: 0, page: 1, pageSize: 25),
         ),
       ),
     ),
@@ -150,42 +151,71 @@ void main() {
     });
   });
 
-  group('select (fk)', () {
-    final spec = testSpec(label: 'Role', kind: ColKind.fk, required: true);
-
-    testWidgets('offers the options passed in and reports the chosen value', (
-      tester,
-    ) async {
-      Object? got;
-      await pump(tester, spec, options: roles, onChanged: (v) => got = v);
-      await tester.tap(find.byType(DropdownButtonFormField<Object>));
-      await tester.pumpAndSettle();
-      expect(find.text('Mall admin'), findsOneWidget);
-      await tester.tap(find.text('Viewer').last);
-      await tester.pumpAndSettle();
-      expect(got, 2);
+  // Review finding 8: a field built once must follow a later value from the
+  // ViewModel (a form reset, a record loaded after the first frame).
+  group('follows later value changes', () {
+    testWidgets('text shows a new value', (tester) async {
+      await pump(tester, testSpec(), value: 'Aurora');
+      expect(find.text('Aurora'), findsOneWidget);
+      await pump(tester, testSpec(), value: 'Bayview');
+      expect(find.text('Bayview'), findsOneWidget);
+      expect(find.text('Aurora'), findsNothing);
     });
 
-    testWidgets('shows the current choice', (tester) async {
-      await pump(tester, spec, options: roles, value: 1);
-      expect(find.text('Mall admin'), findsOneWidget);
+    testWidgets('text clears when the value is reset to null', (tester) async {
+      await pump(tester, testSpec(), value: 'Aurora');
+      await pump(tester, testSpec());
+      expect(find.text('Aurora'), findsNothing);
     });
 
-    testWidgets('required: no choice is refused, naming the field', (
+    testWidgets('typing is not undone when the ViewModel echoes it back', (
       tester,
     ) async {
-      await pump(tester, spec, options: roles);
-      expect(formKey.currentState!.validate(), isFalse);
+      var value = '';
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        formHarness(
+          StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return SpecFormField(
+                spec: testSpec(),
+                value: value,
+                onChanged: (v) => rebuild(() => value = v! as String),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.enterText(find.byType(TextFormField), 'Aur');
       await tester.pump();
-      expect(find.text(l10n.validatorRequired('Role')), findsOneWidget);
+      expect(find.text('Aur'), findsOneWidget);
+      expect(value, 'Aur');
     });
 
-    testWidgets('a value missing from the options does not crash', (
-      tester,
-    ) async {
-      await pump(tester, spec, options: roles, value: 99);
-      expect(tester.takeException(), isNull);
+    testWidgets('integer shows a new value', (tester) async {
+      final spec = testSpec(label: 'Floor', kind: ColKind.integer);
+      await pump(tester, spec, value: 3);
+      expect(find.text('3'), findsOneWidget);
+      await pump(tester, spec, value: 7);
+      expect(find.text('7'), findsOneWidget);
     });
+
+    // DESIGN CHOICE (finding 6): an editable integer keeps what the user typed
+    // while the value it reports is null, and shows the validator's message.
+    testWidgets(
+      'integer keeps a half-typed minus sign while the value is null',
+      (tester) async {
+        final spec = testSpec(label: 'Floor', kind: ColKind.integer);
+        await pump(tester, spec, value: 5);
+        await tester.enterText(find.byType(TextFormField), '-');
+        await pump(tester, spec); // the ViewModel now holds null
+        expect(find.text('-'), findsOneWidget, reason: 'the text is kept');
+        expect(formKey.currentState!.validate(), isFalse);
+        await tester.pump();
+        expect(find.text(l10n.validatorNotInteger('Floor')), findsOneWidget);
+      },
+    );
   });
 
   group('derived validators', () {
@@ -256,16 +286,16 @@ void main() {
       expect(seen, isEmpty);
     });
 
-    testWidgets('select: shows the option label, builds no dropdown', (
+    testWidgets('select: shows the option label, builds no picker', (
       tester,
     ) async {
       await pump(
         tester,
         testSpec(kind: ColKind.fk, readOnly: true),
-        options: roles,
+        current: viewer,
         value: 2,
       );
-      expect(find.byType(DropdownButtonFormField<Object>), findsNothing);
+      expect(find.byType(LookupPickerField), findsNothing);
       expect(find.text('Viewer'), findsOneWidget);
     });
 
@@ -289,12 +319,10 @@ void main() {
               label: 'A rather long field name that must wrap or ellipsize',
               kind: kind,
             ),
-            options: const [
-              SelectOption(
-                value: 1,
-                label: 'A very long option label that also has to fit the row',
-              ),
-            ],
+            current: const SelectOption(
+              value: 1,
+              label: 'A very long option label that also has to fit the row',
+            ),
             value: kind == ColKind.fk ? 1 : null,
             textScale: 1.4,
           );
