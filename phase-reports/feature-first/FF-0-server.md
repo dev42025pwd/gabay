@@ -72,7 +72,7 @@ ALL GREEN   (173.0 s)
 
 **The verify order.** `api-tests` runs after the schema is recreated and before the seed, so the database has no seeded rows then. A first verify run failed two lookups tests that assumed seeded platform rows. The tests were fixed (they now write their own platform rows inside the rolled-back transaction), not the code; the localhost check of the seeded values is manual cases FF0.1 to FF0.5.
 
-**Existing tests:** two changed, by the owner's ruling L155 (see §3 and §8); no other. S1's `app.test.js` counts `warn` log lines on a normal start, which is why the stub's startup line is `info` (DESIGN CHOICE 6).
+**Existing tests:** three changed, by the owner's ruling L155 (see §3 and §8); no other. S1's `app.test.js` counts `warn` log lines on a normal start, which is why the stub's startup line is `info` (DESIGN CHOICE 6).
 
 ## 3. Tests added
 
@@ -89,6 +89,7 @@ All database writes are inside the always-rolled-back transaction (WORKING_AGREE
 
 - `tools/test/workflow-steps.js`: the pinned `run` of the e2e step "Write .env from throwaway values" gains `echo "NODE_ENV=development"` as its first line.
 - `tools/test/workflow-snapshots/e2e.yml.snap`: the same line is added to the snapshot.
+- `tools/test/verify-lock-fix.test.js` (the owner's ruling L155, cleanup only, no assertion changed): the pre-push verify failed `release: a lock held open throughout stays, and one line names the file` (EBUSY unlinking `stuck.lock`) because the test slept a fixed 300 ms after killing its PowerShell holder. `holdOpen`'s stop function now awaits the helper's exit, and a local `cleanWhenFree` retries the folder delete on EBUSY or EPERM for up to 5 s; both file-holding tests (the brief-hold ones and the held-throughout one) use them. Alone: 5 runs of the file, 12 of 12 each. Under load (24 busy-loop Node processes on 12 cores, durations up to 60 s): 5 runs, 12 of 12 each.
 
 Reason: the stub refuses to exist unless `NODE_ENV` is written explicitly, so CI's `.env` must write it (`.env.example` has it). Failing first: with the two tests updated and `e2e.yml` not yet, `npm run tools:test` gave `# tests 414, # pass 408, # fail 4` (the e2e step rule, the snapshot cases). Then `e2e.yml` was changed and it gave `# pass 412, # fail 0, # skipped 2`. The comment explaining the line sits above the step in the workflow, because a comment inside the `run: |` block is part of the pinned run text.
 
