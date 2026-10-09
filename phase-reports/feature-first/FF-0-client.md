@@ -88,7 +88,18 @@ ALL GREEN   (395.3 s)
 EXIT=0
 ```
 
-That ALL GREEN needs the one-line change to an existing test. Without it, `flutter-test` fails by exactly that test. Nothing is reported as passing beyond this.
+- **Run 3** (the committed state `6e3abbf`, `shell_test.dart` untouched): every check `ok` except one,
+
+```
+ok   tools-tests          (120.1 s)    ok   flutter-analyze      (32.6 s)
+FAIL flutter-test         (21.5 s)
+  shell_test.dart: admin shell nothing overflows at text size x1.4 on a small phone [E]
+  00:15 +283 -1: Some tests failed.
+1 FAILED: flutter-test   (303.7 s)
+EXIT=1
+```
+
+That ALL GREEN (run 2) needs the one-line change to an existing test. Without it, `flutter-test` fails by exactly that test and verify exits 1. Nothing is reported as passing beyond this.
 
 **Screenshots** (test-rendered, Roboto and the Material icons loaded from the SDK, outside the repository): `...\scratchpad\ff0-shots\admin_dev_stub_banner_{light,dark}_{phone,tablet}.png` in the session's scratchpad (`C:\Users\User\AppData\Local\Temp\claude\c--Users-User-FlutterProjects-Gabay\baccea26-212d-413f-81c4-d0b01ae88903\scratchpad\ff0-shots\`). 24 PNGs in all; the other 20 are the existing shell, About and message-banner shots, which now show the banner on the admin surface. I looked at light and dark on the phone and light on the tablet: a full-width tinted band with an icon and the text, above the app bar, readable in both modes.
 
