@@ -100,6 +100,42 @@
     }
   },
 
+  "validatorNotInteger": "{label} must be a whole number.",
+  "@validatorNotInteger": {
+    "description": "Form validation: the text in a whole-number field is not a whole number.",
+    "placeholders": { "label": { "type": "String", "example": "Floor" } }
+  },
+  "validatorNotEmail": "{label} must be an email address, like name@example.com.",
+  "@validatorNotEmail": {
+    "description": "Form validation: the text in an email field is not shaped like an email address.",
+    "placeholders": { "label": { "type": "String", "example": "Email" } }
+  },
+
+  "loadingLabel": "Loading",
+  "@loadingLabel": { "description": "Screen-reader name of a progress spinner, so a blind user hears that something is loading." },
+  "pickerSearchLabel": "Search",
+  "@pickerSearchLabel": { "description": "Label of the search box in the list a user picks a value from (a role, a venue)." },
+  "pickerLoadMore": "Load more",
+  "@pickerLoadMore": { "description": "Button at the end of a picker list that fetches the next page of choices." },
+  "pickerEmpty": "Nothing matches your search.",
+  "@pickerEmpty": { "description": "Shown in a picker when no choice matches the search." },
+  "pickerRetry": "Try again",
+  "@pickerRetry": { "description": "Button in a picker after the choices could not be loaded." },
+  "pickerInactive": "{label} (inactive)",
+  "@pickerInactive": {
+    "description": "A field's current choice that has since been switched off. It is kept and shown so saving the record never drops it.",
+    "placeholders": { "label": { "type": "String", "example": "Platform support" } }
+  },
+
+  "fieldAppUserEmail": "Email",
+  "@fieldAppUserEmail": { "description": "Label of the email field on a user's form (AppUser.Email)." },
+  "fieldAppUserDisplayName": "Display name",
+  "@fieldAppUserDisplayName": { "description": "Label of the name field on a user's form (AppUser.DisplayName)." },
+  "fieldAppUserIsActive": "Active",
+  "@fieldAppUserIsActive": { "description": "Label of the switch that grants or revokes a user's access (AppUser.IsActive)." },
+  "fieldUserRoleRole": "Role",
+  "@fieldUserRoleRole": { "description": "Label of the role choice when a user is given a role (UserRole.RoleId)." },
+
   "changelogMobile_e001_a": "The Gabay shopper app now starts. It has no features yet.",
   "@changelogMobile_e001_a": { "description": "Shopper-app changelog, entry e001, first bullet. Plain language for shoppers." },
   "changelogAdmin_e001_a": "The Gabay admin page now starts. It has no features yet.",

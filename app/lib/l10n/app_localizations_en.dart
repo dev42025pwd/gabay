@@ -139,6 +139,48 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String validatorNotInteger(String label) {
+    return '$label must be a whole number.';
+  }
+
+  @override
+  String validatorNotEmail(String label) {
+    return '$label must be an email address, like name@example.com.';
+  }
+
+  @override
+  String get loadingLabel => 'Loading';
+
+  @override
+  String get pickerSearchLabel => 'Search';
+
+  @override
+  String get pickerLoadMore => 'Load more';
+
+  @override
+  String get pickerEmpty => 'Nothing matches your search.';
+
+  @override
+  String get pickerRetry => 'Try again';
+
+  @override
+  String pickerInactive(String label) {
+    return '$label (inactive)';
+  }
+
+  @override
+  String get fieldAppUserEmail => 'Email';
+
+  @override
+  String get fieldAppUserDisplayName => 'Display name';
+
+  @override
+  String get fieldAppUserIsActive => 'Active';
+
+  @override
+  String get fieldUserRoleRole => 'Role';
+
+  @override
   String get changelogMobile_e001_a =>
       'The Gabay shopper app now starts. It has no features yet.';
 

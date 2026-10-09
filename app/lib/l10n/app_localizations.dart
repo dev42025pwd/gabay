@@ -310,6 +310,78 @@ abstract class AppLocalizations {
   /// **'{label} must be at most {max} characters.'**
   String validatorTooLong(String label, int max);
 
+  /// Form validation: the text in a whole-number field is not a whole number.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} must be a whole number.'**
+  String validatorNotInteger(String label);
+
+  /// Form validation: the text in an email field is not shaped like an email address.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} must be an email address, like name@example.com.'**
+  String validatorNotEmail(String label);
+
+  /// Screen-reader name of a progress spinner, so a blind user hears that something is loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get loadingLabel;
+
+  /// Label of the search box in the list a user picks a value from (a role, a venue).
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get pickerSearchLabel;
+
+  /// Button at the end of a picker list that fetches the next page of choices.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get pickerLoadMore;
+
+  /// Shown in a picker when no choice matches the search.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches your search.'**
+  String get pickerEmpty;
+
+  /// Button in a picker after the choices could not be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get pickerRetry;
+
+  /// A field's current choice that has since been switched off. It is kept and shown so saving the record never drops it.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} (inactive)'**
+  String pickerInactive(String label);
+
+  /// Label of the email field on a user's form (AppUser.Email).
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get fieldAppUserEmail;
+
+  /// Label of the name field on a user's form (AppUser.DisplayName).
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get fieldAppUserDisplayName;
+
+  /// Label of the switch that grants or revokes a user's access (AppUser.IsActive).
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get fieldAppUserIsActive;
+
+  /// Label of the role choice when a user is given a role (UserRole.RoleId).
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get fieldUserRoleRole;
+
   /// Shopper-app changelog, entry e001, first bullet. Plain language for shoppers.
   ///
   /// In en, this message translates to:

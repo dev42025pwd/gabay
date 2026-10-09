@@ -2,7 +2,7 @@
 // is a projection of the column it writes to; this fails when a FieldSpec disagrees with db/schema.sql
 // on type kind, nullability, maxLength or scale, naming the table, the column and the spec's file.
 //
-// THE DART SHAPE THIS LINTER PARSES (Phase 3 builds FieldSpec to match; A.13's constructor plus one
+// THE DART SHAPE THIS LINTER PARSES (app/lib/shared/forms/field_spec.dart matches it, S9; A.13's constructor plus one
 // added argument, `table`, because A.13's `name` is the column and a column needs its table):
 //
 //   FieldSpec(
@@ -15,6 +15,7 @@
 //     scale: 4,                  // int literal, default absent
 //     readOnly: false,           // bool literal; true skips required/maxLength/scale (identity, audit columns)
 //     lookup: 'venues',          // anything (not checked)
+//     format: FieldFormat.email, // anything (not checked): any other named argument is ignored
 //   )
 //
 // table, name and kind must be literals, otherwise the spec cannot be checked and that is reported.
