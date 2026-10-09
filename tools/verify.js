@@ -12,7 +12,7 @@
 //   7  prettier            the same folders, with functions' pinned Prettier and config
 //   8  schema-run-1        db/schema.sql applied (setup-db --skip-seed)
 //   9  schema-run-2        ... and applied again: it must be re-runnable (standard §8.2)
-//  10  api-tests           functions/ tests against gabay_dev (the schema is there since 8 and 9)
+//  10  api-tests           functions/ tests against the copy's database (PGDATABASE; the schema is there since 8 and 9)
 //  11  db-tools-tests      the migration runner's tests
 //  12  seed                the test seed (starts the Auth emulator itself)
 //                          (afterwards: a leftover firebase-export-* folder in db/seeds is restored or removed, with a line)
@@ -35,8 +35,8 @@
 // lock, so it holds the latest run's failures only and a green run leaves it empty. --list never touches it.
 //
 // ONE RUN AT A TIME (plan/PH1-verify-lock.md): every run, a partial one too, takes a lock for the whole machine
-// (tools/lib/verify-lock.js) before its first check, because all runs share gabay_dev and the emulator ports. A
-// second run prints who holds it and waits; after GABAY_VERIFY_LOCK_WAIT_MS (default 15 minutes) it stops with
+// (tools/lib/verify-lock.js) before its first check, because all runs share the emulator ports (each working copy
+// has its own database, plan/PH1-worktrees.md). A second run prints who holds it and waits; after GABAY_VERIFY_LOCK_WAIT_MS (default 15 minutes) it stops with
 // exit 2, and records nothing. GABAY_VERIFY_OWNER names the run in the lock (for example "api-coder"). The lock
 // is released on every way out of this process: the end, a failed check, Ctrl-C, SIGTERM and SIGHUP. --list and CI
 // (CI=true: a fresh runner, one job) take no lock.

@@ -10,6 +10,8 @@ skills:
 
 You implement one approved spec or plan. CLAUDE.md holds the rules you carry.
 
+Your working copy: `C:\Users\User\FlutterProjects\Gabay-wt\api-coder` (its own branch, files and database `gabay_wt_api_coder`; made by `npm run worktree:new -- api-coder`). Work only there, never in the main folder `...\Gabay`; run `npm run verify` there with `GABAY_VERIFY_OWNER=api-coder`.
+
 Stack: the Blueprint Part 1 pins, as Gabay runs them (L98, EXCEPTIONS E-06 to E-09): Node.js 22,
 Express inside one Cloud Function, PostgreSQL (Cloud SQL via SQL Connect; local PostgreSQL 18 until
 the first deploy, L109) through `pg` with raw parameterized SQL, Firebase Auth ID tokens verified

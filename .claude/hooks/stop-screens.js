@@ -4,6 +4,10 @@
 // last_assistant_message holds a line that starts "Changelog waived:" followed by a reason on that line
 // (the product owner reads the reason). stop_hook_active does NOT release it.
 //
+// WORKING COPIES (owner ruling I-4): the main folder is always checked, and the working copy of this repository the
+// event's cwd is in as well, each from its own baseline (session-baseline.js records one per folder); a waiver line
+// covers both.
+//
 // "Changed" is measured from the session's baseline (the HEAD recorded by session-baseline.js; HEAD
 // itself when there is none) to the working tree, so work committed during the session still counts.
 //   screens:   any file under app/lib/features/**, app/lib/shared/components|widgets|navigation/**, or
@@ -19,7 +23,7 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { ROOT, readEvent, baselineFile, block, notice } = require('./lib');
+const { ROOT, stopRoots, readEvent, baselineFile, block, notice } = require('./lib');
 
 const ARB = 'app/lib/l10n/app_en.arb';
 const CHANGELOG = 'app/lib/core/config/changelog.dart';
@@ -59,41 +63,46 @@ function waiverReason(message) {
   return null;
 }
 
-const git = (args) =>
+const git = (root, args) =>
   execFileSync('git', args, {
-    cwd: ROOT,
+    cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'ignore'],
   });
 
-function baselineHead(sessionId) {
+function baselineHead(sessionId, root) {
   try {
-    return JSON.parse(fs.readFileSync(baselineFile(sessionId), 'utf8')).head;
+    return JSON.parse(fs.readFileSync(baselineFile(sessionId, root), 'utf8')).head;
   } catch {
     return 'HEAD';
   }
 }
 
 /** Paths that differ between `base` and the working tree (tracked changes, plus new untracked files). */
-function changedPaths(base) {
-  const tracked = git(['-c', 'core.quotePath=false', 'diff', '--name-only', '-z', base]).split(
-    '\0',
-  );
-  const untracked = git(['ls-files', '-z', '--others', '--exclude-standard']).split('\0');
+function changedPaths(root, base) {
+  const tracked = git(root, [
+    '-c',
+    'core.quotePath=false',
+    'diff',
+    '--name-only',
+    '-z',
+    base,
+  ]).split('\0');
+  const untracked = git(root, ['ls-files', '-z', '--others', '--exclude-standard']).split('\0');
   return [...new Set([...tracked, ...untracked].filter(Boolean))];
 }
 
-const baseText = (base, rel) => {
+const baseText = (root, base, rel) => {
   try {
-    return git(['show', `${base}:${rel}`]);
+    return git(root, ['show', `${base}:${rel}`]);
   } catch {
     return null;
   }
 };
-const diskText = (rel) => {
+const diskText = (root, rel) => {
   try {
-    return fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    return fs.readFileSync(path.join(root, rel), 'utf8');
   } catch {
     return null;
   }
@@ -124,27 +133,34 @@ const withoutNoise = (text) =>
     .replace(/(date:\s*')[^']*(')/g, '$1$2')
     .replace(/\s+/g, '');
 
-function assess(base) {
-  const paths = changedPaths(base);
+function assess(root, base) {
+  const paths = changedPaths(root, base);
   const screens = paths.filter((p) => !/\.md$/i.test(p) && SCREEN_PATHS.some((re) => re.test(p)));
   let arbChanged = [];
-  if (paths.includes(ARB)) arbChanged = changedKeys(baseText(base, ARB), diskText(ARB));
+  if (paths.includes(ARB)) arbChanged = changedKeys(baseText(root, base, ARB), diskText(root, ARB));
   const wording = arbChanged.filter((k) => !isMetadataKey(k) && !isChangelogKey(k));
   if (wording.length) {
     screens.push(`${ARB} (${wording.slice(0, 3).join(', ')}${wording.length > 3 ? ', ...' : ''})`);
   }
   const entryInDart =
     paths.includes(CHANGELOG) &&
-    withoutNoise(baseText(base, CHANGELOG)) !== withoutNoise(diskText(CHANGELOG));
+    withoutNoise(baseText(root, base, CHANGELOG)) !== withoutNoise(diskText(root, CHANGELOG));
   const entryInArb = arbChanged.some((k) => !isMetadataKey(k) && isChangelogKey(k));
   return { screens, hasEntry: entryInDart || entryInArb };
 }
 
 async function main() {
   const event = await readEvent();
-  let result;
+  // The main folder always, and the working copy the event's cwd is in as well (owner ruling I-4). Each folder is
+  // measured from its own baseline and judged on its own changelog entry; a copy's baseline is never the main folder's.
+  const screens = [];
   try {
-    result = assess(baselineHead(event.session_id));
+    for (const root of stopRoots(event)) {
+      const result = assess(root, baselineHead(event.session_id, root));
+      if (result.screens.length === 0 || result.hasEntry) continue;
+      const where = root === ROOT ? '' : ` (in the working copy ${root})`;
+      screens.push(...result.screens.map((s) => `${s}${where}`));
+    }
   } catch (err) {
     // Fail closed, like stop-verify: when git cannot say what changed, do not finish on trust.
     block(
@@ -152,8 +168,8 @@ async function main() {
     );
     return;
   }
-  if (result.screens.length === 0 || result.hasEntry) return;
-  const list = result.screens.slice(0, 6).join(', ') + (result.screens.length > 6 ? ', ...' : '');
+  if (screens.length === 0) return;
+  const list = screens.slice(0, 6).join(', ') + (screens.length > 6 ? ', ...' : '');
   const waiver = waiverReason(event.last_assistant_message);
   if (waiver) {
     notice(`changelog waived for the screen changes (${list}): ${waiver}`);

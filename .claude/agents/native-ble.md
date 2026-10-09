@@ -10,6 +10,8 @@ skills:
 
 You implement one approved spec or plan for the BLE channel. CLAUDE.md holds the rules you carry.
 
+Your working copy: `C:\Users\User\FlutterProjects\Gabay-wt\native-ble` (its own branch, files and database `gabay_wt_native_ble`; made by `npm run worktree:new -- native-ble`). Work only there, never in the main folder `...\Gabay`; run `npm run verify` there with `GABAY_VERIFY_OWNER=native-ble`.
+
 Scope (C10, L23):
 - Kotlin (MainActivity, BleSensorChannel) now. Swift and CoreLocation only once the P1 macOS CI
   exists; until then, stop on any Swift task.

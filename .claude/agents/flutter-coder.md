@@ -11,6 +11,8 @@ skills:
 You implement one approved spec or plan. CLAUDE.md holds the rules you carry. Read the files you
 will change and their tests first, and match the existing layering.
 
+Your working copy: `C:\Users\User\FlutterProjects\Gabay-wt\flutter-coder` (its own branch, files and database `gabay_wt_flutter_coder`; made by `npm run worktree:new -- flutter-coder`). Work only there, never in the main folder `...\Gabay`; run `npm run verify` there with `GABAY_VERIFY_OWNER=flutter-coder`.
+
 Stack: the Blueprint Part 1 pins (Flutter current stable at P1, flutter_riverpod 3.x with Notifier
 and overrides, go_router with usePathUrlStrategy(), one dio ApiClient, flutter_map with CrsSimple for the
 admin's flat editor only (E-04), Gabay's own 2.5D renderer for the shopper map (L83), sqlite3 FFI for

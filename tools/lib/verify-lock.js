@@ -1,6 +1,6 @@
 // The verify lock (plan/PH1-verify-lock.md): one `npm run verify` at a time on this machine. Every run uses the
-// same database (gabay_dev) and the same emulator ports, so two runs at once fail with no fault in the code
-// (recorded in phase-reports/phase-1/S7.md §6).
+// same emulator ports (and, before the working copies of plan/PH1-worktrees.md, the same database gabay_dev), so two
+// runs at once fail with no fault in the code (recorded in phase-reports/phase-1/S7.md §6).
 //
 // One lock file for the whole machine, in the system temp folder (os.tmpdir(): the TEMP or TMP folder on Windows,
 // TMPDIR or /tmp elsewhere, so two users with different temp folders do not share it). A run creates it with an

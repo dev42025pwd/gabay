@@ -123,9 +123,24 @@ npm run api:lint            # ESLint and Prettier on functions/ (A.1c)
 npm run setup-db            # schema -> migrations -> seed; RESETS gabay_dev (A.1c)
 npm run migrate             # apply db/migrations (A.1c)
 npm run seed                # the test seed (A.1b)
+npm run worktree:new -- <name>      # a coder's working copy and database (A.5)
+npm run worktree:remove -- <name>   # remove it and drop its database (A.5)
 ```
 
 The pre-push hook runs `npm run verify`, so a push takes two to five minutes (108 s to 261 s measured in S7 and S8).
+
+### A.5 Coder working copies
+
+Each coder agent (`api-coder`, `flutter-coder`, `engine-coder`, `native-ble`, `test-verifier`) works in its own copy of the repository, so branches, files and the database never collide with the main folder or another coder (plan/PH1-worktrees.md). Run these in the **main folder** (not inside a copy), with Node 22, PostgreSQL running and the main `.env` filled in:
+
+```sh
+npm run worktree:new -- api-coder              # branch wt/api-coder/<date> from the fetched origin/main
+npm run worktree:new -- api-coder my-branch    # or on a named branch (an existing one is checked out as it is)
+npm run worktree:remove -- api-coder           # refuses a copy with uncommitted changes
+npm run worktree:remove -- api-coder --force   # removes it anyway
+```
+
+`worktree:new` fetches `origin`, adds a git worktree in `..\Gabay-wt\<name>` (a sibling of the main folder), writes that copy's own `.env` (the main one with only `PGDATABASE` changed to `gabay_wt_<name>`, hyphens turned into underscores; no value is printed), creates the database if it is missing, copies `db/seeds/sources/internal/` from the main folder when it is there (it stays git-ignored and is never committed), runs `npm ci` in `functions/`, `db/tools/` and `db/seeds/` and `flutter pub get` in `app/`, then `npm run setup-db` (under the verify lock, because the seed uses the shared emulator ports). `worktree:remove` removes the worktree and drops the database; the branch and its commits stay. Each copy holds its own `node_modules` and build folders, so allow disk for each one. The default branch `wt/<name>/<date>` is reused when it already exists (a second copy of the same name on the same day picks up the kept branch). `test-verifier` works in the coder's copy of the work it tests by default, and has a copy of its own only when the task says so. The Claude Code Stop hooks always check the main folder and also the working copy the shell is in. The git hooks run in every copy (`core.hooksPath` is shared); `npm run verify` in a copy runs against that copy's database and waits for the lock like any other run.
 
 ## Gotchas
 
