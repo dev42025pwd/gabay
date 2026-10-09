@@ -113,11 +113,13 @@ The paused Phase 2 slices, now applied to every route and screen the features bu
 
 A table in this plan, one row per feature route and admin screen, with columns for the stub-to-real tenant context, guard order, permission row, menu row, audit, validation and e2e. Each feature slice adds its rows; each R slice ticks them. It is the evidence for R13.
 
-Columns: the tenant context (stub to real), the guard order (item 3), the permission row (item 4), the menu row (item 4), the audit row, validation, and the e2e (item 9). `n/a` says why in a word; `open` is an item an R slice still has to close, named in the last column.
+| Route or screen | Slice | Tenant context: stub → real (R1) | Guard order (R1–R3; R7's lint) | Permission row (R2) | Menu row (R2) | Audit (R3) | Validation (R5) | E2E (R12) |
+|---|---|---|---|---|---|---|---|---|
+| `GET /api/lookups/:name` | FF-0 | stub (`devStub`) | open | none | none | n/a (read-only) | open (query read leniently by `parsePaging`; no zod yet) | none (cases written in `E2E_Test_Cases_Manual.md` FF0.1–FF0.18, run by hand). The stub does not filter inactive tenants; R1 (S2) rules inactive-tenant behaviour (L155) |
+| `GET /api/lookups/:name/:id` | FF-0 | stub (`devStub`) | open | none | none | n/a (read-only) | open (the id is checked by pattern; no zod yet) | none (as above). The stub does not filter inactive tenants; R1 (S2) rules inactive-tenant behaviour (L155) |
+| Screen: the admin "Development build: no sign-in" banner (`DevStubBannerFrame`, every admin page) | FF-0 (client) | n/a (a screen; the client sends no `X-Tenant-Id` until R8's switcher) | n/a (no route) | n/a (no route) | n/a (no menu exists yet; R8 builds it from permissions) | n/a (no write) | n/a (no input) | none (manual cases `FF0-FE-01` to `FF0-FE-05` in `E2E_Frontend_Test_Cases_Manual.md`). R8 deletes the banner with its provider, config, ARB string and manual rows (sign-in replaces it) |
 
-| Route or screen | Added by | Tenant context | Guard order | Permission row | Menu row | Audit | Validation | e2e | Closed by |
-|---|---|---|---|---|---|---|---|---|---|
-| Screen: the admin "Development build: no sign-in" banner (`DevStubBannerFrame`, every admin page) | FF-0 (client) | n/a: a screen; the client sends no `X-Tenant-Id` until R8's switcher | n/a: no route | n/a: no route | n/a: no menu exists yet (R8 builds it from permissions) | n/a: no write | n/a: no input | open: automated e2e waived (item 9); manual cases `FF0-FE-01` to `FF0-FE-05` written now | R8 deletes the banner with its provider, its config and its ARB string, and its manual rows (sign-in replaces it); R12 for e2e |
+"open" and "none" are what the retrofit closes; R13 fails while any cell in a row is open or none, other than an "n/a" with its reason.
 
 ## 8. Risks
 

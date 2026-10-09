@@ -2,7 +2,7 @@
 //
 //   trust proxy -> x-powered-by off -> helmet -> cors allow-list -> JSON body limit
 //   -> requestId -> actorContext -> audit logger (slot) -> /api no-store
-//   -> rate limiter (slot) -> routes (public first, then each group behind auth: routes/api.js) -> 404 -> errors
+//   -> rate limiter (slot) -> routes (public first, then each group behind auth, or behind the E-20 development stub: routes/api.js) -> 404 -> errors
 //
 // Cloud Functions owns TLS, the server and listen(), so the standard's TLS options, static files,
 // SPA fallback and "connect, then listen" do not apply (plan §6). createApp() returns the app and
@@ -21,6 +21,8 @@ const { createErrorHandler, notFound } = require('./utils/errors');
 const { createRequestId } = require('./middleware/requestId');
 const { actorContext } = require('./middleware/actorContext');
 const { createAuth } = require('./middleware/auth');
+const { createDevStub } = require('./middleware/devStub');
+const { createLookupService } = require('./services/lookup.service');
 const { createFirebaseVerifier } = require('./auth/firebaseVerifier');
 const { createIdentityStore } = require('./auth/identityStore');
 const { createAccessStore } = require('./auth/accessStore');
@@ -94,13 +96,13 @@ function createApp({
   app.use('/api', apiNoStore);
   app.use('/api', rateLimiterSlot);
 
-  const auth = createAuth({
-    verifier: tokenVerifier,
-    identities: createIdentityStore(db),
-    settings,
-    now,
-  });
-  app.use('/api', apiRoutes({ db, logger, auth, accessStore: createAccessStore(db) }));
+  const identities = createIdentityStore(db);
+  const accessStore = createAccessStore(db);
+  const auth = createAuth({ verifier: tokenVerifier, identities, settings, now });
+  // E-20: refused (this throws) unless the raw NODE_ENV is development or test; R1 deletes it (routes/api.js).
+  const devStub = createDevStub({ config, logger, identities, accessStore });
+  const lookups = createLookupService(db);
+  app.use('/api', apiRoutes({ db, logger, auth, devStub, accessStore, lookups }));
 
   app.use(notFound);
   app.use(createErrorHandler(logger));

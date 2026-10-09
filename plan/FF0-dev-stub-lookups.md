@@ -1,6 +1,6 @@
 # FF0-dev-stub-lookups — FF-0: the development stub and the read-only lookups (E-20)
 
-> **Version**: 1.0 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-09 (L154), with §8's three questions ruled, all as recommended | **Parent**: `plan/PH4-feature-first.md` 1.0 §3 (L153, EXCEPTIONS E-20) | **Spec**: none. FF-0 is setup work that the parent plan defines, as Phase 2's slices are; the P0 entries from FF-1 on each get their own intent, spec and plan | **Approver**: Genesis Perez, product owner
+> **Version**: 1.1 | **Date**: 2026-10-09 | **Status**: APPROVED by Genesis Perez, 2026-10-09 (L154), with §8's three questions ruled, all as recommended; 1.1 adds the server review's rulings (L155, §9) | **Parent**: `plan/PH4-feature-first.md` 1.0 §3 (L153, EXCEPTIONS E-20) | **Spec**: none. FF-0 is setup work that the parent plan defines, as Phase 2's slices are; the P0 entries from FF-1 on each get their own intent, spec and plan | **Approver**: Genesis Perez, product owner
 
 ## 1. What FF-0 delivers
 
@@ -84,7 +84,7 @@ Two things the feature slices need before P0-01 (FF-1) can start, plus one visib
 - the banner has its name and passes the ×1.4 check at 320 px;
 - the screenshot test.
 
-**Existing tests:** none change. `routes/api.js` gains a group; S1's `me` tests stay as they are.
+**Existing tests:** none change, except two named by L155: `tools/test/workflow-steps.js` and `tools/test/workflow-snapshots/e2e.yml.snap`, which pin CI's e2e `.env` step and gain its `NODE_ENV=development` line. `routes/api.js` gains a group; S1's `me` tests stay as they are.
 
 ## 6. Definition of done for FF-0
 
@@ -112,3 +112,9 @@ Every item applies, except:
 1. **The stub acts as `malladmin@gabay.test`**, the mall admin who holds both tenants (L119), named by `DEV_STUB_USER_EMAIL` in `.env`. Not taken: the SUPERADMIN, which has no tenant row and skips permission checks.
 2. **No tenant switcher in FF-0.** Without a header the stub uses the user's first tenant by `Tenant.Code` (`DEMO_MALLS`, before `SPIKE_VENUES`) until R8's real switcher; a request may still send `X-Tenant-Id`. Not taken: a development switcher, removed in R8.
 3. **Three lookups now**: `building-types`, `amenity-types`, `transit-types`. Each later slice adds its own name. Not taken: all eight now.
+
+## 9. Rulings from the server review (L155, 2026-10-09, the product owner, each as recommended)
+
+1. **CI's e2e `.env` gains `NODE_ENV=development`**, matching `.env.example`, because the stub refuses to start without it; the two tests that pin that step change with it. Not taken: `tools/verify.js` setting it for the emulator; relaxing the stub's guard (which would weaken L151).
+2. **Inactive tenants:** the stub does not filter them; R1 (S2's tenant context) rules inactive-tenant behaviour, noted in Blueprint 4.15 and the retrofit ledger. Not taken: skip them now and refuse them in the header.
+3. **Definition-of-done item 15** is N/A for FF-0 (no record type references a lookup yet); FF-1's plan carries the full end-to-end test (deactivate a referenced type, open the record, save, the value survives). Not taken: hold FF-0 open until FF-1.
