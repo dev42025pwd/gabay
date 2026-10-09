@@ -1,6 +1,6 @@
 # Gabay — INSTALL.md
 
-> **Version**: 0.1 stub | **Date**: 2026-10-07 | **Status**: Phase 0 stub (standard §2; plan.html L115) | **Audience**: developers bringing up a machine | **Scope**: development environment; deployment is in `docs/ops/DEPLOYMENT_RUNBOOK.md`
+> **Version**: 0.2 | **Date**: 2026-10-09 | **Status**: Phase 1 (rails built, S0–S7; synced at the S8 gate). First written as the Phase 0 stub (standard §2; plan.html L115) | **Audience**: developers bringing up a machine | **Scope**: development environment; deployment is in `docs/ops/DEPLOYMENT_RUNBOOK.md`
 
 ## Which path?
 
@@ -13,9 +13,11 @@
 
 ## A. Local development
 
-### A.1 Done today (Phase 0)
+Order: A.2 (tools and the repository), then A.1 (the database), A.1b (the seed), A.1c (the API), A.3 (the app), A.4 (the full check).
 
-1. **PostgreSQL 18** (Blueprint Part 1 pin; Cloud SQL's default major, L115). On Windows:
+### A.1 The database
+
+1. **PostgreSQL 18.6** (Blueprint Part 1 pin; Cloud SQL's default major, L115). On Windows:
    ```powershell
    winget install --id PostgreSQL.PostgreSQL.18 --exact --source winget
    ```
@@ -32,7 +34,7 @@
 
 ```sh
 cd db/seeds
-npm install          # pg 8.23.1 and firebase-tools 15.32.1 (pinned)
+npm ci               # pg 8.23.1 and firebase-tools 15.32.1 (exact versions, committed lockfile)
 npm run seed         # starts the Auth emulator (Node, no Java needed); fill PG* and SEED_PW_* in .env first
 ```
 
@@ -62,15 +64,19 @@ db/seeds/node_modules/.bin/firebase emulators:start --only functions --project d
 curl http://127.0.0.1:5001/demo-gabay/asia-southeast1/api/api/health     # {"status":"ok","db":"ok"}
 ```
 
-### A.2 Added in Phase 1 (not yet written)
+### A.2 Tools and the repository (do these first)
 
-- Flutter 3.47.x and Dart 3.13.x; Android SDK (API 24–37); Xcode on the team's Mac for iOS (P1-05).
-- Node.js 22 LTS and `firebase-tools` 15.x. On Windows, install fnm (`winget install Schniz.fnm`), run `fnm install 22`, and add `fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression` to your PowerShell profile: the repository's `.nvmrc` then selects Node 22 inside it and leaves your default Node elsewhere (L124).
-- The Firebase Emulator Suite (Auth, Functions, Storage, Hosting). RECALLED: how far the emulators cover SQL Connect and scheduled functions; checked at Phase 1 (Blueprint §2.6).
-- `git config core.hooksPath .githooks` (README).
-- Copy `.env.example` to `.env` and fill it in.
-- The test seed (P0-02, L119): tenants "Demo Malls" (Aurora, Bayview Grand, Meridian Twin Malls, Skyline Spire; no beacons) and "Spike Venues" (the penthouse, MEZZ office and your exported spike venues), plus six accounts (`superadmin@`, `malladmin@`, `editor@`, `viewer@`, `malladmin.demo@`, `shopper@`, all `@gabay.test`). Fill the `SEED_PW_*` keys in `.env` first.
-- The verification command.
+1. **Node.js 22** (Blueprint Part 1; the Cloud Functions runtime). On Windows, install fnm (`winget install Schniz.fnm`), run `fnm install 22`, and add `fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression` to your PowerShell profile. The repository's `.nvmrc` then selects Node 22 inside it and leaves your default Node elsewhere (L124). In Git Bash, call fnm by its full path and use `npm.cmd`:
+   ```sh
+   "$LOCALAPPDATA/Microsoft/WinGet/Links/fnm.exe" exec --using=22 -- npm.cmd run verify
+   ```
+2. **Flutter 3.47.5** (Dart 3.13; the patch CI installs) with the Android SDK (API 24–37). Xcode on the team's Mac for iOS (P1-05).
+3. **Enable the git hooks**, once per clone (pre-commit: the secret guard, the changelog-duplicate guard and the structural linters on the staged files, then the app's version bump and changelog stamp when a commit touches the shopper app or the admin page, L129; pre-push: the full `npm run verify`):
+   ```sh
+   git config core.hooksPath .githooks
+   ```
+4. **The environment file:** copy `.env.example` to `.env` and fill it in: the `PG*` keys for your local PostgreSQL and every `SEED_PW_*` for the six test accounts. `.env` is never committed (the pre-commit hook refuses it).
+5. **The Firebase Emulator Suite** comes with `firebase-tools` 15.32.1 in `db/seeds` (A.1b); there is no global install. Projects are local only (`demo-gabay`). RECALLED: how far the emulators cover SQL Connect and scheduled functions; checked when a feature first needs them (Blueprint §2.6).
 
 ### A.3 The Flutter app (`app/`, slice S3)
 
@@ -99,6 +105,27 @@ flutter build apk --debug -t lib/main_mobile.dart
 ```
 
 Build stamps come from `--dart-define` (`APP_VERSION`, `BUILD_NUMBER`, `GIT_COMMIT`, `BUILD_TIME`); a plain `flutter run` shows the committed fallbacks. Android: `minSdk 24`, applicationId `com.dynamiqes.gabay`. iOS: deployment target 15.0 (Xcode project and `ios/Podfile`); iOS builds need the team's Mac.
+
+### A.4 The full check
+
+Run from the repository root before reporting any work done (CLAUDE.md, WORKING_AGREEMENT). It runs every check in order and ends `ALL GREEN`; the exit code is the number of failures. A failing check's whole output is kept in `.verify/logs/<check>.log`. Only one run at a time on a machine: a second run waits (up to 15 minutes, `GABAY_VERIFY_LOCK_WAIT_MS`) and names who holds it.
+
+```sh
+npm run verify              # everything: linters and their tests, ESLint, Prettier, the API and tool tests,
+                            # db/schema.sql twice, the seed, the Functions emulator health, flutter analyze, flutter test
+npm run lint:structural     # the ten structural linters (rules 2, 3, 4, 6, 7 and more)
+npm run lint:test           # the linters' own tests
+npm run tools:test          # tests for verify, the hooks and the CI guards
+npm run test:schema-forms   # the schema-to-form drift linter alone
+npm run ci:guards           # CI's secret and changelog-duplicate guards
+npm run api:test            # the API tests (A.1c)
+npm run api:lint            # ESLint and Prettier on functions/ (A.1c)
+npm run setup-db            # schema -> migrations -> seed; RESETS gabay_dev (A.1c)
+npm run migrate             # apply db/migrations (A.1c)
+npm run seed                # the test seed (A.1b)
+```
+
+The pre-push hook runs `npm run verify`, so a push takes two to five minutes (108 s to 261 s measured in S7 and S8).
 
 ## Gotchas
 

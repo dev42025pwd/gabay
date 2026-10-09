@@ -1,6 +1,6 @@
 # Gabay — EXCEPTIONS.md
 
-> **Status**: IN FORCE. E-02 to E-10 and E-12 to E-17 are approved, each with expiry 2027-04-02, by the product owner under delegation from Raphael Mendoza, held since the project started (plan L115, 2026-10-07). E-01 and E-11 are withdrawn. The P0 gate's §1 item is met | **Date**: 2026-10-07 | **Owner**: Gabay developer | **Approver**: Allan Young (Raphael Mendoza if Allan works on Gabay); exercised under Raphael Mendoza's delegation by the product owner (L115)
+> **Status**: IN FORCE. E-02 to E-10 and E-12 to E-17 are approved, each with expiry 2027-04-02, by the product owner under delegation from Raphael Mendoza, held since the project started (plan L115, 2026-10-07). E-01 and E-11 are withdrawn. E-18 is a request awaiting approval (2026-10-09). The P0 gate's §1 item is met | **Date**: 2026-10-09 | **Owner**: Gabay developer | **Approver**: Allan Young (Raphael Mendoza if Allan works on Gabay); exercised under Raphael Mendoza's delegation by the product owner (L115)
 > **Audience**: the tech lead and auditors | **Scope**: deviations from the Dynamiq Engineering Standards v1.0
 > *Standard §1 and Appendix C.1: every §1 deviation is either reversed or has written lead sign-off with an expiry date here before the P0 gate passes. An entry without an expiry date "becomes the standard by silence".*
 
@@ -25,11 +25,13 @@ An entry is in force only once **Approved by** and **Approved on** are filled in
 | E-15 | §1 stack table (a library §1 does not name) | `cupertino_icons` 2.x, in the Flutter app | L126: added by `flutter create` (S3). Removing it makes the build warn that the Cupertino icon font is missing; it is Flutter's own icon font package and carries no code | 2027-04-02 | Product owner (L126), under delegation from Raphael Mendoza | 2026-10-07 |
 | E-16 | §1 stack table (a library §1 does not name) | `flutter_lints` 6.x (dev only), in the Flutter app | L126: the Flutter team's lint set, which the strict `analysis_options.yaml` (§7.2: "a customized `analysis_options.yaml`") includes and then tightens. Ships in no build | 2027-04-02 | Product owner (L126), under delegation from Raphael Mendoza | 2026-10-07 |
 | E-17 | §1 stack table (a library §1 does not name) | `intl` 0.20.x (`^0.20.3`), in the Flutter app | L127: required by the Flutter SDK's `flutter_localizations`, which generates the ARB wording (L126, L99); the SDK constrains its version. Message formatting only | 2027-04-02 | Product owner (L127), under delegation from Raphael Mendoza | 2026-10-07 |
+| E-18 | §1 stack table (a library §1 does not name) | `globals` 17.x (dev only), in `functions/` | ESLint's list of the environment's global names (Node), which the flat config (`functions/eslint.config.js`) reads so `no-undef` knows `process` and `require`. ESLint's own companion package; ships in no build. Pinned in Blueprint Part 1 since S2 (L123). Found missing here by the S8 document sync (2026-10-09) | 2027-04-02 | | |
 
 ## Checked and not exceptions
 
 - `zod`: named by the standard's §3.7 ("Adopt a schema validator (`zod` or `joi`)").
 - `pino`: named by the standard's structured-logger item ("Structured logger (pino)").
+- `eslint`, `@eslint/js` and `prettier` (dev only, `functions/`): named by the standard's §7.2 and §12 ("Adopt ESLint + Prettier (backend)"). `@eslint/js` is ESLint's own recommended rule set, published from the ESLint repository (`github.com/eslint/eslint`, `packages/js`; read from its installed `package.json`, 2026-10-09, S8).
 - `shared_preferences`: named by the standard's §4 ("Session blob in `shared_preferences`"). It holds the shopper's settings, favourites and recents on the phone (L88, L99).
 - The text-to-speech and vibration layer: Gabay's own platform channel (`gabay/voice`, `gabay/haptics`), like the BLE layer (L23). No package, so no entry; `flutter_tts` was not taken (L99).
 - The spike's own packages (gabay_spike): throwaway (L34), outside the product.
@@ -43,6 +45,7 @@ An entry is in force only once **Approved by** and **Approved on** are filled in
 
 | Date | Change |
 |---|---|
+| 2026-10-09 | E-18 requested (`globals`, dev only), found by the S8 document sync; awaits the product owner's approval. ESLint, `@eslint/js` and Prettier recorded as checked (named by the standard) |
 | 2026-10-07 | E-17 added and approved by the product owner under delegation from Raphael Mendoza (plan 0.62, L127): `intl`, required by the SDK's `flutter_localizations` for ARB wording (L126) |
 | 2026-10-07 | E-15 and E-16 added and approved by the product owner under delegation from Raphael Mendoza (plan 0.61, L126): `cupertino_icons` and `flutter_lints`, both added by `flutter create` in S3 |
 | 2026-10-07 | All entries signed (plan 0.52, L115): E-02 to E-04 approved and E-05 to E-10, E-12 to E-14 signed by the product owner under delegation from Raphael Mendoza, with expiry 2027-04-02; E-03's stale MSSQL wording corrected |
