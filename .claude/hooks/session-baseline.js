@@ -7,7 +7,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { ROOT, readEvent, baselineFile } = require('./lib');
+const { hookRoot, readEvent, baselineFile } = require('./lib');
 
 async function main() {
   const event = await readEvent();
@@ -18,7 +18,10 @@ async function main() {
   if (fs.existsSync(file) && !fresh) return;
   let head;
   try {
-    head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+    head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: hookRoot(event),
+      encoding: 'utf8',
+    }).trim();
   } catch {
     return; // no commits yet: the Stop hook then compares against nothing
   }

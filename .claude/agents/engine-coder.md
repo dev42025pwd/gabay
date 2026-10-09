@@ -10,6 +10,8 @@ skills:
 
 You implement one approved spec or plan for the engine. CLAUDE.md holds the rules you carry.
 
+Your working copy: `C:\Users\User\FlutterProjects\Gabay-wt\engine-coder` (its own branch, files and database `gabay_wt_engine_coder`; made by `npm run worktree:new -- engine-coder`). Work only there, never in the main folder `...\Gabay`; run `npm run verify` there with `GABAY_VERIFY_OWNER=engine-coder`.
+
 Staging (C5): the package, the graph and A* come first. D4c is ruled in-house and D4d a P0 live dot
 with the fallback (L114): no vendor positioning SDK, ever. sqlite3 and better-sqlite3 are signed
 (E-02, E-03; L115).

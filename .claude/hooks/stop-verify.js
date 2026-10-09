@@ -18,7 +18,8 @@
 'use strict';
 
 const fs = require('node:fs');
-const { ROOT, readEvent, block, notice } = require('./lib');
+const { ROOT, hookRoot, readEvent, block, notice } = require('./lib');
+// The scripts and this module load from the main folder; what is fingerprinted is the repository the event's cwd is in.
 const { fingerprint, readStateDetailed } = require(`${ROOT}/tools/fingerprint.js`);
 
 /**
@@ -26,17 +27,17 @@ const { fingerprint, readStateDetailed } = require(`${ROOT}/tools/fingerprint.js
  * (tools/lib/verify-logs.js), so the notice can point to it. A failure with no output (code that changed
  * during the run) leaves none, and then there is nothing to point to.
  */
-function hasLogs() {
+function hasLogs(root) {
   try {
-    return fs.readdirSync(`${ROOT}/.verify/logs`).some((name) => name.endsWith('.log'));
+    return fs.readdirSync(`${root}/.verify/logs`).some((name) => name.endsWith('.log'));
   } catch {
     return false;
   }
 }
 
 async function main() {
-  await readEvent(); // the event is not needed, but stdin must be drained
-  const { state, corrupt, unreadable, error } = readStateDetailed(ROOT);
+  const root = hookRoot(await readEvent()); // the event's cwd: the working copy Claude is in (plan/PH1-worktrees.md 1.1)
+  const { state, corrupt, unreadable, error } = readStateDetailed(root);
   if (unreadable) {
     // Fail closed: a record that is there but cannot be read (EACCES, EBUSY) is not the same as one never made.
     block(
@@ -52,7 +53,7 @@ async function main() {
   }
   let now;
   try {
-    now = fingerprint(ROOT);
+    now = fingerprint(root);
   } catch (err) {
     // Fail closed: when we cannot tell whether the code changed, the session may not finish on trust.
     block(
@@ -76,7 +77,7 @@ async function main() {
         ? ''
         : `${ran}${state.totalChecks ? ` of ${state.totalChecks}` : ''} checks ran; `;
     const failed = state.failed.join(', ') || '(no check names recorded)';
-    const logs = hasLogs() ? '; the full output of each failing check is in .verify/logs/' : '';
+    const logs = hasLogs(root) ? '; the full output of each failing check is in .verify/logs/' : '';
     notice(`verify FAILED on the current code: ${progress}failed: ${failed}${logs}`);
   }
 }
